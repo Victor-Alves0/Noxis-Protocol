@@ -56,6 +56,14 @@ pós-quântica só poderão ser considerados ativos depois de escolha formal,
 implementação, testes adversariais e auditoria independente. Ver
 [`CRYPTO_SERVICE_GATE_V0_1.md`](CRYPTO_SERVICE_GATE_V0_1.md).
 
+**Próxima especificação implementável:** `PrivateTransferV2` foi delimitada
+como candidata STARK/AIR transparente, com duas entradas e duas saídas,
+árvore Poseidon2 v2 e nova gênese. O perfil de transporte/identidade híbrido
+fica separado para não atribuir segurança da rede à prova privada. Ambos são
+rascunhos e não habilitam criptografia: ver
+[`PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md`](PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md)
+e [`HYBRID_CRYPTO_PROFILE_DRAFT_V0_1.md`](HYBRID_CRYPTO_PROFILE_DRAFT_V0_1.md).
+
 ### 6. Adaptadores de ativos e políticas de emissão
 
 Conecta ativos apenas onde o backing, a custódia, resgate, falhas e responsabilidades forem explicitamente especificados. Fiat externo nunca é aceito como prova automática de backing.
