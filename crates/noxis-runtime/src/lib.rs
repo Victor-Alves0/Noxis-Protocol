@@ -24,6 +24,8 @@ pub const MANIFEST_FILE_NAME: &str = "manifest.noxis";
 pub const GENESIS_COPY_FILE_NAME: &str = "genesis.noxis";
 /// File name of the durable, genesis-bound state-record history.
 pub const LEDGER_FILE_NAME: &str = "ledger.nxrf";
+/// File name of the durable CometBFT/Noxis block journal.
+pub const BLOCK_JOURNAL_FILE_NAME: &str = "blocks.nxcb";
 /// Directory for immutable, non-authoritative checkpoint artifacts.
 pub const CHECKPOINT_DIRECTORY_NAME: &str = "checkpoints";
 /// File name used to exclude concurrent node-runtime instances.
@@ -32,20 +34,47 @@ pub const LOCK_FILE_NAME: &str = ".noxis.lock";
 /// Fixed bytes identifying a Noxis node manifest.
 pub const MANIFEST_MAGIC: [u8; 4] = *b"NXMF";
 /// The only manifest layout accepted by this release.
-pub const MANIFEST_FORMAT_VERSION: u16 = 6;
+pub const MANIFEST_FORMAT_VERSION: u16 = 7;
 /// Bound on manifest asset entries, preventing unbounded allocation on open.
 pub const MAX_MANIFEST_ASSETS: u32 = 4_096;
 /// Bound for canonical consensus configuration included in the local manifest.
 pub const MAX_MANIFEST_CONSENSUS_CONFIG_BYTES: usize = MAX_GENESIS_CONSENSUS_CONFIG_BYTES;
 /// Largest possible v6 manifest, including its bounded consensus configuration
 /// and optional canonical CometBFT identity.
-pub const MAX_MANIFEST_BYTES: usize = 120
+pub const MAX_MANIFEST_BYTES: usize = 121
     + MAX_COMET_BFT_NETWORK_IDENTITY_ENCODED_LENGTH
     + MAX_MANIFEST_CONSENSUS_CONFIG_BYTES
     + MAX_MANIFEST_ASSETS as usize * 50;
 
 const ASSET_KIND_NATIVE_BACKED: u8 = 1;
 const ASSET_KIND_SYNTHETIC: u8 = 2;
+
+/// Immutable durable-history layout selected when a data directory is created.
+///
+/// A directory may contain either local transition records or consensus blocks,
+/// never both as competing authorities for one genesis.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StorageMode {
+    LocalRecordLogV1,
+    CometBlockJournalV1,
+}
+
+impl StorageMode {
+    const fn protocol_tag(self) -> u8 {
+        match self {
+            Self::LocalRecordLogV1 => 1,
+            Self::CometBlockJournalV1 => 2,
+        }
+    }
+
+    fn from_protocol_tag(tag: u8) -> Result<Self, ManifestError> {
+        match tag {
+            1 => Ok(Self::LocalRecordLogV1),
+            2 => Ok(Self::CometBlockJournalV1),
+            _ => Err(ManifestError::UnknownStorageMode(tag)),
+        }
+    }
+}
 
 /// A path designated for Noxis node-local state.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -83,6 +112,11 @@ impl DataDirectory {
         self.root.join(LEDGER_FILE_NAME)
     }
 
+    /// Returns the durable consensus-block journal path controlled by this directory.
+    pub fn block_journal_path(&self) -> PathBuf {
+        self.root.join(BLOCK_JOURNAL_FILE_NAME)
+    }
+
     /// Returns the protected directory for checkpoint artifacts.
     pub fn checkpoints_path(&self) -> PathBuf {
         self.root.join(CHECKPOINT_DIRECTORY_NAME)
@@ -99,11 +133,20 @@ impl DataDirectory {
 pub struct NodeManifest {
     genesis: GenesisConfig,
     genesis_id: GenesisId,
+    storage_mode: StorageMode,
 }
 
 impl NodeManifest {
     /// Creates a manifest from already validated genesis configuration.
     pub fn from_genesis(genesis: GenesisConfig) -> Result<Self, ManifestError> {
+        Self::from_genesis_with_storage_mode(genesis, StorageMode::LocalRecordLogV1)
+    }
+
+    /// Creates a manifest for one explicit durable-history layout.
+    pub fn from_genesis_with_storage_mode(
+        genesis: GenesisConfig,
+        storage_mode: StorageMode,
+    ) -> Result<Self, ManifestError> {
         let asset_count = genesis.assets().len();
         if asset_count > MAX_MANIFEST_ASSETS as usize {
             return Err(ManifestError::TooManyAssets {
@@ -122,6 +165,7 @@ impl NodeManifest {
         Ok(Self {
             genesis,
             genesis_id,
+            storage_mode,
         })
     }
 
@@ -138,6 +182,11 @@ impl NodeManifest {
     /// Returns the canonical identity of the persisted genesis configuration.
     pub const fn genesis_id(&self) -> GenesisId {
         self.genesis_id
+    }
+
+    /// Returns the immutable history layout selected for this data directory.
+    pub const fn storage_mode(&self) -> StorageMode {
+        self.storage_mode
     }
 
     /// Returns the deterministic binary representation of this manifest.
@@ -159,6 +208,7 @@ impl NodeManifest {
         bytes.extend_from_slice(&MANIFEST_MAGIC);
         bytes.extend_from_slice(&MANIFEST_FORMAT_VERSION.to_be_bytes());
         bytes.extend_from_slice(&self.genesis_id.0);
+        bytes.push(self.storage_mode.protocol_tag());
         bytes.extend_from_slice(&self.genesis.validation_context().encode());
         bytes.extend_from_slice(&(consensus_bytes.len() as u32).to_be_bytes());
         bytes.extend_from_slice(&consensus_bytes);
@@ -192,6 +242,7 @@ impl NodeManifest {
             return Err(ManifestError::UnsupportedFormatVersion(version));
         }
         let encoded_genesis_id = GenesisId::new(reader.read_array()?);
+        let storage_mode = StorageMode::from_protocol_tag(reader.read_u8()?)?;
         let validation_context =
             ValidationContext::decode(reader.read_exact(ValidationContext::ENCODED_LENGTH)?)
                 .map_err(ManifestError::InvalidValidationContext)?;
@@ -264,6 +315,7 @@ impl NodeManifest {
         let manifest = Self {
             genesis,
             genesis_id: encoded_genesis_id,
+            storage_mode,
         };
         if manifest.encode() != bytes {
             return Err(ManifestError::NonCanonicalEncoding);
@@ -289,10 +341,23 @@ impl NodeRuntime {
         data_directory: DataDirectory,
         genesis: GenesisConfig,
     ) -> Result<Self, RuntimeError> {
+        Self::open_or_initialize_with_storage_mode(
+            data_directory,
+            genesis,
+            StorageMode::LocalRecordLogV1,
+        )
+    }
+
+    /// Opens or initializes one directory for a specific immutable history layout.
+    pub fn open_or_initialize_with_storage_mode(
+        data_directory: DataDirectory,
+        genesis: GenesisConfig,
+        storage_mode: StorageMode,
+    ) -> Result<Self, RuntimeError> {
         ensure_directory(&data_directory)?;
         let lock = DirectoryLock::acquire(data_directory.lock_path())?;
-        let expected =
-            NodeManifest::from_genesis(genesis).map_err(RuntimeError::InvalidGenesisForManifest)?;
+        let expected = NodeManifest::from_genesis_with_storage_mode(genesis, storage_mode)
+            .map_err(RuntimeError::InvalidGenesisForManifest)?;
         let manifest_path = data_directory.manifest_path();
         let genesis_copy_path = data_directory.genesis_copy_path();
         let manifest_exists = path_exists(&manifest_path)?;
@@ -311,8 +376,14 @@ impl NodeRuntime {
                 if stored_manifest != genesis_copy {
                     return Err(RuntimeError::ManifestGenesisCopyMismatch);
                 }
-                if stored_manifest != expected {
+                if stored_manifest.genesis() != expected.genesis() {
                     return Err(RuntimeError::GenesisMismatch);
+                }
+                if stored_manifest.storage_mode() != expected.storage_mode() {
+                    return Err(RuntimeError::StorageModeMismatch {
+                        expected: expected.storage_mode(),
+                        actual: stored_manifest.storage_mode(),
+                    });
                 }
                 stored_manifest
             }
@@ -346,6 +417,16 @@ impl NodeRuntime {
     /// Returns the protected durable record-log path for this runtime.
     pub fn ledger_path(&self) -> PathBuf {
         self.data_directory.ledger_path()
+    }
+
+    /// Returns the protected durable consensus-block path for a Comet service.
+    pub fn block_journal_path(&self) -> PathBuf {
+        self.data_directory.block_journal_path()
+    }
+
+    /// Returns the immutable storage mode of this held directory.
+    pub const fn storage_mode(&self) -> StorageMode {
+        self.manifest.storage_mode()
     }
 
     /// Returns the checkpoint directory held inside this locked runtime.
@@ -550,6 +631,7 @@ pub enum ManifestError {
         actual: usize,
         maximum: usize,
     },
+    UnknownStorageMode(u8),
     UnknownCometBftIdentityTag(u8),
     CometBftIdentityTooLarge {
         actual: usize,
@@ -601,6 +683,9 @@ impl fmt::Display for ManifestError {
                 formatter,
                 "manifest consensus configuration has {actual} bytes, above maximum {maximum}"
             ),
+            Self::UnknownStorageMode(tag) => {
+                write!(formatter, "unknown manifest storage mode tag {tag}")
+            }
             Self::UnknownCometBftIdentityTag(tag) => {
                 write!(formatter, "unknown CometBFT identity presence tag {tag}")
             }
@@ -671,6 +756,10 @@ pub enum RuntimeError {
     DirectoryAlreadyLocked(PathBuf),
     IncompleteDataDirectory,
     GenesisMismatch,
+    StorageModeMismatch {
+        expected: StorageMode,
+        actual: StorageMode,
+    },
     ManifestGenesisCopyMismatch,
     InvalidGenesisForManifest(ManifestError),
     ManifestFileTooLarge {
@@ -717,6 +806,10 @@ impl fmt::Display for RuntimeError {
             ),
             Self::GenesisMismatch => formatter.write_str(
                 "existing node manifest does not match requested genesis; refusing to overwrite it",
+            ),
+            Self::StorageModeMismatch { expected, actual } => write!(
+                formatter,
+                "data directory storage mode is {actual:?}; requested {expected:?}"
             ),
             Self::ManifestGenesisCopyMismatch => formatter.write_str(
                 "node manifest and immutable genesis copy do not match",
@@ -893,6 +986,7 @@ mod tests {
         let kind_offset = 4
             + 2
             + 32
+            + 1
             + ValidationContext::ENCODED_LENGTH
             + 4
             + encode_consensus_config(manifest.genesis().consensus_config()).len()
@@ -936,6 +1030,7 @@ mod tests {
         let header = 4
             + 2
             + 32
+            + 1
             + ValidationContext::ENCODED_LENGTH
             + 4
             + encode_consensus_config(manifest.genesis().consensus_config()).len()
@@ -971,6 +1066,32 @@ mod tests {
         assert!(!data_directory.lock_path().exists());
         let reopened = NodeRuntime::open_or_initialize(data_directory, configured_genesis).unwrap();
         drop(reopened);
+        clean_up(&directory_path);
+    }
+
+    #[test]
+    fn data_directory_cannot_change_its_durable_history_mode() {
+        let directory_path = temporary_directory("storage-mode");
+        let data_directory = DataDirectory::new(&directory_path).unwrap();
+        let configured_genesis = genesis(4, 3);
+        {
+            let runtime =
+                NodeRuntime::open_or_initialize(data_directory.clone(), configured_genesis.clone())
+                    .unwrap();
+            assert_eq!(runtime.storage_mode(), StorageMode::LocalRecordLogV1);
+        }
+
+        assert!(matches!(
+            NodeRuntime::open_or_initialize_with_storage_mode(
+                data_directory,
+                configured_genesis,
+                StorageMode::CometBlockJournalV1,
+            ),
+            Err(RuntimeError::StorageModeMismatch {
+                expected: StorageMode::CometBlockJournalV1,
+                actual: StorageMode::LocalRecordLogV1,
+            })
+        ));
         clean_up(&directory_path);
     }
 

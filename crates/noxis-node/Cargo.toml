@@ -8,8 +8,10 @@ rust-version.workspace = true
 [dependencies]
 noxis-consensus = { path = "../noxis-consensus" }
 noxis-codec = { path = "../noxis-codec" }
+noxis-comet-abci = { path = "../noxis-comet-abci" }
 noxis-config = { path = "../noxis-config" }
 noxis-crypto = { path = "../noxis-crypto" }
+noxis-execution = { path = "../noxis-execution" }
 noxis-ledger = { path = "../noxis-ledger" }
 noxis-merkle = { path = "../noxis-merkle" }
 noxis-record-chain = { path = "../noxis-record-chain" }
