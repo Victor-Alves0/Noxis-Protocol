@@ -28,7 +28,7 @@ o contexto fornecido, os IDs dos componentes em execução e o `ChainAnchor`
 antes de abrir, varrer ou truncar o log. Uma divergência deixa o nó fechado e
 não cria nem altera o histórico.
 
-O manifesto `NXMF` v6 contém o contexto completo, a configuração de consenso
+O manifesto `NXMF` v7 contém o contexto completo, a configuração de consenso
 e a identidade CometBFT opcional; ele recalcula tanto o
 `ValidationContextId` quanto o `GenesisId`; versões anteriores são rejeitadas.
 

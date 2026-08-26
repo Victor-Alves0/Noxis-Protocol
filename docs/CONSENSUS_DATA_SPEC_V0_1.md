@@ -107,7 +107,7 @@ gravada no manifesto de um nó.
 ## Vínculo com gênese e runtime local
 
 `GenesisConfig` exige uma `ConsensusConfig`; seu `GenesisId` compromete os
-bytes canônicos dessa configuração. O manifesto de diretório `NXMF` v6 armazena
+bytes canônicos dessa configuração. O manifesto de diretório `NXMF` v7 armazena
 os mesmos bytes, a identidade CometBFT opcional e os redecodifica antes de
 comparar o `GenesisId`. Portanto, um diretório inicializado para um conjunto de
 validadores não pode ser reaberto silenciosamente usando outro conjunto, outra

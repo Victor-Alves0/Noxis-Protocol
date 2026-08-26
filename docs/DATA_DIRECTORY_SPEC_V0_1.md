@@ -6,12 +6,13 @@ This document specifies the filesystem boundary for a Noxis local node. It
 covers deployment identity, genesis material, initialization, exclusive writer
 ownership, opening, shutdown, permissions, and failure handling.
 
-The current runtime persists a canonical `NXMF` v6 manifest plus a genesis
+The current runtime persists a canonical `NXMF` v7 manifest plus a genesis
 copy, holds a cooperative OS file lock, and makes `LocalNodeRuntime` derive
-the record-log path as `<data-dir>/ledger.nxrf`; it does not use the embedding
-API's arbitrary path. This is not a complete crash-safe ownership mechanism:
-ACL/symlink checks, storage-class validation, multi-process fault injection
-and several lifecycle requirements below remain unimplemented.
+the record-log path as `<data-dir>/ledger.nxrf`; the separate Comet service
+derives `<data-dir>/blocks.nxcb`. It does not use an embedding API's arbitrary
+path. This is not a complete crash-safe ownership mechanism: ACL/symlink
+checks, storage-class validation, multi-process fault injection and several
+lifecycle requirements below remain unimplemented.
 
 The authoritative transaction-history and recovery rules are specified in
 `docs/DURABILITY_SPEC_V0_1.md`. This specification does not introduce network
@@ -62,6 +63,15 @@ The manifest must not contain private keys, credentials, proof witnesses, or
 other secrets. It must be atomically created before a directory is considered
 initialized. If a manifest is present but invalid, incomplete, or incompatible,
 the directory is not openable for writes.
+
+`NXMF` v7 additionally records one immutable storage mode. It is one of
+`LocalRecordLogV1` (only `ledger.nxrf` is authoritative) or
+`CometBlockJournalV1` (only `blocks.nxcb` is authoritative). Reopening with a
+different mode fails before replay. There is no automatic v6-to-v7 migration:
+an operator must preserve the old directory, create a separately reviewed
+export/migration procedure and then initialize a new v7 directory. This
+fail-closed rule prevents a record log and a consensus journal from silently
+becoming competing sources of history.
 
 ### Genesis artifact
 

@@ -7,9 +7,13 @@
 
 use std::{
     fmt, io,
-    net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
-    sync::{Arc, Mutex, MutexGuard},
+    net::{SocketAddr, TcpListener, TcpStream},
+    sync::{
+        Arc, Mutex, MutexGuard,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
     thread,
+    time::Duration,
 };
 
 use noxis_consensus::{CometBftDecision, CometBftValidator};
@@ -20,6 +24,18 @@ use crate::{
     wire::{self, InitValidatorUpdate, Request, Response, WireError},
 };
 
+/// Maximum number of simultaneous local ABCI peers accepted by default.
+///
+/// CometBFT normally maintains a small fixed set of long-lived ABCI
+/// connections. A bounded value prevents an arbitrary local process from
+/// turning each accepted socket into an unbounded operating-system thread.
+pub const DEFAULT_MAX_CONCURRENT_ABCI_CONNECTIONS: usize = 16;
+
+/// Maximum idle duration for one local ABCI socket before it is disconnected.
+pub const DEFAULT_ABCI_SOCKET_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
+
+const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
+
 /// A TCP listener serving the reviewed CometBFT v0.38 ABCI socket subset.
 ///
 /// The listener is intentionally not a P2P or public client endpoint. It must
@@ -28,14 +44,16 @@ use crate::{
 pub struct CometAbciServer {
     listener: TcpListener,
     core: Arc<Mutex<NoxisCometCore>>,
+    shutdown_requested: Arc<AtomicBool>,
+    active_connections: Arc<AtomicUsize>,
 }
 
 impl CometAbciServer {
     /// Binds one local ABCI listener around a replay-verified application core.
-    pub fn bind(
-        address: impl ToSocketAddrs,
-        core: NoxisCometCore,
-    ) -> Result<Self, CometAbciServerError> {
+    pub fn bind(address: SocketAddr, core: NoxisCometCore) -> Result<Self, CometAbciServerError> {
+        if !address.ip().is_loopback() {
+            return Err(CometAbciServerError::NonLoopbackAddress(address));
+        }
         let listener = TcpListener::bind(address).map_err(|source| CometAbciServerError::Io {
             operation: "bind ABCI TCP listener",
             source,
@@ -43,6 +61,8 @@ impl CometAbciServer {
         Ok(Self {
             listener,
             core: Arc::new(Mutex::new(core)),
+            shutdown_requested: Arc::new(AtomicBool::new(false)),
+            active_connections: Arc::new(AtomicUsize::new(0)),
         })
     }
 
@@ -78,28 +98,88 @@ impl CometAbciServer {
     /// keeps its consensus, mempool and info connections open concurrently.
     /// The application core remains serialized by its mutex.
     pub fn serve(&self) -> Result<(), CometAbciServerError> {
-        loop {
-            let (stream, _) =
-                self.listener
-                    .accept()
-                    .map_err(|source| CometAbciServerError::Io {
+        self.listener
+            .set_nonblocking(true)
+            .map_err(|source| CometAbciServerError::Io {
+                operation: "make ABCI TCP listener nonblocking",
+                source,
+            })?;
+        while !self.shutdown_requested.load(Ordering::Acquire) {
+            let (stream, _) = match self.listener.accept() {
+                Ok(connection) => connection,
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    thread::sleep(ACCEPT_POLL_INTERVAL);
+                    continue;
+                }
+                Err(source) => {
+                    return Err(CometAbciServerError::Io {
                         operation: "accept ABCI TCP connection",
                         source,
-                    })?;
+                    });
+                }
+            };
+            if !try_acquire_connection(&self.active_connections) {
+                drop(stream);
+                continue;
+            }
             let core = Arc::clone(&self.core);
+            let active_connections = Arc::clone(&self.active_connections);
             thread::spawn(move || {
                 // A peer-level failure closes only that peer. Listener failure
                 // is still returned by the accepting loop above for supervision.
-                let _ = serve_socket(&core, stream);
+                let _permit = ConnectionPermit(active_connections);
+                let _ = configure_socket(&stream).and_then(|_| serve_socket(&core, stream));
             });
         }
+        Ok(())
+    }
+
+    /// Requests an orderly stop of the accepting loop.
+    ///
+    /// Existing peer threads are allowed to finish or to reach their socket
+    /// timeout. Callers should join their service thread after this method
+    /// returns rather than assuming connections were forcefully interrupted.
+    pub fn request_shutdown(&self) {
+        self.shutdown_requested.store(true, Ordering::Release);
     }
 
     /// Serves an already accepted stream. It is public for embedders that own
     /// socket acceptance separately, while retaining the same strict parser.
     pub fn serve_connection(&self, stream: TcpStream) -> Result<(), CometAbciServerError> {
+        configure_socket(&stream)?;
         serve_socket(&self.core, stream)
     }
+}
+
+struct ConnectionPermit(Arc<AtomicUsize>);
+
+impl Drop for ConnectionPermit {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+fn try_acquire_connection(active_connections: &AtomicUsize) -> bool {
+    active_connections
+        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+            (current < DEFAULT_MAX_CONCURRENT_ABCI_CONNECTIONS).then_some(current + 1)
+        })
+        .is_ok()
+}
+
+fn configure_socket(stream: &TcpStream) -> Result<(), CometAbciServerError> {
+    stream
+        .set_read_timeout(Some(DEFAULT_ABCI_SOCKET_IDLE_TIMEOUT))
+        .map_err(|source| CometAbciServerError::Io {
+            operation: "set ABCI socket read timeout",
+            source,
+        })?;
+    stream
+        .set_write_timeout(Some(DEFAULT_ABCI_SOCKET_IDLE_TIMEOUT))
+        .map_err(|source| CometAbciServerError::Io {
+            operation: "set ABCI socket write timeout",
+            source,
+        })
 }
 
 fn serve_socket(
@@ -272,6 +352,7 @@ fn map_init_validators(
 /// A socket, framing, initialization-mapping or core-lifecycle failure.
 #[derive(Debug)]
 pub enum CometAbciServerError {
+    NonLoopbackAddress(SocketAddr),
     Io {
         operation: &'static str,
         source: io::Error,
@@ -286,6 +367,10 @@ pub enum CometAbciServerError {
 impl fmt::Display for CometAbciServerError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NonLoopbackAddress(address) => write!(
+                formatter,
+                "ABCI listener {address} is not loopback; the unauthenticated protocol must stay local"
+            ),
             Self::Io { operation, source } => write!(formatter, "cannot {operation}: {source}"),
             Self::Wire(error) => write!(formatter, "invalid ABCI socket data: {error}"),
             Self::Core(error) => write!(formatter, "ABCI application rejected request: {error}"),
@@ -306,9 +391,10 @@ impl std::error::Error for CometAbciServerError {
             Self::Io { source, .. } => Some(source),
             Self::Wire(error) => Some(error),
             Self::Core(error) => Some(error),
-            Self::CorePoisoned | Self::UnknownInitValidator | Self::InitValidatorPowerMismatch => {
-                None
-            }
+            Self::NonLoopbackAddress(_)
+            | Self::CorePoisoned
+            | Self::UnknownInitValidator
+            | Self::InitValidatorPowerMismatch => None,
         }
     }
 }
@@ -322,7 +408,7 @@ mod tests {
         path::PathBuf,
         sync::Arc,
         thread,
-        time::{SystemTime, UNIX_EPOCH},
+        time::{Duration, SystemTime, UNIX_EPOCH},
     };
 
     use noxis_consensus::{
@@ -336,8 +422,7 @@ mod tests {
     use noxis_ledger::{DenyAllMints, LedgerState, MintPolicy};
     use noxis_storage::PersistentExecution;
     use noxis_types::{
-        AssetDefinition, AssetId, AssetKind, ChainAnchor, GenesisId, MintPolicyId, ProofVerifierId,
-        ValidatorId,
+        AssetDefinition, AssetId, AssetKind, ChainAnchor, GenesisId, ProofVerifierId, ValidatorId,
     };
 
     use super::*;
@@ -425,8 +510,11 @@ mod tests {
             std::process::id()
         ));
         fs::create_dir(&directory).unwrap();
-        let server =
-            CometAbciServer::bind("127.0.0.1:0", test_core(directory.join("blocks.nxcb"))).unwrap();
+        let server = CometAbciServer::bind(
+            "127.0.0.1:0".parse().unwrap(),
+            test_core(directory.join("blocks.nxcb")),
+        )
+        .unwrap();
         let address = server.local_addr().unwrap();
         let task = thread::spawn(move || server.serve_one());
         let mut client = TcpStream::connect(address).unwrap();
@@ -440,6 +528,56 @@ mod tests {
         let info = read_frame(&mut client);
         assert_eq!(info[0], 0x22); // Response.info field number 4.
         drop(client);
+        task.join().unwrap().unwrap();
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn refuses_a_public_abci_listener() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "noxis-comet-abci-public-listener-test-{}-{unique}",
+            std::process::id()
+        ));
+        fs::create_dir(&directory).unwrap();
+        let result = CometAbciServer::bind(
+            "0.0.0.0:26658".parse().unwrap(),
+            test_core(directory.join("blocks.nxcb")),
+        );
+
+        assert!(matches!(
+            result,
+            Err(CometAbciServerError::NonLoopbackAddress(_))
+        ));
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn serving_loop_stops_after_a_shutdown_request() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "noxis-comet-abci-shutdown-test-{}-{unique}",
+            std::process::id()
+        ));
+        fs::create_dir(&directory).unwrap();
+        let server = Arc::new(
+            CometAbciServer::bind(
+                "127.0.0.1:0".parse().unwrap(),
+                test_core(directory.join("blocks.nxcb")),
+            )
+            .unwrap(),
+        );
+        let serving = Arc::clone(&server);
+        let task = thread::spawn(move || serving.serve());
+
+        thread::sleep(Duration::from_millis(20));
+        server.request_shutdown();
         task.join().unwrap().unwrap();
         fs::remove_dir_all(directory).unwrap();
     }

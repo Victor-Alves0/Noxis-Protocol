@@ -125,7 +125,7 @@ uma coleção de bytes de "finalidade" antes da integração com uma engine
 auditada.
 
 A configuração de consenso também passou a ser parte obrigatória de
-`GenesisConfig` e do manifesto local `NXMF` v6. `GenesisId` inclui os bytes
+`GenesisConfig` e do manifesto local `NXMF` v7. `GenesisId` inclui os bytes
 canônicos dessa configuração; trocar chaves, pesos, orçamento de falha ou
 limites produz outra identidade de rede e a abertura do diretório com uma
 configuração diferente falha.
@@ -197,7 +197,7 @@ do conjunto com a serialização protobuf e Merkle especificadas pela própria
 engine; ela foi conferida contra CometBFT v0.38.17.
 
 Quando o nó é configurado para CometBFT, a identidade e o hash do conjunto
-mapeado entram no `GenesisId` (formato 5) e no manifesto `NXMF` v6. Uma âncora
+mapeado entram no `GenesisId` (formato 5) e no manifesto `NXMF` v7. Uma âncora
 de consenso usa o ID conjunto de rede e validadores, não apenas o nome da rede.
 
 Cada `NXCB` v2 transporta a identidade da rede, altura da decisão, hash do

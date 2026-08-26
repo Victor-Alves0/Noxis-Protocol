@@ -43,7 +43,7 @@ dos componentes canônicos do ledger. Logo, dois deployments com o mesmo estado
 mutável, mas gêneses diferentes, têm IDs de estado incompatíveis. `ChainAnchor`
 carrega `GenesisId`, `ValidationContextId`, os IDs de verificador e política,
 e o `StateId` do estado gênese; tudo é revalidado antes de o armazenamento
-abrir ou truncar um log. O manifesto `NXMF` v6 guarda o contexto completo, a
+abrir ou truncar um log. O manifesto `NXMF` v7 guarda o contexto completo, a
 configuração de consenso canônica, a identidade CometBFT opcional e o
 `GenesisId`, recalculando ambos ao abrir; versões anteriores são rejeitadas
 explicitamente.

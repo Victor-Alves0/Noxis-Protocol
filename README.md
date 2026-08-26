@@ -17,12 +17,14 @@ It is not a bank, exchange, wallet, custodian, stablecoin issuer, or production 
   per-record replay remains only for non-consensus migration/local use.
 - A CometBFT v0.38 ABCI lifecycle and TCP socket adapter: local admission
   detects pending double spends, proposal execution is side-effect free, and
-  only a finalized candidate can reach the durable `Commit` boundary. The
-  server still needs end-to-end verification against a real CometBFT process;
-  it is not yet a running multi-node network.
+  only a finalized candidate can reach the durable `Commit` boundary. Its
+  composed service accepts only loopback ABCI listeners, uses a dedicated
+  consensus block journal and rejects a genesis or cryptographic components
+  that do not match. It still needs end-to-end verification against a real
+  CometBFT process; it is not yet a running multi-node network.
 - For a Comet-enabled genesis, the engine identity, parameter commitment and
   exact v0.38 Ed25519 validator mapping are bound to `GenesisId` and `NXMF`
-  v6; each `NXCB` v2 block binds the exact Comet decision context into both
+  v7; each `NXCB` v2 block binds the exact Comet decision context into both
   durable replay and `AppHash`.
 - A typed embedded local-node API for admission, status and membership proofs.
 - A genesis-bound data-directory runtime with a cooperative exclusive writer lock.
@@ -56,7 +58,7 @@ crates/
   noxis-comet-abci  ABCI lifecycle, strict v0.38 socket protocol and NXCB.
   noxis-config   Validated genesis and local-node configuration.
   noxis-runtime  Genesis-bound data directory and writer-lock lifecycle.
-  noxis-node     Typed local-node application API; networking comes later.
+  noxis-node     Typed local-node API and guarded loopback CometBFT service.
 docs/
   PROTOCOL_SPEC_V0_1.md         Scope, invariants and state machine.
   THREAT_MODEL_V0_1.md          Explicit security assumptions and acceptance criteria.
@@ -84,5 +86,11 @@ SDK linker and libraries.
 ## Security boundary
 
 The `ProofVerifier` and `MintPolicy` interfaces are deliberately unimplemented for production. A transaction is never private merely because it contains a `Proof` byte array: privacy and conservation are established only when an audited proof system verifies the statement against a canonical state root. Post-quantum and hybrid cryptography are design reservations, not active protection in this codebase.
+
+The ABCI socket is deliberately loopback-only and has bounded local
+connections, but it is still unauthenticated IPC. It must run in an
+operator-controlled same-user or isolated service boundary with CometBFT; a
+host where arbitrary local processes are untrusted needs an authenticated IPC
+boundary (for example a permissioned Unix socket) before use.
 
 Do not use this code to custody value or operate on public networks without an independent security review, a complete threat model, formal protocol work, legal analysis, and operational controls.

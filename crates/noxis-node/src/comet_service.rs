@@ -163,6 +163,15 @@ impl CometNodeService {
         self.abci.serve().map_err(CometNodeServiceError::Abci)
     }
 
+    /// Asks the serving loop to stop accepting new ABCI connections.
+    ///
+    /// The caller remains responsible for joining the thread running
+    /// [`Self::serve`]. Existing connections finish or expire under the
+    /// server's bounded idle timeout.
+    pub fn request_shutdown(&self) {
+        self.abci.request_shutdown();
+    }
+
     /// Returns the held runtime, including its immutable storage-mode manifest.
     pub fn runtime(&self) -> &NodeRuntime {
         &self.runtime

@@ -1,0 +1,41 @@
+name: Set up pinned CometBFT
+description: Download and verify the exact CometBFT binary supported by the Noxis ABCI adapter.
+
+outputs:
+  bin:
+    description: Absolute path to the verified CometBFT binary.
+    value: ${{ steps.install.outputs.bin }}
+
+runs:
+  using: composite
+  steps:
+    - id: install
+      name: Download CometBFT 0.38.17 and verify its checksum
+      shell: bash
+      env:
+        COMETBFT_VERSION: 0.38.17
+        COMETBFT_ARCHIVE: cometbft_0.38.17_linux_amd64.tar.gz
+        COMETBFT_SHA256: ca4d7ca0df296e092462edc92a3f07a4cd1e6c0366516e382a0726b522806f38
+        COMETBFT_URL: https://github.com/cometbft/cometbft/releases/download/v0.38.17/cometbft_0.38.17_linux_amd64.tar.gz
+      run: |
+        set -euo pipefail
+
+        work_directory="$(mktemp -d "${RUNNER_TEMP:?}/noxis-cometbft-${COMETBFT_VERSION}.XXXXXX")"
+        archive_path="${work_directory}/${COMETBFT_ARCHIVE}"
+
+        curl --fail --location --retry 3 --retry-all-errors --silent --show-error \
+          "${COMETBFT_URL}" --output "${archive_path}"
+        printf '%s  %s\n' "${COMETBFT_SHA256}" "${archive_path}" | sha256sum --check --status
+
+        tar --extract --gzip --file "${archive_path}" \
+          --directory "${work_directory}" --no-same-owner --no-same-permissions
+        mkdir --parents "${work_directory}/bin"
+        mv "${work_directory}/cometbft" "${work_directory}/bin/cometbft"
+        cometbft_bin="${work_directory}/bin/cometbft"
+        test -x "${cometbft_bin}"
+
+        actual_version="$("${cometbft_bin}" version)"
+        test "${actual_version}" = "${COMETBFT_VERSION}"
+
+        printf 'COMETBFT_BIN=%s\n' "${cometbft_bin}" >> "${GITHUB_ENV}"
+        printf 'bin=%s\n' "${cometbft_bin}" >> "${GITHUB_OUTPUT}"

@@ -39,7 +39,7 @@ pub const MANIFEST_FORMAT_VERSION: u16 = 7;
 pub const MAX_MANIFEST_ASSETS: u32 = 4_096;
 /// Bound for canonical consensus configuration included in the local manifest.
 pub const MAX_MANIFEST_CONSENSUS_CONFIG_BYTES: usize = MAX_GENESIS_CONSENSUS_CONFIG_BYTES;
-/// Largest possible v6 manifest, including its bounded consensus configuration
+/// Largest possible v7 manifest, including its bounded consensus configuration
 /// and optional canonical CometBFT identity.
 pub const MAX_MANIFEST_BYTES: usize = 121
     + MAX_COMET_BFT_NETWORK_IDENTITY_ENCODED_LENGTH
@@ -358,6 +358,7 @@ impl NodeRuntime {
         let lock = DirectoryLock::acquire(data_directory.lock_path())?;
         let expected = NodeManifest::from_genesis_with_storage_mode(genesis, storage_mode)
             .map_err(RuntimeError::InvalidGenesisForManifest)?;
+        ensure_no_conflicting_history_file(&data_directory, storage_mode)?;
         let manifest_path = data_directory.manifest_path();
         let genesis_copy_path = data_directory.genesis_copy_path();
         let manifest_exists = path_exists(&manifest_path)?;
@@ -433,6 +434,23 @@ impl NodeRuntime {
     pub fn checkpoints_path(&self) -> PathBuf {
         self.data_directory.checkpoints_path()
     }
+}
+
+fn ensure_no_conflicting_history_file(
+    data_directory: &DataDirectory,
+    storage_mode: StorageMode,
+) -> Result<(), RuntimeError> {
+    let conflicting_path = match storage_mode {
+        StorageMode::LocalRecordLogV1 => data_directory.block_journal_path(),
+        StorageMode::CometBlockJournalV1 => data_directory.ledger_path(),
+    };
+    if path_exists(&conflicting_path)? {
+        return Err(RuntimeError::ConflictingHistoryFile {
+            storage_mode,
+            path: conflicting_path,
+        });
+    }
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -760,6 +778,10 @@ pub enum RuntimeError {
         expected: StorageMode,
         actual: StorageMode,
     },
+    ConflictingHistoryFile {
+        storage_mode: StorageMode,
+        path: PathBuf,
+    },
     ManifestGenesisCopyMismatch,
     InvalidGenesisForManifest(ManifestError),
     ManifestFileTooLarge {
@@ -810,6 +832,11 @@ impl fmt::Display for RuntimeError {
             Self::StorageModeMismatch { expected, actual } => write!(
                 formatter,
                 "data directory storage mode is {actual:?}; requested {expected:?}"
+            ),
+            Self::ConflictingHistoryFile { storage_mode, path } => write!(
+                formatter,
+                "data directory for {storage_mode:?} contains conflicting durable history at {}",
+                path.display()
             ),
             Self::ManifestGenesisCopyMismatch => formatter.write_str(
                 "node manifest and immutable genesis copy do not match",
@@ -1092,6 +1119,28 @@ mod tests {
                 actual: StorageMode::LocalRecordLogV1,
             })
         ));
+        clean_up(&directory_path);
+    }
+
+    #[test]
+    fn refuses_a_history_file_owned_by_the_other_storage_mode() {
+        let directory_path = temporary_directory("conflicting-history");
+        let data_directory = DataDirectory::new(&directory_path).unwrap();
+        std::fs::create_dir(&directory_path).unwrap();
+        std::fs::write(data_directory.ledger_path(), b"not a Comet journal").unwrap();
+
+        assert!(matches!(
+            NodeRuntime::open_or_initialize_with_storage_mode(
+                data_directory.clone(),
+                genesis(4, 3),
+                StorageMode::CometBlockJournalV1,
+            ),
+            Err(RuntimeError::ConflictingHistoryFile {
+                storage_mode: StorageMode::CometBlockJournalV1,
+                ..
+            })
+        ));
+        assert!(!data_directory.manifest_path().exists());
         clean_up(&directory_path);
     }
 

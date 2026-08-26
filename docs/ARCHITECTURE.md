@@ -34,7 +34,7 @@ Dependencies point inward. Domain types never depend on storage, transport, cryp
 
 1. A identidade, o compromisso de parâmetros e o mapeamento exato dos
    validadores Comet v0.38 já estão ancorados no genesis, no manifesto `NXMF`
-   v6, em cada decisão `NXCB` v2 e no `AppHash`. O núcleo exige que
+   v7, em cada decisão `NXCB` v2 e no `AppHash`. O núcleo exige que
    `InitChain` apresente esses mesmos parâmetros e validadores. O servidor TCP
    ABCI v0.38 já existe; em seguida, executar cenários ponta a ponta contra um
    binário CometBFT v0.38 fixado, completar a recuperação coordenada e provar
