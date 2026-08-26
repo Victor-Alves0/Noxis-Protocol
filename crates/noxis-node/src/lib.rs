@@ -1,8 +1,16 @@
 //! Local application API for one Noxis ledger process.
 //!
-//! This crate deliberately has no TCP, HTTP, P2P, wallet, custody, or consensus
-//! adapter. It provides typed operations that a future authenticated local
-//! transport can call without reimplementing protocol rules.
+//! The embedded [`LocalNode`] API persists independent `NXRF` transitions for
+//! local integrations. The separately composed [`CometNodeService`] exposes
+//! the loopback-only ABCI side of the consensus node and persists `NXCB` block
+//! history. Neither API exposes a public wallet, custody, HTTP, or P2P surface.
+
+mod comet_service;
+
+pub use comet_service::{
+    CometNodeService, CometNodeServiceConfig, CometNodeServiceError, LocalAbciEndpoint,
+    LocalAbciEndpointError,
+};
 
 use std::path::{Path, PathBuf};
 

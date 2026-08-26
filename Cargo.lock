@@ -172,9 +172,11 @@ name = "noxis-node"
 version = "0.1.0"
 dependencies = [
  "noxis-codec",
+ "noxis-comet-abci",
  "noxis-config",
  "noxis-consensus",
  "noxis-crypto",
+ "noxis-execution",
  "noxis-ledger",
  "noxis-merkle",
  "noxis-record-chain",
