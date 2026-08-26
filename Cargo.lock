@@ -186,6 +186,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "noxis-privacy-types"
+version = "0.1.0"
+dependencies = [
+ "noxis-types",
+]
+
+[[package]]
 name = "noxis-record-chain"
 version = "0.1.0"
 dependencies = [

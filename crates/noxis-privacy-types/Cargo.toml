@@ -1,0 +1,12 @@
+[package]
+name = "noxis-privacy-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+noxis-types = { path = "../noxis-types" }
+
+[lints]
+workspace = true

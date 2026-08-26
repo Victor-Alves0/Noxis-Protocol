@@ -81,3 +81,7 @@ Cada saída v2 contém `note_commitment_v2`, `hybrid_recipient_envelope` e `ciph
 Antes de autorização de serviço, o repositório precisa conter vetores independentes, teste diferencial entre árvore Rust/referência/AIR, rejeições de cada input público alterado, testes de overflow/conservação/inclusão, fuzzing de parser com orçamento de CPU/RAM, benchmark reproduzível e auditoria externa da AIR, parâmetros, implementação e modelo de privacidade.
 
 Tipos v2, árvore v2 e carteira/prover offline são entregas separadas. Nenhuma delas, isoladamente, remove o gate em [`CRYPTO_SERVICE_GATE_V0_1.md`](CRYPTO_SERVICE_GATE_V0_1.md).
+
+## Base entregue
+
+`noxis-privacy-types` agora fixa a primeira fronteira de código desta arquitetura. O crate depende somente de `noxis-types` e não participa de `NOXT` v1, do ledger ou do serviço Comet. Ele entrega `CircuitId`, parâmetros de árvore, commitments, nullifiers, raiz e digests de envelope em 64 bytes, e uma `PrivateTransferIntentV2` de 640 bytes, com aridade exatamente 2×2, ordem canônica, rejeição de duplicatas e round-trip testado. O ID da intenção ainda não é calculado ali: uma camada criptográfica futura deverá derivá-lo dos bytes canônicos com o domínio `NOXIS/PRIVATE-TRANSFER-INTENT/V2\0` antes de passá-lo à AIR. Isso evita tanto autorreferência quanto um ID escolhido pelo chamador.

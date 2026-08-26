@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/noxis-types",
+    "crates/noxis-privacy-types",
     "crates/noxis-crypto",
     "crates/noxis-ledger",
     "crates/noxis-codec",

@@ -64,6 +64,8 @@ rascunhos e não habilitam criptografia: ver
 [`PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md`](PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md)
 e [`HYBRID_CRYPTO_PROFILE_DRAFT_V0_1.md`](HYBRID_CRYPTO_PROFILE_DRAFT_V0_1.md).
 
+**Base de código v2:** o crate isolado `noxis-privacy-types` fixa a intenção canônica de transferência privada, sua aridade e tipos públicos sem acoplar provas, hashes, chaves ou carteira. O próximo incremento é um codec externo `NXPT` com limites e anexos de envelope/prova, ainda sem aceitar a transação no ledger v1.
+
 ### 6. Adaptadores de ativos e políticas de emissão
 
 Conecta ativos apenas onde o backing, a custódia, resgate, falhas e responsabilidades forem explicitamente especificados. Fiat externo nunca é aceito como prova automática de backing.
