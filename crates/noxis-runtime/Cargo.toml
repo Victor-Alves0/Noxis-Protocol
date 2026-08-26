@@ -1,0 +1,15 @@
+[package]
+name = "noxis-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+noxis-consensus = { path = "../noxis-consensus" }
+noxis-config = { path = "../noxis-config" }
+noxis-crypto = { path = "../noxis-crypto" }
+noxis-types = { path = "../noxis-types" }
+
+[lints]
+workspace = true

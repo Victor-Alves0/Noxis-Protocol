@@ -1,0 +1,28 @@
+[workspace]
+members = [
+    "crates/noxis-types",
+    "crates/noxis-crypto",
+    "crates/noxis-ledger",
+    "crates/noxis-codec",
+    "crates/noxis-merkle",
+    "crates/noxis-storage",
+    "crates/noxis-config",
+    "crates/noxis-runtime",
+    "crates/noxis-record-chain",
+    "crates/noxis-checkpoint",
+    "crates/noxis-consensus",
+    "crates/noxis-execution",
+    "crates/noxis-comet-abci",
+    "crates/noxis-node",
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0"
+version = "0.1.0"
+rust-version = "1.85"
+authors = ["Noxis Protocol contributors"]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

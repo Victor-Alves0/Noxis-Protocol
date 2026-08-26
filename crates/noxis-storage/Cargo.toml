@@ -1,0 +1,22 @@
+[package]
+name = "noxis-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Append-only, crash-detecting transaction log for Noxis."
+
+[dependencies]
+fs2 = "0.4"
+noxis-checkpoint = { path = "../noxis-checkpoint" }
+noxis-codec = { path = "../noxis-codec" }
+noxis-consensus = { path = "../noxis-consensus" }
+noxis-crypto = { path = "../noxis-crypto" }
+noxis-execution = { path = "../noxis-execution" }
+noxis-ledger = { path = "../noxis-ledger" }
+noxis-record-chain = { path = "../noxis-record-chain" }
+noxis-types = { path = "../noxis-types" }
+sha2 = "0.10"
+
+[lints]
+workspace = true

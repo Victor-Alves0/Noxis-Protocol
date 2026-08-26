@@ -1,0 +1,9 @@
+# Rust build outputs are reproducible and must not be versioned.
+/target/
+**/target/
+
+# Local IDE and operating-system files.
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Rust quality gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Install the minimum supported Rust toolchain
+        run: rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy
+
+      - name: Check formatting
+        run: cargo +1.85.0 fmt --all -- --check
+
+      - name: Check compilation
+        run: cargo +1.85.0 check --workspace --all-targets --locked
+
+      - name: Run tests
+        run: cargo +1.85.0 test --workspace --locked
+
+      - name: Run lints
+        run: cargo +1.85.0 clippy --workspace --all-targets --locked -- -D warnings

@@ -1,0 +1,84 @@
+# Noxis Protocol
+
+Noxis is a security-first implementation of a privacy-preserving, multi-asset settlement protocol. Development starts with the part that must be correct before networking, wallets, liquidity or chain adapters: **the state-transition rules**.
+
+It is not a bank, exchange, wallet, custodian, stablecoin issuer, or production cryptographic implementation. It does not connect to real assets, fiat systems, blockchains, or payment rails.
+
+## What exists now
+
+- A modular Rust workspace with explicit ownership boundaries.
+- A UTXO-like private-ledger state model: commitments are created; nullifiers are spent exactly once.
+- Explicit asset registry and supply accounting.
+- Pluggable proof verification and mint-authority contracts.
+- Canonical, versioned binary transaction codec with strict parser limits.
+- Fixed-depth Merkle state roots and inclusion proofs for commitments.
+- Durable consensus-block replay: an `NXCB` frame stores a whole executed
+  block, then recovery re-executes it before restoring its tip; the older
+  per-record replay remains only for non-consensus migration/local use.
+- A CometBFT v0.38 ABCI lifecycle and TCP socket adapter: local admission
+  detects pending double spends, proposal execution is side-effect free, and
+  only a finalized candidate can reach the durable `Commit` boundary. The
+  server still needs end-to-end verification against a real CometBFT process;
+  it is not yet a running multi-node network.
+- For a Comet-enabled genesis, the engine identity, parameter commitment and
+  exact v0.38 Ed25519 validator mapping are bound to `GenesisId` and `NXMF`
+  v6; each `NXCB` v2 block binds the exact Comet decision context into both
+  durable replay and `AppHash`.
+- A typed embedded local-node API for admission, status and membership proofs.
+- A genesis-bound data-directory runtime with a cooperative exclusive writer lock.
+- Canonical genesis IDs; state IDs and durable histories are bound to that genesis.
+- Validation context IDs bind the declared proof verifier and mint policy before recovery.
+- Non-self-referential transaction intent IDs, bound with genesis, validation-context and pre-transition state IDs in every transfer proof and mint-authorization statement.
+- Canonical `NXCP` checkpoints, atomically published under the protected data directory and verified against strict replay.
+- Versioned cryptographic-suite metadata to prevent permanent coupling to one primitive.
+- Canonical consensus data: weighted validator sets, block headers, record commitments and finality-certificate verification boundaries. This is not yet a running validator network or a finality claim.
+- Genesis and the protected local manifest commit to the validator set, public verification keys, declared fault budget and consensus limits. A node cannot reopen the same data directory with a different consensus configuration.
+- Tests for unauthorized issuance, duplicate nullifiers, duplicate commitments, and unknown assets.
+
+`NXCB` consensus-block commits currently require Unix filesystem durability
+semantics. On Windows the block writer fails closed instead of acknowledging a
+commit without a proven directory-durability barrier.
+
+## Architecture
+
+```text
+crates/
+  noxis-types    Identifiers, amounts and asset definitions.
+  noxis-crypto   CryptoSuite metadata and proof-verifier boundary.
+  noxis-ledger   Transactions, validation and deterministic state transitions.
+  noxis-codec    Canonical binary transaction encoding and decoding.
+  noxis-merkle   Fixed-depth commitment tree and inclusion proofs.
+  noxis-record-chain Strict state-transition record codec and link validator.
+  noxis-checkpoint Canonical checkpoint codec and snapshot integrity validation.
+  noxis-consensus  Engine-neutral BFT block, quorum and finality-certificate primitives.
+  noxis-execution Deterministic execution of ordered blocks and AppHash calculation.
+  noxis-storage  Atomic block journal plus legacy framed-record persistence.
+  noxis-comet-abci  ABCI lifecycle, strict v0.38 socket protocol and NXCB.
+  noxis-config   Validated genesis and local-node configuration.
+  noxis-runtime  Genesis-bound data directory and writer-lock lifecycle.
+  noxis-node     Typed local-node application API; networking comes later.
+docs/
+  PROTOCOL_SPEC_V0_1.md         Scope, invariants and state machine.
+  THREAT_MODEL_V0_1.md          Explicit security assumptions and acceptance criteria.
+  CONSENSUS_DECISION_V0_1.md    Consensus decision and required security choices.
+  CRYPTOGRAPHY_DECISION_V0_1.md Chosen cryptographic direction and safeguards.
+  ARCHITECTURE.md                Module boundaries and implementation roadmap.
+```
+
+Run the checks with:
+
+```powershell
+cargo fmt --check
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+```
+
+The CI workflow runs the same quality gate on Ubuntu with Rust 1.85, the
+minimum supported compiler. It uses the committed lockfile and has read-only
+repository permissions.
+
+## Security boundary
+
+The `ProofVerifier` and `MintPolicy` interfaces are deliberately unimplemented for production. A transaction is never private merely because it contains a `Proof` byte array: privacy and conservation are established only when an audited proof system verifies the statement against a canonical state root. Post-quantum and hybrid cryptography are design reservations, not active protection in this codebase.
+
+Do not use this code to custody value or operate on public networks without an independent security review, a complete threat model, formal protocol work, legal analysis, and operational controls.
