@@ -8,6 +8,7 @@ rust-version.workspace = true
 [dependencies]
 noxis-crypto = { path = "../noxis-crypto" }
 noxis-ledger = { path = "../noxis-ledger" }
+noxis-privacy-types = { path = "../noxis-privacy-types" }
 noxis-types = { path = "../noxis-types" }
 sha2 = "0.10.9"
 

@@ -9,6 +9,7 @@ use std::fmt;
 
 use noxis_crypto::{AlgorithmId, CryptoSuite, CryptoSuiteError, Proof};
 use noxis_ledger::{Mint, Operation, Transaction, Transfer};
+use noxis_privacy_types::{PrivacyTypesError, PrivateTransferIntentV2};
 use noxis_types::{Amount, AssetId, Commitment, Nullifier, TransactionId, TransactionIntentId};
 use sha2::{Digest, Sha256};
 
@@ -16,6 +17,15 @@ use sha2::{Digest, Sha256};
 pub const TRANSACTION_MAGIC: [u8; 4] = *b"NOXT";
 /// The only transaction-wire format version currently supported.
 pub const TRANSACTION_FORMAT_VERSION: u16 = 1;
+
+/// Fixed prefix for the private-transfer v2 packet. It is never `NOXT` v1.
+pub const PRIVATE_TRANSFER_MAGIC: [u8; 4] = *b"NXPT";
+/// The only private-transfer packet format currently supported.
+pub const PRIVATE_TRANSFER_FORMAT_VERSION: u16 = 1;
+/// Maximum bytes of one encrypted-recipient envelope before KEM is implemented.
+pub const MAX_PRIVATE_ENVELOPE_BYTES: u16 = 4 * 1024;
+/// Provisional upper bound for an opaque v2 proof, pending adversarial benchmarks.
+pub const MAX_PRIVATE_PROOF_BYTES: u32 = 2 * 1024 * 1024;
 
 /// Upper bound on each transfer input/output collection.
 pub const MAX_COLLECTION_ITEMS: u32 = 65_536;
@@ -26,6 +36,95 @@ const OPERATION_TRANSFER: u8 = 1;
 const OPERATION_MINT: u8 = 2;
 #[cfg(test)]
 const SUITE_BYTES: usize = 6;
+
+/// A framed v2 private transfer whose cryptographic contents remain opaque.
+///
+/// This packet only fixes resource limits and field order. It does not verify
+/// proof soundness, derive envelope digests, perform KEM/AEAD, or authorize a
+/// ledger transition.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PrivateTransferPacketV2 {
+    intent: PrivateTransferIntentV2,
+    recipient_envelopes: [Vec<u8>; 2],
+    proof: Vec<u8>,
+}
+
+impl PrivateTransferPacketV2 {
+    pub fn new(
+        intent: PrivateTransferIntentV2,
+        recipient_envelopes: [Vec<u8>; 2],
+        proof: Vec<u8>,
+    ) -> Result<Self, CodecError> {
+        for envelope in &recipient_envelopes {
+            ensure_private_envelope_limit(envelope.len())?;
+        }
+        ensure_private_proof_limit(proof.len())?;
+        Ok(Self {
+            intent,
+            recipient_envelopes,
+            proof,
+        })
+    }
+
+    pub const fn intent(&self) -> &PrivateTransferIntentV2 {
+        &self.intent
+    }
+
+    pub const fn recipient_envelopes(&self) -> &[Vec<u8>; 2] {
+        &self.recipient_envelopes
+    }
+
+    pub fn proof(&self) -> &[u8] {
+        &self.proof
+    }
+}
+
+/// Produces the sole canonical external representation of a v2 private packet.
+pub fn encode_private_transfer(packet: &PrivateTransferPacketV2) -> Result<Vec<u8>, CodecError> {
+    let packet = PrivateTransferPacketV2::new(
+        packet.intent.clone(),
+        packet.recipient_envelopes.clone(),
+        packet.proof.clone(),
+    )?;
+    let mut output = Vec::with_capacity(
+        PRIVATE_TRANSFER_MAGIC.len()
+            + 2
+            + PrivateTransferIntentV2::ENCODED_LENGTH
+            + 2 * (2 + MAX_PRIVATE_ENVELOPE_BYTES as usize)
+            + 4
+            + packet.proof.len(),
+    );
+    output.extend_from_slice(&PRIVATE_TRANSFER_MAGIC);
+    write_u16(&mut output, PRIVATE_TRANSFER_FORMAT_VERSION);
+    output.extend_from_slice(&packet.intent.encode());
+    for envelope in &packet.recipient_envelopes {
+        write_private_envelope(&mut output, envelope)?;
+    }
+    write_private_proof(&mut output, &packet.proof)?;
+    Ok(output)
+}
+
+/// Decodes exactly one bounded v2 private packet.
+pub fn decode_private_transfer(bytes: &[u8]) -> Result<PrivateTransferPacketV2, CodecError> {
+    let mut reader = Reader::new(bytes);
+    if reader.read_array::<4>()? != PRIVATE_TRANSFER_MAGIC {
+        return Err(CodecError::InvalidPrivateTransferMagic);
+    }
+    let version = reader.read_u16()?;
+    if version != PRIVATE_TRANSFER_FORMAT_VERSION {
+        return Err(CodecError::UnsupportedPrivateTransferFormatVersion(version));
+    }
+    let intent_bytes = reader.read_exact(PrivateTransferIntentV2::ENCODED_LENGTH)?;
+    let intent = PrivateTransferIntentV2::decode(intent_bytes)
+        .map_err(CodecError::InvalidPrivateTransferIntent)?;
+    let recipient_envelopes = [
+        reader.read_private_envelope()?,
+        reader.read_private_envelope()?,
+    ];
+    let proof = reader.read_private_proof()?;
+    reader.finish()?;
+    PrivateTransferPacketV2::new(intent, recipient_envelopes, proof)
+}
 
 /// Produces the sole canonical wire representation of `transaction`.
 ///
@@ -228,6 +327,32 @@ fn ensure_opaque_limit(length: usize) -> Result<(), CodecError> {
     }
 }
 
+fn ensure_private_envelope_limit(length: usize) -> Result<(), CodecError> {
+    if length == 0 {
+        return Err(CodecError::EmptyRequiredField("private recipient envelope"));
+    }
+    if length > MAX_PRIVATE_ENVELOPE_BYTES as usize {
+        return Err(CodecError::PrivateEnvelopeTooLarge {
+            actual: length,
+            maximum: MAX_PRIVATE_ENVELOPE_BYTES,
+        });
+    }
+    Ok(())
+}
+
+fn ensure_private_proof_limit(length: usize) -> Result<(), CodecError> {
+    if length == 0 {
+        return Err(CodecError::EmptyRequiredField("private transfer proof"));
+    }
+    if length > MAX_PRIVATE_PROOF_BYTES as usize {
+        return Err(CodecError::PrivateProofTooLarge {
+            actual: length,
+            maximum: MAX_PRIVATE_PROOF_BYTES,
+        });
+    }
+    Ok(())
+}
+
 fn write_suite(output: &mut Vec<u8>, suite: CryptoSuite) {
     write_u16(output, suite.version);
     output.push(encode_algorithm(suite.hash));
@@ -313,6 +438,28 @@ fn write_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), CodecError> {
     Ok(())
 }
 
+fn write_private_envelope(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), CodecError> {
+    ensure_private_envelope_limit(bytes.len())?;
+    let length = u16::try_from(bytes.len()).map_err(|_| CodecError::PrivateEnvelopeTooLarge {
+        actual: bytes.len(),
+        maximum: MAX_PRIVATE_ENVELOPE_BYTES,
+    })?;
+    write_u16(output, length);
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn write_private_proof(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), CodecError> {
+    ensure_private_proof_limit(bytes.len())?;
+    let length = u32::try_from(bytes.len()).map_err(|_| CodecError::PrivateProofTooLarge {
+        actual: bytes.len(),
+        maximum: MAX_PRIVATE_PROOF_BYTES,
+    })?;
+    write_u32(output, length);
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
 fn write_u16(output: &mut Vec<u8>, value: u16) {
     output.extend_from_slice(&value.to_be_bytes());
 }
@@ -354,6 +501,18 @@ impl<'a> Reader<'a> {
             });
         }
         Ok(self.read_exact(length as usize)?.to_vec())
+    }
+
+    fn read_private_envelope(&mut self) -> Result<Vec<u8>, CodecError> {
+        let length = self.read_u16()? as usize;
+        ensure_private_envelope_limit(length)?;
+        Ok(self.read_exact(length)?.to_vec())
+    }
+
+    fn read_private_proof(&mut self) -> Result<Vec<u8>, CodecError> {
+        let length = self.read_u32()? as usize;
+        ensure_private_proof_limit(length)?;
+        Ok(self.read_exact(length)?.to_vec())
     }
 
     fn read_collection_length(&mut self) -> Result<usize, CodecError> {
@@ -413,6 +572,9 @@ impl<'a> Reader<'a> {
 pub enum CodecError {
     InvalidMagic,
     UnsupportedFormatVersion(u16),
+    InvalidPrivateTransferMagic,
+    UnsupportedPrivateTransferFormatVersion(u16),
+    InvalidPrivateTransferIntent(PrivacyTypesError),
     UnknownOperation(u8),
     UnknownAlgorithm(u8),
     InvalidCryptoSuite(CryptoSuiteError),
@@ -421,6 +583,8 @@ pub enum CodecError {
     LengthOverflow,
     CollectionTooLarge { actual: usize, maximum: u32 },
     OpaqueDataTooLarge { actual: usize, maximum: u32 },
+    PrivateEnvelopeTooLarge { actual: usize, maximum: u16 },
+    PrivateProofTooLarge { actual: usize, maximum: u32 },
     EmptyRequiredField(&'static str),
     ZeroMintAmount,
     ProofSuiteVersionMismatch { transaction: u16, proof: u16 },
@@ -434,6 +598,18 @@ impl fmt::Display for CodecError {
                 formatter,
                 "unsupported transaction format version {version}"
             ),
+            Self::InvalidPrivateTransferMagic => {
+                formatter.write_str("invalid private-transfer magic bytes")
+            }
+            Self::UnsupportedPrivateTransferFormatVersion(version) => {
+                write!(
+                    formatter,
+                    "unsupported private-transfer format version {version}"
+                )
+            }
+            Self::InvalidPrivateTransferIntent(error) => {
+                write!(formatter, "invalid private-transfer intent: {error}")
+            }
             Self::UnknownOperation(tag) => {
                 write!(formatter, "unknown transaction operation tag {tag}")
             }
@@ -461,6 +637,14 @@ impl fmt::Display for CodecError {
                 formatter,
                 "opaque data length {actual} exceeds maximum {maximum}"
             ),
+            Self::PrivateEnvelopeTooLarge { actual, maximum } => write!(
+                formatter,
+                "private recipient envelope length {actual} exceeds maximum {maximum}"
+            ),
+            Self::PrivateProofTooLarge { actual, maximum } => write!(
+                formatter,
+                "private transfer proof length {actual} exceeds maximum {maximum}"
+            ),
             Self::EmptyRequiredField(field) => write!(formatter, "{field} cannot be empty"),
             Self::ZeroMintAmount => formatter.write_str("mint amount must be non-zero"),
             Self::ProofSuiteVersionMismatch { transaction, proof } => write!(
@@ -475,6 +659,7 @@ impl std::error::Error for CodecError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::InvalidCryptoSuite(error) => Some(error),
+            Self::InvalidPrivateTransferIntent(error) => Some(error),
             _ => None,
         }
     }
@@ -483,6 +668,10 @@ impl std::error::Error for CodecError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use noxis_privacy_types::{
+        CiphertextDigestV2, CircuitId, MerkleRootV2, NoteCommitmentV2, NullifierV2,
+        TreeParametersId, TreeParametersV2,
+    };
 
     fn transfer() -> Transaction {
         Transaction {
@@ -513,6 +702,29 @@ mod tests {
         }
     }
 
+    fn private_packet() -> PrivateTransferPacketV2 {
+        let intent = PrivateTransferIntentV2::new(
+            CircuitId::new([20; 32]),
+            noxis_types::GenesisId::new([21; 32]),
+            noxis_types::ValidationContextId::new([22; 32]),
+            noxis_types::StateId::new([23; 32]),
+            TreeParametersV2::new(TreeParametersId::new([24; 32])),
+            MerkleRootV2::new([25; 64]),
+            AssetId::new([26; 32]),
+            [NullifierV2::new([27; 64]), NullifierV2::new([28; 64])],
+            [
+                NoteCommitmentV2::new([29; 64]),
+                NoteCommitmentV2::new([30; 64]),
+            ],
+            [
+                CiphertextDigestV2::new([31; 64]),
+                CiphertextDigestV2::new([32; 64]),
+            ],
+        )
+        .unwrap();
+        PrivateTransferPacketV2::new(intent, [vec![33, 34], vec![35]], vec![36, 37]).unwrap()
+    }
+
     #[test]
     fn transfer_round_trip_is_exact_and_canonical() {
         let transaction = transfer();
@@ -532,6 +744,114 @@ mod tests {
         assert_eq!(
             encode_transaction(&decode_transaction(&encoded).unwrap()).unwrap(),
             encoded
+        );
+    }
+
+    #[test]
+    fn private_transfer_round_trip_is_exact_and_does_not_use_noxt() {
+        let packet = private_packet();
+        let encoded = encode_private_transfer(&packet).unwrap();
+        assert_eq!(&encoded[..4], &PRIVATE_TRANSFER_MAGIC);
+        assert_eq!(decode_private_transfer(&encoded).unwrap(), packet);
+        assert_eq!(
+            encode_private_transfer(&decode_private_transfer(&encoded).unwrap()).unwrap(),
+            encoded
+        );
+    }
+
+    #[test]
+    fn private_transfer_rejects_unknown_values_truncation_and_trailing_bytes() {
+        let encoded = encode_private_transfer(&private_packet()).unwrap();
+        assert_eq!(
+            decode_private_transfer(&encoded[..5]),
+            Err(CodecError::UnexpectedEnd { offset: 4 })
+        );
+
+        let mut magic = encoded.clone();
+        magic[0] ^= 1;
+        assert_eq!(
+            decode_private_transfer(&magic),
+            Err(CodecError::InvalidPrivateTransferMagic)
+        );
+
+        let mut version = encoded.clone();
+        version[5] = 2;
+        assert_eq!(
+            decode_private_transfer(&version),
+            Err(CodecError::UnsupportedPrivateTransferFormatVersion(2))
+        );
+
+        let mut trailing = encoded;
+        trailing.push(0);
+        assert_eq!(
+            decode_private_transfer(&trailing),
+            Err(CodecError::TrailingBytes { count: 1 })
+        );
+    }
+
+    #[test]
+    fn private_transfer_bounds_opaque_parts_before_allocating() {
+        let mut encoded = encode_private_transfer(&private_packet()).unwrap();
+        let first_envelope_length_offset = 4 + 2 + PrivateTransferIntentV2::ENCODED_LENGTH;
+        encoded[first_envelope_length_offset..first_envelope_length_offset + 2]
+            .copy_from_slice(&(MAX_PRIVATE_ENVELOPE_BYTES + 1).to_be_bytes());
+        assert_eq!(
+            decode_private_transfer(&encoded),
+            Err(CodecError::PrivateEnvelopeTooLarge {
+                actual: (MAX_PRIVATE_ENVELOPE_BYTES + 1) as usize,
+                maximum: MAX_PRIVATE_ENVELOPE_BYTES,
+            })
+        );
+
+        let mut encoded = encode_private_transfer(&private_packet()).unwrap();
+        let proof_length_offset = 4 + 2 + PrivateTransferIntentV2::ENCODED_LENGTH + 2 + 2 + 2 + 1;
+        encoded[proof_length_offset..proof_length_offset + 4]
+            .copy_from_slice(&(MAX_PRIVATE_PROOF_BYTES + 1).to_be_bytes());
+        assert_eq!(
+            decode_private_transfer(&encoded),
+            Err(CodecError::PrivateProofTooLarge {
+                actual: (MAX_PRIVATE_PROOF_BYTES + 1) as usize,
+                maximum: MAX_PRIVATE_PROOF_BYTES,
+            })
+        );
+
+        let overlong_proof = PrivateTransferPacketV2::new(
+            private_packet().intent().clone(),
+            [vec![1], vec![2]],
+            vec![0; MAX_PRIVATE_PROOF_BYTES as usize + 1],
+        );
+        assert_eq!(
+            overlong_proof,
+            Err(CodecError::PrivateProofTooLarge {
+                actual: MAX_PRIVATE_PROOF_BYTES as usize + 1,
+                maximum: MAX_PRIVATE_PROOF_BYTES,
+            })
+        );
+    }
+
+    #[test]
+    fn private_transfer_rejects_empty_and_accepts_exact_opaque_limits() {
+        let packet = private_packet();
+        assert_eq!(
+            PrivateTransferPacketV2::new(packet.intent().clone(), [Vec::new(), vec![1]], vec![2]),
+            Err(CodecError::EmptyRequiredField("private recipient envelope"))
+        );
+        assert_eq!(
+            PrivateTransferPacketV2::new(packet.intent().clone(), [vec![1], vec![2]], Vec::new()),
+            Err(CodecError::EmptyRequiredField("private transfer proof"))
+        );
+        let largest = PrivateTransferPacketV2::new(
+            packet.intent().clone(),
+            [
+                vec![1; MAX_PRIVATE_ENVELOPE_BYTES as usize],
+                vec![2; MAX_PRIVATE_ENVELOPE_BYTES as usize],
+            ],
+            vec![3; MAX_PRIVATE_PROOF_BYTES as usize],
+        )
+        .unwrap();
+        assert_eq!(
+            decode_private_transfer(&encode_private_transfer(&largest).unwrap()).unwrap(),
+            largest
         );
     }
 

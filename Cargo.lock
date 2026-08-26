@@ -89,6 +89,7 @@ version = "0.1.0"
 dependencies = [
  "noxis-crypto",
  "noxis-ledger",
+ "noxis-privacy-types",
  "noxis-types",
  "sha2",
 ]
