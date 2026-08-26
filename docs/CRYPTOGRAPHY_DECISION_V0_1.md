@@ -18,6 +18,7 @@ O Noxis não implementará primitivas criptográficas próprias. A evolução se
 2. O `state_anchor` já carrega uma raiz Merkle tipada e a profundidade da árvore. A implementação SHA-256 atual estabelece a semântica de estado e é declarada no `CryptoSuite` provisório, mas será substituída por uma árvore Poseidon compatível com o circuito antes de introduzir provas ZK.
 3. O nó só aceitará transferências privadas depois de verificar uma prova concreta contra essa raiz. Não haverá modo que aceite uma prova simulada em ambientes com valor transferível.
 4. Antes de introduzir Halo2, o projeto define os bytes canônicos de cada transação, a separação de domínio, os limites e vetores de teste.
+5. O serviço de liquidação não pode ser aberto com nenhuma suíte nesta versão: a autorização de produção falha fechada. A feature `research-testing` só libera o fixture E2E com `RESEARCH_V1`; detalhes estão em [`CRYPTO_SERVICE_GATE_V0_1.md`](CRYPTO_SERVICE_GATE_V0_1.md).
 
 ## Sequência obrigatória
 

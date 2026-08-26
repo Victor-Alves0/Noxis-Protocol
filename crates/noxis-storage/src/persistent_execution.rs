@@ -9,6 +9,7 @@
 use std::{fmt, path::Path};
 
 use noxis_consensus::{CometBftGenesis, CometBftNetworkIdentity};
+use noxis_crypto::ValidationContext;
 use noxis_execution::{
     BlockProposal, CandidateExecutionState, CommittedExecutionState, ExecutedBlock,
     ExecutionContext, ExecutionError, ExecutionReceipt, execute_block, simulate_transaction,
@@ -116,6 +117,12 @@ impl PersistentExecution {
     /// Complete CometBFT genesis mapping used to validate durable decisions.
     pub fn comet_bft_genesis(&self) -> &CometBftGenesis {
         self.context.comet_bft_genesis()
+    }
+
+    /// Immutable public identity of the cryptographic components bound to this
+    /// journal's genesis and replay context.
+    pub const fn validation_context(&self) -> ValidationContext {
+        self.context.validation_context()
     }
 
     /// Maximum records accepted in a single deterministic execution block.

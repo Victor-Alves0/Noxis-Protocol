@@ -1,6 +1,7 @@
 use std::fmt;
 
 use noxis_consensus::EngineIdentityError;
+use noxis_crypto::ServiceCryptoEligibilityError;
 use noxis_execution::ExecutionError;
 use noxis_storage::PersistentExecutionError;
 
@@ -9,6 +10,7 @@ use crate::HeightMappingError;
 /// A lifecycle violation or deterministic execution failure in the ABCI core.
 #[derive(Debug)]
 pub enum CometAbciError {
+    CryptoEligibility(ServiceCryptoEligibilityError),
     Height(HeightMappingError),
     EngineIdentity(Box<EngineIdentityError>),
     Execution(ExecutionError),
@@ -27,6 +29,12 @@ pub enum CometAbciError {
 impl fmt::Display for CometAbciError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::CryptoEligibility(error) => {
+                write!(
+                    formatter,
+                    "cryptographic settlement eligibility failed: {error}"
+                )
+            }
             Self::Height(error) => write!(formatter, "invalid Comet/Noxis height: {error}"),
             Self::EngineIdentity(error) => {
                 write!(formatter, "invalid CometBFT decision context: {error}")
@@ -72,6 +80,7 @@ impl fmt::Display for CometAbciError {
 impl std::error::Error for CometAbciError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::CryptoEligibility(error) => Some(error),
             Self::Height(error) => Some(error),
             Self::EngineIdentity(error) => Some(error.as_ref()),
             Self::Execution(error) => Some(error),

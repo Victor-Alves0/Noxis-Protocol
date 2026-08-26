@@ -496,7 +496,15 @@ mod tests {
             Arc::new(mint_policy),
         )
         .unwrap();
-        NoxisCometCore::new(PersistentExecution::open(path, ledger, context).unwrap())
+        let authorization = context
+            .validation_context()
+            .authorize_research_testing()
+            .unwrap();
+        NoxisCometCore::try_new(
+            PersistentExecution::open(path, ledger, context).unwrap(),
+            authorization,
+        )
+        .unwrap()
     }
 
     #[test]

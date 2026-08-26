@@ -5,6 +5,11 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+[features]
+# Enables explicitly marked research-only consensus fixtures. It is never
+# enabled by default and does not make any crypto suite production-ready.
+research-testing = []
+
 [dependencies]
 noxis-types = { path = "../noxis-types" }
 sha2 = "0.10.9"

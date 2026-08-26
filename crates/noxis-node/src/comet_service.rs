@@ -12,7 +12,7 @@ use std::{
 
 use noxis_comet_abci::{CometAbciServer, CometAbciServerError, NoxisCometCore};
 use noxis_config::{ConfigError, GenesisConfig};
-use noxis_crypto::ProofVerifier;
+use noxis_crypto::{ProofVerifier, ServiceCryptoEligibilityError, SettlementServiceAuthorization};
 use noxis_execution::{ExecutionContext, ExecutionError};
 use noxis_ledger::MintPolicy;
 use noxis_runtime::{DataDirectory, NodeRuntime, RuntimeError, StorageMode};
@@ -89,9 +89,10 @@ impl CometNodeServiceConfig {
 
 /// One initialized CometBFT application service.
 ///
-/// The caller must supply the concrete proof verifier and mint policy. This
-/// crate intentionally provides no permissive fallback, no private validator
-/// key handling and no public-network listener.
+/// The caller must supply the concrete proof verifier, mint policy and opaque
+/// settlement-service authorization. This crate intentionally provides no
+/// permissive fallback, no private validator key handling and no public-network
+/// listener.
 pub struct CometNodeService {
     runtime: NodeRuntime,
     abci: CometAbciServer,
@@ -104,11 +105,15 @@ impl CometNodeService {
         config: CometNodeServiceConfig,
         verifier: V,
         mint_policy: P,
+        authorization: SettlementServiceAuthorization,
     ) -> Result<Self, CometNodeServiceError>
     where
         V: ProofVerifier + 'static,
         P: MintPolicy + 'static,
     {
+        authorization
+            .ensure_matches(config.genesis.validation_context())
+            .map_err(CometNodeServiceError::CryptoEligibility)?;
         let comet_genesis = config
             .genesis
             .comet_bft_genesis()
@@ -147,7 +152,8 @@ impl CometNodeService {
                 .map_err(CometNodeServiceError::PersistentExecution)?;
         let abci = CometAbciServer::bind(
             config.abci_endpoint.socket_addr(),
-            NoxisCometCore::new(execution),
+            NoxisCometCore::try_new(execution, authorization)
+                .map_err(CometNodeServiceError::AbciCore)?,
         )
         .map_err(CometNodeServiceError::Abci)?;
         Ok(Self { runtime, abci })
@@ -215,17 +221,22 @@ impl std::error::Error for LocalAbciEndpointError {
 /// A failure while composing the local CometBFT service.
 #[derive(Debug)]
 pub enum CometNodeServiceError {
+    CryptoEligibility(ServiceCryptoEligibilityError),
     EngineNeutralGenesis,
     Config(ConfigError),
     Runtime(RuntimeError),
     Execution(ExecutionError),
     PersistentExecution(PersistentExecutionError),
+    AbciCore(noxis_comet_abci::CometAbciError),
     Abci(CometAbciServerError),
 }
 
 impl fmt::Display for CometNodeServiceError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::CryptoEligibility(error) => {
+                write!(formatter, "cryptographic settlement eligibility failed: {error}")
+            }
             Self::EngineNeutralGenesis => formatter.write_str(
                 "CometBFT service requires a genesis with an explicit CometBFT identity and validator mapping",
             ),
@@ -233,6 +244,7 @@ impl fmt::Display for CometNodeServiceError {
             Self::Runtime(error) => write!(formatter, "cannot establish CometBFT service runtime: {error}"),
             Self::Execution(error) => write!(formatter, "cannot establish deterministic execution: {error}"),
             Self::PersistentExecution(error) => write!(formatter, "cannot recover consensus block journal: {error}"),
+            Self::AbciCore(error) => write!(formatter, "cannot compose ABCI core: {error}"),
             Self::Abci(error) => write!(formatter, "cannot serve local ABCI: {error}"),
         }
     }
@@ -241,10 +253,12 @@ impl fmt::Display for CometNodeServiceError {
 impl std::error::Error for CometNodeServiceError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::CryptoEligibility(error) => Some(error),
             Self::Config(error) => Some(error),
             Self::Runtime(error) => Some(error),
             Self::Execution(error) => Some(error),
             Self::PersistentExecution(error) => Some(error),
+            Self::AbciCore(error) => Some(error),
             Self::Abci(error) => Some(error),
             Self::EngineNeutralGenesis => None,
         }
@@ -361,6 +375,13 @@ mod tests {
         .unwrap()
     }
 
+    fn research_authorization(genesis: &GenesisConfig) -> SettlementServiceAuthorization {
+        genesis
+            .validation_context()
+            .authorize_research_testing()
+            .unwrap()
+    }
+
     #[test]
     fn rejects_a_non_loopback_abci_listener() {
         let error = LocalAbciEndpoint::new("0.0.0.0:26658".parse().unwrap()).unwrap_err();
@@ -371,14 +392,17 @@ mod tests {
     fn opens_a_loopback_service_with_a_dedicated_block_journal() {
         let workspace = TemporaryDirectory::new();
         let data_directory = DataDirectory::new(workspace.0.join("comet-node")).unwrap();
+        let genesis = comet_genesis();
+        let authorization = research_authorization(&genesis);
         let service = CometNodeService::open(
             CometNodeServiceConfig::new(
                 data_directory.clone(),
-                comet_genesis(),
+                genesis,
                 LocalAbciEndpoint::new("127.0.0.1:0".parse().unwrap()).unwrap(),
             ),
             AcceptingVerifier,
             DenyAllMints,
+            authorization,
         )
         .unwrap();
 
@@ -395,17 +419,51 @@ mod tests {
     fn refuses_wrong_crypto_components_before_creating_node_data() {
         let workspace = TemporaryDirectory::new();
         let data_directory = DataDirectory::new(workspace.0.join("uncreated-comet-node")).unwrap();
+        let genesis = comet_genesis();
+        let authorization = research_authorization(&genesis);
+        let result = CometNodeService::open(
+            CometNodeServiceConfig::new(
+                data_directory.clone(),
+                genesis,
+                LocalAbciEndpoint::new("127.0.0.1:0".parse().unwrap()).unwrap(),
+            ),
+            WrongVerifier,
+            DenyAllMints,
+            authorization,
+        );
+
+        assert!(matches!(result, Err(CometNodeServiceError::Execution(_))));
+        assert!(!data_directory.path().exists());
+    }
+
+    #[test]
+    fn refuses_research_authorization_for_a_different_validation_context() {
+        let workspace = TemporaryDirectory::new();
+        let data_directory = DataDirectory::new(workspace.0.join("uncreated-comet-node")).unwrap();
+        let authorization = ValidationContext::new(
+            CryptoSuite::RESEARCH_V1,
+            ProofVerifierId::new([9; 32]),
+            MintPolicyId::new([0; 32]),
+        )
+        .authorize_research_testing()
+        .unwrap();
         let result = CometNodeService::open(
             CometNodeServiceConfig::new(
                 data_directory.clone(),
                 comet_genesis(),
                 LocalAbciEndpoint::new("127.0.0.1:0".parse().unwrap()).unwrap(),
             ),
-            WrongVerifier,
+            AcceptingVerifier,
             DenyAllMints,
+            authorization,
         );
 
-        assert!(matches!(result, Err(CometNodeServiceError::Execution(_))));
+        assert!(matches!(
+            result,
+            Err(CometNodeServiceError::CryptoEligibility(
+                ServiceCryptoEligibilityError::AuthorizationContextMismatch
+            ))
+        ));
         assert!(!data_directory.path().exists());
     }
 
@@ -441,6 +499,7 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
+        let authorization = research_authorization(&genesis);
 
         let result = CometNodeService::open(
             CometNodeServiceConfig::new(
@@ -450,6 +509,7 @@ mod tests {
             ),
             AcceptingVerifier,
             DenyAllMints,
+            authorization,
         );
 
         assert!(matches!(

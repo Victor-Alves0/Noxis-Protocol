@@ -165,6 +165,16 @@ pub struct ValidationContext {
     mint_policy_id: MintPolicyId,
 }
 
+/// An unforgeable, context-bound permission to construct a settlement service.
+///
+/// No production authorization is issued in this release. The type exists so a
+/// future audited suite can be approved centrally without allowing callers to
+/// claim approval merely by selecting algorithm labels in a configuration.
+#[derive(Debug)]
+pub struct SettlementServiceAuthorization {
+    validation_context_id: ValidationContextId,
+}
+
 impl ValidationContext {
     /// Byte length of the canonical public encoding.
     pub const ENCODED_LENGTH: usize = 2 + 4 + 64;
@@ -200,6 +210,36 @@ impl ValidationContext {
             Ok(()) => Ok(()),
             Err(error) => Err(ValidationContextError::InvalidCryptoSuite(error)),
         }
+    }
+
+    /// Requests authorization to construct a settlement service.
+    ///
+    /// This release deliberately has no approved production proof system,
+    /// commitment tree, key-management design or independent audit. Therefore
+    /// every context fails closed, including contexts whose labels are valid.
+    pub const fn authorize_settlement_service(
+        self,
+    ) -> Result<SettlementServiceAuthorization, ServiceCryptoEligibilityError> {
+        let _ = self;
+        Err(ServiceCryptoEligibilityError::UnapprovedValidationContext)
+    }
+
+    /// Authorizes a research-only fixture for the built-in `RESEARCH_V1` suite.
+    ///
+    /// This API is excluded unless the consuming crate explicitly enables the
+    /// `research-testing` feature. It exists solely to exercise deterministic
+    /// persistence and ABCI lifecycle tests; it does not authorize custody,
+    /// public networking, a testnet carrying value, or any privacy claim.
+    #[cfg(feature = "research-testing")]
+    pub fn authorize_research_testing(
+        self,
+    ) -> Result<SettlementServiceAuthorization, ServiceCryptoEligibilityError> {
+        if self.crypto_suite != CryptoSuite::RESEARCH_V1 {
+            return Err(ServiceCryptoEligibilityError::UnapprovedValidationContext);
+        }
+        Ok(SettlementServiceAuthorization {
+            validation_context_id: self.id(),
+        })
     }
 
     /// Hash-addressed identity of this canonical public context.
@@ -251,6 +291,19 @@ impl ValidationContext {
     }
 }
 
+impl SettlementServiceAuthorization {
+    /// Rejects use of an authorization emitted for another validation context.
+    pub fn ensure_matches(
+        &self,
+        context: ValidationContext,
+    ) -> Result<(), ServiceCryptoEligibilityError> {
+        if self.validation_context_id != context.id() {
+            return Err(ServiceCryptoEligibilityError::AuthorizationContextMismatch);
+        }
+        Ok(())
+    }
+}
+
 /// A public validation-context encoding cannot be interpreted safely.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ValidationContextError {
@@ -292,6 +345,30 @@ impl std::error::Error for ValidationContextError {
         }
     }
 }
+
+/// A request to start settlement processing without an approved crypto stack.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ServiceCryptoEligibilityError {
+    /// No concrete production suite has been approved in this release.
+    UnapprovedValidationContext,
+    /// A capability issued for one context was presented with another one.
+    AuthorizationContextMismatch,
+}
+
+impl fmt::Display for ServiceCryptoEligibilityError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnapprovedValidationContext => formatter.write_str(
+                "the validation context has no approved production cryptographic implementation",
+            ),
+            Self::AuthorizationContextMismatch => formatter.write_str(
+                "settlement-service authorization belongs to a different validation context",
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ServiceCryptoEligibilityError {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Proof {
@@ -436,6 +513,39 @@ mod tests {
                     algorithm: AlgorithmId::Ed25519,
                 }
             ))
+        );
+    }
+
+    #[test]
+    fn no_context_can_claim_production_settlement_approval() {
+        let context = ValidationContext::new(
+            CryptoSuite::RESEARCH_V1,
+            ProofVerifierId::new([1; 32]),
+            MintPolicyId::new([2; 32]),
+        );
+        assert!(matches!(
+            context.authorize_settlement_service(),
+            Err(ServiceCryptoEligibilityError::UnapprovedValidationContext)
+        ));
+    }
+
+    #[cfg(feature = "research-testing")]
+    #[test]
+    fn research_authorization_is_bound_to_its_exact_context() {
+        let context = ValidationContext::new(
+            CryptoSuite::RESEARCH_V1,
+            ProofVerifierId::new([1; 32]),
+            MintPolicyId::new([2; 32]),
+        );
+        let authorization = context.authorize_research_testing().unwrap();
+        assert!(authorization.ensure_matches(context).is_ok());
+        assert_eq!(
+            authorization.ensure_matches(ValidationContext::new(
+                CryptoSuite::RESEARCH_V1,
+                ProofVerifierId::new([3; 32]),
+                MintPolicyId::new([2; 32]),
+            )),
+            Err(ServiceCryptoEligibilityError::AuthorizationContextMismatch)
         );
     }
 }

@@ -12,7 +12,7 @@
 //! the explicit, controlled supervisor signal before the second service opens
 //! the directory.
 
-#![cfg(unix)]
+#![cfg(all(unix, feature = "research-testing"))]
 
 use std::{
     collections::BTreeMap,
@@ -119,6 +119,10 @@ fn real_cometbft_handshake_empty_block_and_process_restart() {
     let node_directory =
         DataDirectory::new(workspace.0.join("noxis-node")).expect("test data directory is valid");
     let genesis = genesis_for_fixture(&fixture);
+    let authorization = genesis
+        .validation_context()
+        .authorize_research_testing()
+        .expect("fixture uses the explicitly enabled research suite");
     let service = Arc::new(
         CometNodeService::open(
             CometNodeServiceConfig::new(
@@ -128,6 +132,7 @@ fn real_cometbft_handshake_empty_block_and_process_restart() {
             ),
             EmptyBlockVerifier,
             DenyAllMints,
+            authorization,
         )
         .expect("test service can bind and initialize"),
     );
@@ -148,6 +153,10 @@ fn real_cometbft_handshake_empty_block_and_process_restart() {
 
     // Opening a fresh service on the same data directory replays the durable
     // `NXCB` journal before it accepts the restarted engine's Info handshake.
+    let authorization = genesis
+        .validation_context()
+        .authorize_research_testing()
+        .expect("fixture uses the explicitly enabled research suite");
     let service = Arc::new(
         CometNodeService::open(
             CometNodeServiceConfig::new(
@@ -157,6 +166,7 @@ fn real_cometbft_handshake_empty_block_and_process_restart() {
             ),
             EmptyBlockVerifier,
             DenyAllMints,
+            authorization,
         )
         .expect("restarted service can recover the same journal"),
     );

@@ -56,7 +56,7 @@ serviço ABCI Noxis e um validador CometBFT local. Sua forma é:
       - id: cometbft
         uses: ./.github/actions/setup-cometbft
       - run: >-
-          cargo +1.85.0 test -p noxis-node --test cometbft_e2e --locked --
+          cargo +1.85.0 test -p noxis-node --test cometbft_e2e --features research-testing --locked --
           --ignored --exact real_cometbft_handshake_empty_block_and_process_restart
         env:
           COMETBFT_BIN: ${{ steps.cometbft.outputs.bin }}

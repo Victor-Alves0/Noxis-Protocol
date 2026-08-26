@@ -5,6 +5,11 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+[features]
+# Enables an explicitly labelled research-only Comet service fixture. This
+# cannot authorize a production crypto suite or public settlement deployment.
+research-testing = ["noxis-crypto/research-testing"]
+
 [dependencies]
 noxis-consensus = { path = "../noxis-consensus" }
 noxis-codec = { path = "../noxis-codec" }
@@ -18,6 +23,9 @@ noxis-record-chain = { path = "../noxis-record-chain" }
 noxis-runtime = { path = "../noxis-runtime" }
 noxis-storage = { path = "../noxis-storage" }
 noxis-types = { path = "../noxis-types" }
+
+[dev-dependencies]
+noxis-crypto = { path = "../noxis-crypto", features = ["research-testing"] }
 
 [lints]
 workspace = true

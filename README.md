@@ -85,7 +85,7 @@ SDK linker and libraries.
 
 ## Security boundary
 
-The `ProofVerifier` and `MintPolicy` interfaces are deliberately unimplemented for production. A transaction is never private merely because it contains a `Proof` byte array: privacy and conservation are established only when an audited proof system verifies the statement against a canonical state root. Post-quantum and hybrid cryptography are design reservations, not active protection in this codebase.
+The `ProofVerifier` and `MintPolicy` interfaces are deliberately unimplemented for production. A transaction is never private merely because it contains a `Proof` byte array: privacy and conservation are established only when an audited proof system verifies the statement against a canonical state root. Post-quantum and hybrid cryptography are design reservations, not active protection in this codebase. The consensus service is fail-closed: no cryptographic context is approved to run settlement yet; the only research exception is an explicitly compiled E2E fixture. See [`docs/CRYPTO_SERVICE_GATE_V0_1.md`](docs/CRYPTO_SERVICE_GATE_V0_1.md).
 
 The ABCI socket is deliberately loopback-only and has bounded local
 connections, but it is still unauthenticated IPC. It must run in an

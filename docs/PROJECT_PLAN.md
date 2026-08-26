@@ -38,19 +38,23 @@ manifesto; o mapeamento v0.38 de chaves Ed25519, endereços e poderes também é
 recalculado e preso à gênese. Cada bloco durável e seu `AppHash` registram a
 decisão exata da engine, e o núcleo compara os parâmetros e validadores de
 `InitChain` com essa âncora. O adaptador TCP ABCI v0.38 agora decodifica o
-socket protobuf estritamente e mantém o núcleo serializado entre conexões. Ainda
-faltam validar tudo contra uma engine BFT em execução, adaptador de assinatura
-concreto, chaves privadas, rotação/governança, comunicação entre nós e
-recuperação baseada em finalidade.
+socket protobuf estritamente e mantém o núcleo serializado entre conexões. Um
+teste Linux inicia CometBFT 0.38.17 real, produz um bloco, reinicia ambos os
+processos contra o mesmo journal e roda na CI com binário fixado por checksum.
+Ainda faltam adaptador de assinatura concreto, chaves privadas,
+rotação/governança, comunicação entre nós e recuperação baseada em finalidade.
 
 ### 5. Privacidade criptográfica auditável
 
 Substitui o verificador de desenvolvimento por um sistema de provas escolhido e revisado, com circuitos, árvore Merkle canônica, provas de associação, conservação de valor e prevenção de gasto duplo.
 
 **Estado atual:** não implementada. As interfaces e a versão de suíte existem
-para permitir migração; anonimato real, provas ZK de produção e criptografia
-híbrida pós-quântica só poderão ser considerados ativos depois de escolha
-formal, implementação, testes adversariais e auditoria independente.
+para permitir migração, e o serviço de liquidação agora falha fechado até uma
+pilha criptográfica aprovada existir. A exceção `research-testing` é limitada ao
+teste E2E. Anonimato real, provas ZK de produção e criptografia híbrida
+pós-quântica só poderão ser considerados ativos depois de escolha formal,
+implementação, testes adversariais e auditoria independente. Ver
+[`CRYPTO_SERVICE_GATE_V0_1.md`](CRYPTO_SERVICE_GATE_V0_1.md).
 
 ### 6. Adaptadores de ativos e políticas de emissão
 

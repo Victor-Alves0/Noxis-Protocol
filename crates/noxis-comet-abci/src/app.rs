@@ -1,3 +1,4 @@
+use noxis_crypto::SettlementServiceAuthorization;
 use noxis_execution::{BlockProposal, ExecutedBlock, ExecutionReceipt};
 use noxis_record_chain::RecordHash;
 use noxis_storage::{DurableBlockReceipt, PersistentExecution};
@@ -111,8 +112,16 @@ pub struct NoxisCometCore {
 }
 
 impl NoxisCometCore {
-    /// Creates a core around an already replay-verified durable journal.
-    pub fn new(execution: PersistentExecution) -> Self {
+    /// Creates a core around a replay-verified journal only after the caller
+    /// proves that the journal's exact validation context is eligible to run a
+    /// settlement service.
+    pub fn try_new(
+        execution: PersistentExecution,
+        authorization: SettlementServiceAuthorization,
+    ) -> Result<Self, CometAbciError> {
+        authorization
+            .ensure_matches(execution.validation_context())
+            .map_err(CometAbciError::CryptoEligibility)?;
         let identity = CometIdentity::from_genesis(execution.comet_bft_genesis().clone());
         let mempool = MempoolOverlay::new(execution.candidate_execution_state());
         let lifecycle = if execution.committed_state().height() == 0 {
@@ -120,7 +129,7 @@ impl NoxisCometCore {
         } else {
             Lifecycle::Running
         };
-        Self {
+        Ok(Self {
             identity,
             execution,
             mempool,
@@ -129,7 +138,7 @@ impl NoxisCometCore {
             // bootstrap. A fresh journal must receive a matching InitChain
             // before it is allowed to execute a consensus block.
             lifecycle,
-        }
+        })
     }
 
     pub fn identity(&self) -> &CometIdentity {

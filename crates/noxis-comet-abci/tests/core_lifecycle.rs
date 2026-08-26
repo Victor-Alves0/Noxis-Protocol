@@ -143,9 +143,13 @@ fn fixture(
         Arc::new(mint_policy),
     )
     .expect("test execution context is valid");
+    let authorization = context
+        .validation_context()
+        .authorize_research_testing()
+        .unwrap();
     let execution = PersistentExecution::open(directory.journal_path(), ledger, context)
         .expect("test journal opens on Unix");
-    let core = NoxisCometCore::new(execution);
+    let core = NoxisCometCore::try_new(execution, authorization).unwrap();
     (directory, core)
 }
 
