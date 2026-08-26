@@ -35,6 +35,7 @@ impl FinalityTarget {
         }
     }
 
+    #[allow(clippy::too_many_arguments)] // Exact canonical fields from the decoder; no public builder.
     pub(crate) const fn new(
         genesis_id: GenesisId,
         validation_context_id: ValidationContextId,

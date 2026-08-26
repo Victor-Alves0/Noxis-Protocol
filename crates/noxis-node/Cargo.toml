@@ -15,6 +15,7 @@ noxis-merkle = { path = "../noxis-merkle" }
 noxis-record-chain = { path = "../noxis-record-chain" }
 noxis-runtime = { path = "../noxis-runtime" }
 noxis-storage = { path = "../noxis-storage" }
+noxis-types = { path = "../noxis-types" }
 
 [lints]
 workspace = true

@@ -560,13 +560,15 @@ fn ensure_validation_components(
     let verifier_id = verifier.proof_verifier_id();
     let mint_policy_id = mint_policy.mint_policy_id();
     if verifier_id != anchor.proof_verifier_id || mint_policy_id != anchor.mint_policy_id {
-        return Err(PersistentLedgerError::ValidationContextMismatch {
-            expected: anchor.validation_context_id,
-            expected_proof_verifier: anchor.proof_verifier_id,
-            actual_proof_verifier: verifier_id,
-            expected_mint_policy: anchor.mint_policy_id,
-            actual_mint_policy: mint_policy_id,
-        });
+        return Err(PersistentLedgerError::ValidationContextMismatch(Box::new(
+            ValidationContextMismatch {
+                expected: anchor.validation_context_id,
+                expected_proof_verifier: anchor.proof_verifier_id,
+                actual_proof_verifier: verifier_id,
+                expected_mint_policy: anchor.mint_policy_id,
+                actual_mint_policy: mint_policy_id,
+            },
+        )));
     }
     Ok(())
 }
@@ -610,13 +612,7 @@ pub enum PersistentLedgerError {
         anchor: ValidationContextId,
         supplied: ValidationContextId,
     },
-    ValidationContextMismatch {
-        expected: ValidationContextId,
-        expected_proof_verifier: ProofVerifierId,
-        actual_proof_verifier: ProofVerifierId,
-        expected_mint_policy: MintPolicyId,
-        actual_mint_policy: MintPolicyId,
-    },
+    ValidationContextMismatch(Box<ValidationContextMismatch>),
     TransactionCryptoSuiteMismatch {
         expected: noxis_crypto::CryptoSuite,
         actual: noxis_crypto::CryptoSuite,
@@ -626,6 +622,19 @@ pub enum PersistentLedgerError {
         computed: StateId,
     },
     WriteUnavailable,
+}
+
+/// Detailed component identities for a rejected validation context.
+///
+/// It is boxed by [`PersistentLedgerError`] so successful and ordinary error
+/// paths do not carry five 32-byte identifiers by value.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ValidationContextMismatch {
+    expected: ValidationContextId,
+    expected_proof_verifier: ProofVerifierId,
+    actual_proof_verifier: ProofVerifierId,
+    expected_mint_policy: MintPolicyId,
+    actual_mint_policy: MintPolicyId,
 }
 
 impl fmt::Display for PersistentLedgerError {
@@ -653,7 +662,7 @@ impl fmt::Display for PersistentLedgerError {
             Self::InvalidChainAnchorContext { .. } => formatter.write_str(
                 "configured chain anchor does not match the supplied validation context",
             ),
-            Self::ValidationContextMismatch { .. } => formatter.write_str(
+            Self::ValidationContextMismatch(_) => formatter.write_str(
                 "configured validation context does not match the proof verifier or mint policy",
             ),
             Self::TransactionCryptoSuiteMismatch { .. } => formatter.write_str(
@@ -682,7 +691,7 @@ impl std::error::Error for PersistentLedgerError {
             Self::InvalidValidationContext(error) => Some(error),
             Self::InvalidChainAnchor { .. }
             | Self::InvalidChainAnchorContext { .. }
-            | Self::ValidationContextMismatch { .. }
+            | Self::ValidationContextMismatch(_)
             | Self::TransactionCryptoSuiteMismatch { .. }
             | Self::CheckpointAtGenesis
             | Self::AmbiguousCheckpoints { .. }
@@ -829,6 +838,7 @@ fn open_log_file(path: &Path) -> Result<File, StorageError> {
         .read(true)
         .write(true)
         .create(true)
+        .truncate(false)
         .open(path)
         .map_err(|source| StorageError::Io {
             operation: "open transaction log",
@@ -1268,7 +1278,7 @@ mod tests {
                 &DifferentVerifier,
                 &DenyAllMints
             ),
-            Err(PersistentLedgerError::ValidationContextMismatch { .. })
+            Err(PersistentLedgerError::ValidationContextMismatch(_))
         ));
         assert!(!path.exists());
 
@@ -1283,7 +1293,7 @@ mod tests {
                 &TestVerifier,
                 &DifferentDenyAllMints
             ),
-            Err(PersistentLedgerError::ValidationContextMismatch { .. })
+            Err(PersistentLedgerError::ValidationContextMismatch(_))
         ));
         assert!(!path.exists());
     }
@@ -1297,7 +1307,7 @@ mod tests {
 
         assert!(matches!(
             ledger.apply(&transaction(1), &DifferentVerifier, &DenyAllMints),
-            Err(PersistentLedgerError::ValidationContextMismatch { .. })
+            Err(PersistentLedgerError::ValidationContextMismatch(_))
         ));
         assert_eq!(ledger.status().sequence, 0);
         assert_eq!(fs::metadata(&path).unwrap().len(), original_length);
@@ -1491,7 +1501,7 @@ mod tests {
     fn checkpoint_at_genesis_is_refused_without_creating_artifacts() {
         let directory = TestDirectory::new();
         let checkpoint_directory = directory.checkpoint_directory();
-        let ledger = open_persistent(&directory.log_path()).unwrap();
+        let mut ledger = open_persistent(&directory.log_path()).unwrap();
         assert!(matches!(
             ledger.publish_checkpoint(checkpoint_directory.clone()),
             Err(PersistentLedgerError::CheckpointAtGenesis)

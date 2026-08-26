@@ -149,7 +149,7 @@ impl TransactionRecord {
             });
         }
         let transaction_bytes = reader.read_exact(transaction_length as usize)?.to_vec();
-        let transaction_intent_id = TransactionIntentId::new(reader.read_array()?);
+        let stored_transaction_intent_id = TransactionIntentId::new(reader.read_array()?);
         let resulting_state_id = StateId::new(reader.read_array()?);
         let record_hash = RecordHash(reader.read_array()?);
         reader.finish()?;
@@ -159,9 +159,9 @@ impl TransactionRecord {
             decode_transaction(&transaction_bytes).map_err(RecordError::Transaction)?;
         let calculated_intent_id =
             transaction_intent_id(&decoded_transaction).map_err(RecordError::Transaction)?;
-        if calculated_intent_id != transaction_intent_id {
+        if calculated_intent_id != stored_transaction_intent_id {
             return Err(RecordError::TransactionIntentIdMismatch {
-                record: transaction_intent_id,
+                record: stored_transaction_intent_id,
                 transaction: calculated_intent_id,
             });
         }
@@ -169,7 +169,7 @@ impl TransactionRecord {
             sequence,
             previous_state_id,
             &transaction_bytes,
-            transaction_intent_id,
+            stored_transaction_intent_id,
             resulting_state_id,
         );
         if record_hash != expected_hash {
@@ -179,7 +179,7 @@ impl TransactionRecord {
             sequence,
             previous_state_id,
             transaction_bytes,
-            transaction_intent_id,
+            transaction_intent_id: stored_transaction_intent_id,
             resulting_state_id,
             record_hash,
         })

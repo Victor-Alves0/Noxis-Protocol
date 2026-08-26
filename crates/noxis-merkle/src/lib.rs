@@ -241,7 +241,7 @@ fn empty_hashes(depth: u8) -> Vec<Hash> {
 }
 
 fn parent_level(children: &[Hash]) -> Vec<Hash> {
-    debug_assert!(children.len() > 0 && children.len() % 2 == 0);
+    debug_assert!(!children.is_empty() && children.len() % 2 == 0);
     children
         .chunks_exact(2)
         .map(|pair| hash_node(&pair[0], &pair[1]))

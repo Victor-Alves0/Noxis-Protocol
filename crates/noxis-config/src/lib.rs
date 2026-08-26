@@ -555,7 +555,7 @@ mod tests {
         .unwrap();
         let changed_mint_policy = GenesisConfig::new(
             3,
-            assets,
+            assets.clone(),
             ValidationContext::new(
                 CryptoSuite::RESEARCH_V1,
                 ProofVerifierId::new([1; 32]),

@@ -77,6 +77,10 @@ The CI workflow runs the same quality gate on Ubuntu with Rust 1.85, the
 minimum supported compiler. It uses the committed lockfile and has read-only
 repository permissions.
 
+On Windows, run the checks from a Visual Studio Build Tools C++ developer
+shell (or initialize `VsDevCmd.bat`) so Rust's MSVC target can find the Windows
+SDK linker and libraries.
+
 ## Security boundary
 
 The `ProofVerifier` and `MintPolicy` interfaces are deliberately unimplemented for production. A transaction is never private merely because it contains a `Proof` byte array: privacy and conservation are established only when an audited proof system verifies the statement against a canonical state root. Post-quantum and hybrid cryptography are design reservations, not active protection in this codebase.

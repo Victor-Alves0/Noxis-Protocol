@@ -1,6 +1,6 @@
 use noxis_ledger::LedgerState;
 use noxis_record_chain::{RecordChain, RecordHash};
-use noxis_types::{BlockId, ChainAnchor, StateId};
+use noxis_types::{BlockId, ChainAnchor};
 
 use crate::ExecutionError;
 

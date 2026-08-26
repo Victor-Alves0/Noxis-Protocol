@@ -98,7 +98,8 @@ impl StateRecordLog {
         let payload = record.encode();
         // Re-decoding makes this boundary reject any future construction path
         // that accidentally bypasses canonical record validation.
-        TransactionRecord::decode(&payload).map_err(RecordLogError::Record)?;
+        TransactionRecord::decode(&payload)
+            .map_err(|source| RecordLogError::Record { offset: 0, source })?;
         let frame = encode_frame(&payload)?;
         let offset = self
             .file
@@ -331,6 +332,7 @@ fn open_file(path: &Path) -> Result<File, RecordLogError> {
         .read(true)
         .write(true)
         .create(true)
+        .truncate(false)
         .open(path)
         .map_err(|source| RecordLogError::Io {
             operation: "open state-record log",

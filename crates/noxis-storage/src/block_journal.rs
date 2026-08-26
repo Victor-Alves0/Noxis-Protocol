@@ -180,7 +180,10 @@ impl BlockJournal {
         )?;
         // Decode the exact canonical bytes at the storage boundary.  This
         // makes malformed future construction paths fail before disk I/O.
-        decode_payload(&payload)?;
+        decode_payload(&payload).map_err(|source| BlockJournalError::Payload {
+            offset: 0,
+            source: Box::new(source),
+        })?;
         let frame = encode_frame(&payload)?;
         let offset = self
             .file
@@ -691,6 +694,7 @@ fn open_file(path: &Path) -> Result<File, BlockJournalError> {
         .read(true)
         .write(true)
         .create(true)
+        .truncate(false)
         .open(path)
         .map_err(|source| BlockJournalError::Io {
             operation: "open block journal",

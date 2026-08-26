@@ -89,12 +89,14 @@ impl Checkpoint {
         if self.genesis_id != anchor.genesis_id
             || self.validation_context_id != anchor.validation_context_id
         {
-            return Err(CheckpointError::AnchorMismatch {
-                checkpoint_genesis: self.genesis_id,
-                configured_genesis: anchor.genesis_id,
-                checkpoint_context: self.validation_context_id,
-                configured_context: anchor.validation_context_id,
-            });
+            return Err(CheckpointError::AnchorMismatch(Box::new(
+                CheckpointAnchorMismatch {
+                    checkpoint_genesis: self.genesis_id,
+                    configured_genesis: anchor.genesis_id,
+                    checkpoint_context: self.validation_context_id,
+                    configured_context: anchor.validation_context_id,
+                },
+            )));
         }
         let state = LedgerState::from_snapshot(self.snapshot.clone())
             .map_err(CheckpointError::InvalidSnapshot)?;
@@ -296,8 +298,8 @@ fn decode_snapshot(bytes: &[u8]) -> Result<LedgerSnapshot, CheckpointError> {
         })?;
         assets.push(asset);
     }
-    let commitments = read_identifiers(&mut reader, |bytes| Commitment::new(bytes))?;
-    let spent_nullifiers = read_identifiers(&mut reader, |bytes| Nullifier::new(bytes))?;
+    let commitments = read_identifiers(&mut reader, Commitment::new)?;
+    let spent_nullifiers = read_identifiers(&mut reader, Nullifier::new)?;
     let supply_count = reader.read_count(MAX_SNAPSHOT_ASSETS)?;
     let mut issued_supply = Vec::with_capacity(supply_count);
     for _ in 0..supply_count {
@@ -306,7 +308,7 @@ fn decode_snapshot(bytes: &[u8]) -> Result<LedgerSnapshot, CheckpointError> {
             .ok_or(CheckpointError::Snapshot(SnapshotError::ZeroSupply))?;
         issued_supply.push((asset_id, amount));
     }
-    let accepted_transactions = read_identifiers(&mut reader, |bytes| TransactionId::new(bytes))?;
+    let accepted_transactions = read_identifiers(&mut reader, TransactionId::new)?;
     reader.finish()?;
     LedgerSnapshot::from_canonical_parts(
         tree_depth,
@@ -489,7 +491,7 @@ impl<'a> SnapshotReader<'a> {
             .offset
             .checked_add(length)
             .ok_or(CheckpointError::LengthOverflow)?;
-        let bytes = self.bytes.get(self.offset..end).ok_or_else(|| {
+        let bytes = self.bytes.get(self.offset..end).ok_or({
             CheckpointError::Snapshot(SnapshotError::UnexpectedEnd {
                 offset: self.offset,
             })
@@ -613,13 +615,20 @@ pub enum CheckpointError {
         encoded: StateId,
         computed: StateId,
     },
-    AnchorMismatch {
-        checkpoint_genesis: GenesisId,
-        configured_genesis: GenesisId,
-        checkpoint_context: ValidationContextId,
-        configured_context: ValidationContextId,
-    },
+    AnchorMismatch(Box<CheckpointAnchorMismatch>),
     NonCanonicalEncoding,
+}
+
+/// The detailed identities involved in a checkpoint deployment mismatch.
+///
+/// This is boxed by [`CheckpointError`] so routine result values remain small
+/// even though the diagnostic retains all four 32-byte identifiers.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CheckpointAnchorMismatch {
+    checkpoint_genesis: GenesisId,
+    configured_genesis: GenesisId,
+    checkpoint_context: ValidationContextId,
+    configured_context: ValidationContextId,
 }
 
 impl fmt::Display for CheckpointError {
@@ -670,7 +679,7 @@ impl fmt::Display for CheckpointError {
             Self::StateIdMismatch { .. } => {
                 formatter.write_str("checkpoint state identifier does not match its snapshot")
             }
-            Self::AnchorMismatch { .. } => formatter.write_str(
+            Self::AnchorMismatch(_) => formatter.write_str(
                 "checkpoint deployment identity does not match the configured chain anchor",
             ),
             Self::NonCanonicalEncoding => {
@@ -754,7 +763,7 @@ mod tests {
         changed_anchor.genesis_id = GenesisId::new([99; 32]);
         assert!(matches!(
             checkpoint.restore_state(changed_anchor),
-            Err(CheckpointError::AnchorMismatch { .. })
+            Err(CheckpointError::AnchorMismatch(_))
         ));
     }
 

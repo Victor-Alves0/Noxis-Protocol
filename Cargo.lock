@@ -105,6 +105,7 @@ dependencies = [
  "noxis-record-chain",
  "noxis-storage",
  "noxis-types",
+ "sha2",
 ]
 
 [[package]]
@@ -179,6 +180,7 @@ dependencies = [
  "noxis-record-chain",
  "noxis-runtime",
  "noxis-storage",
+ "noxis-types",
 ]
 
 [[package]]

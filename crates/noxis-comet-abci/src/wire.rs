@@ -19,6 +19,14 @@ use crate::{AppInfo, CheckTxResult, FinalizeBlockResult, ProposalStatus};
 /// decoder limit at this application boundary.
 pub const MAX_ABCI_FRAME_BYTES: usize = 80 * 1024 * 1024;
 
+/// Largest CometBFT block size that can be safely transported inside the
+/// bounded ABCI frames accepted by this application.
+///
+/// The reserved 16 MiB covers protobuf envelopes and the request context. It
+/// also ensures a peer cannot configure CometBFT with an unbounded proposal
+/// and turn `PrepareProposal` into an application-memory denial of service.
+pub const MAX_COMET_BLOCK_BYTES: i64 = 64 * 1024 * 1024;
+
 const REQUEST_ECHO: u32 = 1;
 const REQUEST_FLUSH: u32 = 2;
 const REQUEST_INFO: u32 = 3;
@@ -59,6 +67,20 @@ const RESPONSE_FINALIZE_BLOCK: u32 = 21;
 pub(crate) struct InitValidatorUpdate {
     pub public_key: [u8; 32],
     pub voting_power: i64,
+}
+
+/// Security-relevant limits extracted from a v0.38 `ConsensusParams` message.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct ConsensusParameters {
+    pub block_max_bytes: i64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct DecisionRequest {
+    transactions: Vec<Vec<u8>>,
+    block_hash: [u8; 32],
+    height: i64,
+    next_validators_hash: [u8; 32],
 }
 
 /// ABCI v0.38 requests understood by the transport adapter.
@@ -120,7 +142,7 @@ pub(crate) enum Response {
     PrepareProposal(Vec<Vec<u8>>),
     ProcessProposal(ProposalStatus),
     ExtendVote,
-    VerifyVoteExtensionReject,
+    VerifyVoteExtensionAccept,
     FinalizeBlock(FinalizeBlockResult),
 }
 
@@ -188,20 +210,22 @@ fn decode_request(bytes: &[u8]) -> Result<Request, WireError> {
 
 fn decode_echo(bytes: &[u8]) -> Result<String, WireError> {
     let mut reader = ProtoReader::new(bytes);
-    let field = reader
-        .next()?
-        .ok_or(WireError::MissingField("echo.message"))?;
-    if field.number != 1 {
-        return Err(WireError::UnsupportedField {
-            message: "RequestEcho",
-            field: field.number,
-        });
+    let mut message = None;
+    while let Some(field) = reader.next()? {
+        if field.number != 1 {
+            return Err(WireError::UnsupportedField {
+                message: "RequestEcho",
+                field: field.number,
+            });
+        }
+        set_once(
+            &mut message,
+            decode_utf8(field.bytes()?, "echo.message")?,
+            "echo.message",
+        )?;
     }
-    let value = decode_utf8(field.bytes()?, "echo.message")?;
-    if reader.next()?.is_some() {
-        return Err(WireError::DuplicateOrTrailingField("echo.message"));
-    }
-    Ok(value)
+    // Proto3 omits an empty scalar field from the wire representation.
+    Ok(message.unwrap_or_default())
 }
 
 fn decode_check_tx(bytes: &[u8]) -> Result<Vec<u8>, WireError> {
@@ -221,7 +245,71 @@ fn decode_check_tx(bytes: &[u8]) -> Result<Vec<u8>, WireError> {
             }
         }
     }
-    transaction.ok_or(WireError::MissingField("check_tx.tx"))
+    // Proto3 omits an empty bytes field. The application still decides whether
+    // an empty transaction is admissible through its ordinary CheckTx rules.
+    Ok(transaction.unwrap_or_default())
+}
+
+/// Parses the only consensus parameter that constrains this transport.
+///
+/// The complete raw message remains committed by its SHA-256 digest in the
+/// genesis identity. This extraction is additionally needed to reject engine
+/// configurations that could legally produce a frame above this listener's
+/// allocation limit.
+pub(crate) fn decode_consensus_parameters(bytes: &[u8]) -> Result<ConsensusParameters, WireError> {
+    let mut reader = ProtoReader::new(bytes);
+    let mut block_parameters = None;
+    while let Some(field) = reader.next()? {
+        match field.number {
+            1 => set_once(
+                &mut block_parameters,
+                decode_block_parameters(field.bytes()?)?,
+                "consensus_params.block",
+            )?,
+            2..=5 => {
+                let _ = field.bytes()?;
+            }
+            other => {
+                return Err(WireError::UnsupportedField {
+                    message: "ConsensusParams",
+                    field: other,
+                });
+            }
+        }
+    }
+    let block_max_bytes =
+        block_parameters.ok_or(WireError::MissingField("consensus_params.block"))?;
+    if !(1..=MAX_COMET_BLOCK_BYTES).contains(&block_max_bytes) {
+        return Err(WireError::UnsupportedCometBlockMaximum {
+            actual: block_max_bytes,
+            maximum: MAX_COMET_BLOCK_BYTES,
+        });
+    }
+    Ok(ConsensusParameters { block_max_bytes })
+}
+
+fn decode_block_parameters(bytes: &[u8]) -> Result<i64, WireError> {
+    let mut reader = ProtoReader::new(bytes);
+    let mut maximum_bytes = None;
+    while let Some(field) = reader.next()? {
+        match field.number {
+            1 => set_once(
+                &mut maximum_bytes,
+                field.varint()? as i64,
+                "consensus_params.block.max_bytes",
+            )?,
+            2 => {
+                let _ = field.varint()?;
+            }
+            other => {
+                return Err(WireError::UnsupportedField {
+                    message: "BlockParams",
+                    field: other,
+                });
+            }
+        }
+    }
+    maximum_bytes.ok_or(WireError::MissingField("consensus_params.block.max_bytes"))
 }
 
 fn decode_init_chain(bytes: &[u8]) -> Result<Request, WireError> {
@@ -368,24 +456,22 @@ fn decode_prepare_proposal(bytes: &[u8]) -> Result<Request, WireError> {
 }
 
 fn decode_process_proposal(bytes: &[u8]) -> Result<Request, WireError> {
-    let (transactions, block_hash, height, next_validators_hash) =
-        decode_decision_request(bytes, "RequestProcessProposal", "process_proposal")?;
+    let decision = decode_decision_request(bytes, "RequestProcessProposal", "process_proposal")?;
     Ok(Request::ProcessProposal {
-        transactions,
-        block_hash,
-        height,
-        next_validators_hash,
+        transactions: decision.transactions,
+        block_hash: decision.block_hash,
+        height: decision.height,
+        next_validators_hash: decision.next_validators_hash,
     })
 }
 
 fn decode_finalize_block(bytes: &[u8]) -> Result<Request, WireError> {
-    let (transactions, block_hash, height, next_validators_hash) =
-        decode_decision_request(bytes, "RequestFinalizeBlock", "finalize_block")?;
+    let decision = decode_decision_request(bytes, "RequestFinalizeBlock", "finalize_block")?;
     Ok(Request::FinalizeBlock {
-        transactions,
-        block_hash,
-        height,
-        next_validators_hash,
+        transactions: decision.transactions,
+        block_hash: decision.block_hash,
+        height: decision.height,
+        next_validators_hash: decision.next_validators_hash,
     })
 }
 
@@ -393,7 +479,7 @@ fn decode_decision_request(
     bytes: &[u8],
     message: &'static str,
     prefix: &'static str,
-) -> Result<(Vec<Vec<u8>>, [u8; 32], i64, [u8; 32]), WireError> {
+) -> Result<DecisionRequest, WireError> {
     let mut reader = ProtoReader::new(bytes);
     let mut transactions = Vec::new();
     let mut block_hash = None;
@@ -429,21 +515,21 @@ fn decode_decision_request(
         "finalize_block" => "finalize_block",
         _ => unreachable!("only fixed decoder prefixes are used"),
     };
-    Ok((
+    Ok(DecisionRequest {
         transactions,
-        block_hash.ok_or(WireError::MissingField(match field {
+        block_hash: block_hash.ok_or(WireError::MissingField(match field {
             "process_proposal" => "process_proposal.hash",
             _ => "finalize_block.hash",
         }))?,
-        height.ok_or(WireError::MissingField(match field {
+        height: height.ok_or(WireError::MissingField(match field {
             "process_proposal" => "process_proposal.height",
             _ => "finalize_block.height",
         }))?,
-        next_validators_hash.ok_or(WireError::MissingField(match field {
+        next_validators_hash: next_validators_hash.ok_or(WireError::MissingField(match field {
             "process_proposal" => "process_proposal.next_validators_hash",
             _ => "finalize_block.next_validators_hash",
         }))?,
-    ))
+    })
 }
 
 fn encode_response(response: &Response) -> Vec<u8> {
@@ -492,9 +578,9 @@ fn encode_response(response: &Response) -> Vec<u8> {
             (RESPONSE_PROCESS_PROPOSAL, message)
         }
         Response::ExtendVote => (RESPONSE_EXTEND_VOTE, Vec::new()),
-        Response::VerifyVoteExtensionReject => {
+        Response::VerifyVoteExtensionAccept => {
             let mut message = Vec::new();
-            write_varint_field(1, 2, &mut message);
+            write_varint_field(1, 1, &mut message);
             (RESPONSE_VERIFY_VOTE_EXTENSION, message)
         }
         Response::FinalizeBlock(result) => (RESPONSE_FINALIZE_BLOCK, encode_finalize(result)),
@@ -853,6 +939,10 @@ pub enum WireError {
         actual: usize,
     },
     InvalidEd25519KeyLength,
+    UnsupportedCometBlockMaximum {
+        actual: i64,
+        maximum: i64,
+    },
     UnexpectedMessageBytes(&'static str),
 }
 
@@ -902,6 +992,10 @@ impl fmt::Display for WireError {
             Self::InvalidEd25519KeyLength => {
                 formatter.write_str("ABCI validator Ed25519 key must have 32 bytes")
             }
+            Self::UnsupportedCometBlockMaximum { actual, maximum } => write!(
+                formatter,
+                "CometBFT block max bytes {actual} is outside the supported 1..={maximum} range"
+            ),
             Self::UnexpectedMessageBytes(message) => {
                 write!(formatter, "ABCI message {message} must be empty")
             }
@@ -934,10 +1028,60 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_overlong_varint() {
+    fn accepts_proto3_default_echo_and_check_tx_fields() {
         assert_eq!(
+            decode_request(&[0x0a, 0x00]).unwrap(),
+            Request::Echo(String::new())
+        );
+        assert_eq!(
+            decode_request(&[0x42, 0x00]).unwrap(),
+            Request::CheckTx(Vec::new())
+        );
+    }
+
+    #[test]
+    fn rejects_consensus_block_limits_that_exceed_transport_capacity() {
+        // ConsensusParams{block: BlockParams{max_bytes: 64 MiB + 1}}.
+        let maximum = (MAX_COMET_BLOCK_BYTES + 1) as u64;
+        let mut block = vec![0x08];
+        write_uvarint(maximum, &mut block);
+        let mut parameters = vec![0x0a];
+        write_uvarint(block.len() as u64, &mut parameters);
+        parameters.extend_from_slice(&block);
+
+        assert!(matches!(
+            decode_consensus_parameters(&parameters),
+            Err(WireError::UnsupportedCometBlockMaximum {
+                actual,
+                maximum,
+            }) if actual == MAX_COMET_BLOCK_BYTES + 1 && maximum == MAX_COMET_BLOCK_BYTES
+        ));
+    }
+
+    #[test]
+    fn accepts_a_bounded_consensus_block_limit() {
+        // ConsensusParams{block: BlockParams{max_bytes: 1 MiB, max_gas: -1}}.
+        let mut block = vec![0x08];
+        write_uvarint(1024 * 1024, &mut block);
+        block.push(0x10);
+        write_uvarint(u64::MAX, &mut block);
+        let mut parameters = vec![0x0a];
+        write_uvarint(block.len() as u64, &mut parameters);
+        parameters.extend_from_slice(&block);
+
+        assert_eq!(
+            decode_consensus_parameters(&parameters).unwrap(),
+            ConsensusParameters {
+                block_max_bytes: 1024 * 1024,
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_an_overlong_varint() {
+        assert!(matches!(
             decode_request(&[0x8a, 0x00]),
             Err(WireError::NonCanonicalVarint)
-        );
+        ));
     }
 }

@@ -172,8 +172,14 @@ frames protobuf com tamanho limitado e varints canônicos, aceita as chamadas
 necessárias de `Info`, `InitChain`, `CheckTx`, propostas, `FinalizeBlock` e
 `Commit`, e devolve erros de framing como exceções ABCI. Conexões simultâneas
 da engine são serializadas no mesmo núcleo de estado. `Query` continua
-indisponível, state-sync é recusado e extensões de voto são rejeitadas até que
-essas políticas tenham especificação própria.
+indisponível e state-sync é recusado. O adaptador aceita a representação
+protobuf canônica de campos vazios (por exemplo, `Echo("")`) e limita cada
+frame a 80 MiB. No `InitChain`, ele recusa `BlockParams.max_bytes` fora de
+`1..=64 MiB`, de modo que a engine não possa configurar propostas maiores que
+a capacidade de transporte e memória assumida pelo nó. Extensões de voto são
+aceitas como bytes opacos para preservar a disponibilidade quando a opção da
+engine estiver habilitada, mas ainda não participam da execução, do `AppHash`
+nem de uma política Noxis.
 
 O código ainda não foi validado contra um binário CometBFT e não implementa
 P2P, chaves privadas de validador, prova de finalidade nem uma rede com vários

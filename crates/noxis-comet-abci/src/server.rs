@@ -144,6 +144,8 @@ fn dispatch(
             validators,
             initial_height,
         } => {
+            wire::decode_consensus_parameters(&consensus_parameters)
+                .map_err(CometAbciServerError::Wire)?;
             let validators = map_init_validators(&core, &validators)?;
             let parameters_sha256 = Sha256::digest(consensus_parameters).into();
             core.init_chain(InitChainRequest::new(
@@ -190,14 +192,19 @@ fn dispatch(
                 .unwrap_or(ProposalStatus::Reject),
         )),
         Request::ExtendVote => Ok(Response::ExtendVote),
-        Request::VerifyVoteExtension => Ok(Response::VerifyVoteExtensionReject),
+        // Noxis does not currently derive application state from vote
+        // extensions. Accepting the opaque extension keeps a CometBFT network
+        // live when that engine feature is enabled; its bytes are deliberately
+        // not incorporated into Noxis execution or AppHash.
+        Request::VerifyVoteExtension => Ok(Response::VerifyVoteExtensionAccept),
         Request::FinalizeBlock {
             transactions,
             block_hash,
             height,
             next_validators_hash,
         } => {
-            let decision = decision_for(&core, height, block_hash, next_validators_hash)?;
+            let decision = decision_for(&core, height, block_hash, next_validators_hash)
+                .map_err(CometAbciServerError::Core)?;
             core.finalize_block(decision, &transactions)
                 .map(Response::FinalizeBlock)
                 .map_err(CometAbciServerError::Core)

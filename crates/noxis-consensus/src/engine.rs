@@ -554,9 +554,11 @@ pub fn decode_comet_bft_network_identity(
             format_version,
         ));
     }
-    let chain_id = reader.read_label(reader.read_u8()? as usize)?;
+    let chain_id_length = reader.read_u8()? as usize;
+    let chain_id = reader.read_label(chain_id_length)?;
     let initial_height = reader.read_i64()?;
-    let compatibility_version = reader.read_label(reader.read_u8()? as usize)?;
+    let compatibility_version_length = reader.read_u8()? as usize;
+    let compatibility_version = reader.read_label(compatibility_version_length)?;
     let parameters_sha256 = reader.read_array()?;
     reader.finish()?;
     let identity = CometBftNetworkIdentity::new(

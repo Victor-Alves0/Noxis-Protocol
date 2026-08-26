@@ -1,0 +1,10 @@
+# Keep source and canonical protocol vectors stable across Windows and Linux.
+* text=auto eol=lf
+
+# Generated/binary artifacts must not be line-ending transformed.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.wasm binary

@@ -374,8 +374,6 @@ impl DirectoryLock {
                     RuntimeError::io("create runtime lock", path.clone(), error)
                 }
             })?;
-        file.try_lock()
-            .map_err(|error| RuntimeError::io("lock runtime sentinel", path.clone(), error))?;
         Ok(Self {
             file: Some(file),
             path,
@@ -899,6 +897,7 @@ mod tests {
             + 4
             + encode_consensus_config(manifest.genesis().consensus_config()).len()
             + 1
+            + 1
             + 4
             + 32;
         encoded[kind_offset] = 99;
@@ -940,6 +939,7 @@ mod tests {
             + ValidationContext::ENCODED_LENGTH
             + 4
             + encode_consensus_config(manifest.genesis().consensus_config()).len()
+            + 1
             + 1
             + 4;
         const ASSET_BYTES: usize = 38;

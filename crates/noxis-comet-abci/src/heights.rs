@@ -19,7 +19,7 @@ impl CometIdentity {
         self.0.identity().chain_id()
     }
 
-    pub const fn initial_height(&self) -> i64 {
+    pub fn initial_height(&self) -> i64 {
         self.0.identity().initial_height()
     }
 
@@ -27,7 +27,7 @@ impl CometIdentity {
         self.0.identity().compatibility_version()
     }
 
-    pub const fn parameters_sha256(&self) -> [u8; 32] {
+    pub fn parameters_sha256(&self) -> [u8; 32] {
         self.0.identity().parameters_sha256()
     }
 

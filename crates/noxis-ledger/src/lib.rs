@@ -11,8 +11,8 @@ use noxis_crypto::{
 };
 use noxis_merkle::{InclusionProof, MerkleError, MerkleRoot, MerkleTree};
 use noxis_types::{
-    Amount, AssetDefinition, AssetId, Commitment, GenesisId, MintPolicyId, Nullifier,
-    ProofVerifierId, StateId, TransactionId, TransactionIntentId, ValidationContextId,
+    Amount, AssetDefinition, AssetId, Commitment, GenesisId, MintPolicyId, Nullifier, StateId,
+    TransactionId, TransactionIntentId, ValidationContextId,
 };
 use sha2::{Digest, Sha256};
 
@@ -731,7 +731,7 @@ impl std::error::Error for LedgerError {}
 
 #[cfg(test)]
 mod tests {
-    use noxis_types::AssetKind;
+    use noxis_types::{AssetKind, ProofVerifierId};
 
     use super::*;
 

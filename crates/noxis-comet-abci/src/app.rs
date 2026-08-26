@@ -3,7 +3,9 @@ use noxis_record_chain::RecordHash;
 use noxis_storage::{DurableBlockReceipt, PersistentExecution};
 use noxis_types::{AppHash, StateId, TransactionIntentId};
 
-use crate::{CometAbciError, CometBftDecision, CometBftValidator, CometIdentity, MempoolOverlay};
+use crate::{
+    CometAbciError, CometBftDecision, CometBftValidator, CometIdentity, mempool::MempoolOverlay,
+};
 
 /// Stable outcome returned for a proposal received from CometBFT.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
