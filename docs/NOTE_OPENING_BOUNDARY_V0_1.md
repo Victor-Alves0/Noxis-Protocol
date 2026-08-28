@@ -50,7 +50,7 @@ significativo. Não há bitmap, índice alternativo ou caminho de tamanho variá
 O circuito deverá recusar uma raiz diferente, caminho incompleto, posição fora
 do intervalo ou abertura incompatível com o commitment da folha.
 
-## Funções ainda pendentes de seleção
+## Funções candidatas ainda não selecionadas
 
 Depois de selecionar e revisar uma extensão de parâmetros, a AIR deverá usar
 estas relações, sem mudar o preimage acima:
@@ -65,12 +65,23 @@ nullifier           = H_NULLIFIER(nullifier_key, rho, note_commitment, leaf_posi
 Assim, a AIR deverá provar que o dono da chave comprometida pelo destinatário é
 o mesmo que deriva o nullifier; chaves de cifragem híbrida continuam separadas.
 
-`H_ADDR`, `H_NOTE` e `H_NULLIFIER` **não existem neste repositório hoje**. A
-candidata P24 congelada cobre apenas `LEAF`, `NODE` e `EMPTY`; reutilizá-la
-silenciosamente para esses três domínios mudaria seus parâmetros, ID e corpus.
-Antes de implementar qualquer uma das relações, uma nova candidata deverá
-fixar: domínio em bytes, absorção bytes→campo, padding, aridade, IV,
-separação entre domínios, saída de 16 elementos e vetores externos.
+`H_ADDR`, `H_NOTE` e `H_NULLIFIER` existem somente como referência isolada da
+candidata `NXPH` P24. Ela tem manifesto, ID e corpus próprios e não reutiliza
+silenciosamente os domínios de árvore `LEAF`, `NODE` e `EMPTY`. A referência
+local não é um backend criptográfico selecionado, não habilita carteira nem
+autoriza liquidação. Antes de uso em AIR, prover ou rede, a candidata ainda
+precisa de seleção e revisão criptográfica independente.
+
+Para esta candidata, a ponte explícita para a árvore também é fixa:
+
+```text
+tree_leaf = H_LEAF(note_commitment)
+root      = H_NODE(...tree_leaf, siblings[0..32], leaf_position...)
+```
+
+Ou seja, `note_commitment` não entra diretamente como raiz ou nó interno. A
+abertura local candidata calcula essa ponte apenas para conferir um caminho de
+32 níveis; ela não demonstra inclusão nem autorização perante o protocolo.
 
 ## Codificação candidata bytes→campo
 
@@ -117,10 +128,11 @@ não tornam `PrivateTransferIntentV2`, `NXPT`, uma prova opaca ou qualquer
 - Um caminho de teste no índice `u32::MAX` é KAT de orientação, não prova de
   que uma árvore append-only com poucas inserções tenha tido esse estado.
 
-## Critérios para a próxima entrega
+## Critérios para uma integração de prova ou protocolo
 
-Uma implementação local de abertura só poderá ser iniciada quando a extensão
-de parâmetros contiver os domínios `ADDR`, `NOTE` e `NULLIFIER` e passar por:
+Uma integração de abertura em AIR, prover ou protocolo só poderá ser iniciada
+quando a extensão de parâmetros contiver os domínios `ADDR`, `NOTE` e
+`NULLIFIER` e passar por:
 
 1. manifesto, ID candidato e checksums congelados;
 2. vetores externos reproduzíveis para cada função e preimage;
@@ -129,5 +141,6 @@ de parâmetros contiver os domínios `ADDR`, `NOTE` e `NULLIFIER` e passar por:
    vínculo à intenção;
 5. revisão criptográfica independente.
 
-Até esses critérios, o formato de 178 bytes é a única parte congelada desta
-fronteira; nenhuma função criptográfica de abertura é reivindicada.
+Até esses critérios, o formato de 178 bytes e a referência candidata local são
+artefatos de engenharia e evidência; nenhuma função criptográfica selecionada
+ou abertura segura de produção é reivindicada.

@@ -116,8 +116,16 @@ canonical_babybear_vector!(
     "Canonical sixteen-element BabyBear encoding of a v2 note commitment."
 );
 canonical_babybear_vector!(
+    RecipientCommitmentV2,
+    "Canonical sixteen-element BabyBear commitment to the recipient spending key."
+);
+canonical_babybear_vector!(
     NullifierV2,
     "Canonical sixteen-element BabyBear encoding of a v2 nullifier."
+);
+canonical_babybear_vector!(
+    MerkleSiblingV2,
+    "Canonical sixteen-element BabyBear value used as one private v2 Merkle-path sibling."
 );
 canonical_babybear_vector!(
     MerkleRootV2,

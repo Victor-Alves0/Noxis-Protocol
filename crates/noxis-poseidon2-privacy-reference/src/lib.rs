@@ -35,17 +35,17 @@ impl Poseidon2P24PrivacyReference {
     /// Evaluates the fixed 32-byte address-domain input.
     pub fn hash_addr(
         &self,
-        nullifier_key: [u8; 32],
+        nullifier_key: &[u8; 32],
     ) -> Result<BabyBearDigestV2, Poseidon2P24PrivacyReferenceError> {
-        self.hash_bytes(Poseidon2P24NoteDomainV1::Addr, &nullifier_key)
+        self.hash_bytes(Poseidon2P24NoteDomainV1::Addr, nullifier_key)
     }
 
     /// Evaluates the fixed 178-byte canonical note preimage.
     pub fn hash_note(
         &self,
-        note_preimage: [u8; 178],
+        note_preimage: &[u8; 178],
     ) -> Result<BabyBearDigestV2, Poseidon2P24PrivacyReferenceError> {
-        self.hash_bytes(Poseidon2P24NoteDomainV1::Note, &note_preimage)
+        self.hash_bytes(Poseidon2P24NoteDomainV1::Note, note_preimage)
     }
 
     /// Evaluates the fixed canonical 132-byte nullifier preimage.
@@ -55,9 +55,9 @@ impl Poseidon2P24PrivacyReference {
     /// that assembly so secrets never become a generic byte-hash API.
     pub fn hash_nullifier_preimage(
         &self,
-        nullifier_preimage: [u8; 132],
+        nullifier_preimage: &[u8; 132],
     ) -> Result<BabyBearDigestV2, Poseidon2P24PrivacyReferenceError> {
-        self.hash_bytes(Poseidon2P24NoteDomainV1::Nullifier, &nullifier_preimage)
+        self.hash_bytes(Poseidon2P24NoteDomainV1::Nullifier, nullifier_preimage)
     }
 
     /// Shows the only candidate bytes-to-field conversion for one fixed domain.
@@ -204,7 +204,7 @@ mod tests {
     fn matches_externally_executed_addr_and_note_kats() {
         let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
         assert_eq!(
-            reference.hash_addr(ascending::<32>(0)).unwrap(),
+            reference.hash_addr(&ascending::<32>(0)).unwrap(),
             [
                 115_780_848,
                 1_488_678_630,
@@ -226,7 +226,7 @@ mod tests {
         );
         let descending = core::array::from_fn(|index| 255_u8 - index as u8);
         assert_eq!(
-            reference.hash_addr(descending).unwrap(),
+            reference.hash_addr(&descending).unwrap(),
             [
                 2_002_739_025,
                 113_032_689,
@@ -249,7 +249,7 @@ mod tests {
         let affine =
             core::array::from_fn(|index| 17_u8.wrapping_add(31_u8.wrapping_mul(index as u8)));
         assert_eq!(
-            reference.hash_note(ascending::<178>(0)).unwrap(),
+            reference.hash_note(&ascending::<178>(0)).unwrap(),
             [
                 1_727_817_926,
                 750_994_629,
@@ -270,7 +270,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            reference.hash_note(affine).unwrap(),
+            reference.hash_note(&affine).unwrap(),
             [
                 562_739_465,
                 1_798_714_523,
@@ -298,7 +298,7 @@ mod tests {
         let mut first = ascending::<132>(0);
         first[128..].copy_from_slice(&0_u32.to_be_bytes());
         assert_eq!(
-            reference.hash_nullifier_preimage(first).unwrap(),
+            reference.hash_nullifier_preimage(&first).unwrap(),
             [
                 2_003_527_154,
                 1_745_920_045,
@@ -343,8 +343,14 @@ mod tests {
             1_535_097_886,
             1_170_294_996,
         ];
-        assert_eq!(reference.hash_nullifier_preimage(second).unwrap(), expected);
+        assert_eq!(
+            reference.hash_nullifier_preimage(&second).unwrap(),
+            expected
+        );
         second[100] ^= 1;
-        assert_ne!(reference.hash_nullifier_preimage(second).unwrap(), expected);
+        assert_ne!(
+            reference.hash_nullifier_preimage(&second).unwrap(),
+            expected
+        );
     }
 }

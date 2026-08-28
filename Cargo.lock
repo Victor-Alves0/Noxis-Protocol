@@ -193,6 +193,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "noxis-note-opening"
+version = "0.1.0"
+dependencies = [
+ "noxis-poseidon2-privacy-reference",
+ "noxis-poseidon2-reference",
+ "noxis-privacy-types",
+ "noxis-types",
+ "zeroize",
+]
+
+[[package]]
 name = "noxis-poseidon2-privacy-reference"
 version = "0.1.0"
 dependencies = [
@@ -309,3 +320,9 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[package]]
+name = "zeroize"
+version = "1.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e"
