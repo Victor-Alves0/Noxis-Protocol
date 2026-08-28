@@ -8,9 +8,14 @@ use std::fmt;
 use noxis_poseidon2_reference::{
     BABYBEAR_MODULUS, BabyBearDigestV2, Poseidon2P24Reference, Poseidon2P24ReferenceError,
 };
+use noxis_privacy_types::{
+    PrivacyTypesError, PrivateTransferIntentCommitmentV2, PrivateTransferIntentV2,
+};
 use noxis_tree_params::{
-    CandidatePoseidon2P24NoteDomainsManifestV1, P24_BYTE_PACK_WIDTH, Poseidon2P24NoteDomainV1,
-    Poseidon2P24NoteDomainsCandidateError,
+    CandidatePoseidon2P24IntentCommitmentManifestV1, CandidatePoseidon2P24NoteDomainsManifestV1,
+    P24_BYTE_PACK_WIDTH, P24_INTENT_COMMITMENT_INPUT_BYTES, P24_INTENT_COMMITMENT_INPUT_ELEMENTS,
+    Poseidon2P24IntentCommitmentCandidateError, Poseidon2P24IntentCommitmentDomainV1,
+    Poseidon2P24NoteDomainV1, Poseidon2P24NoteDomainsCandidateError,
 };
 
 const RATE: usize = 15;
@@ -27,6 +32,7 @@ impl Poseidon2P24PrivacyReference {
     /// Loads the frozen tree and private-domain candidates before evaluation.
     pub fn load_candidate() -> Result<Self, Poseidon2P24PrivacyReferenceError> {
         CandidatePoseidon2P24NoteDomainsManifestV1::new().encode()?;
+        CandidatePoseidon2P24IntentCommitmentManifestV1::new().encode()?;
         Ok(Self {
             permutation: Poseidon2P24Reference::load_candidate()?,
         })
@@ -58,6 +64,18 @@ impl Poseidon2P24PrivacyReference {
         nullifier_preimage: &[u8; 132],
     ) -> Result<BabyBearDigestV2, Poseidon2P24PrivacyReferenceError> {
         self.hash_bytes(Poseidon2P24NoteDomainV1::Nullifier, nullifier_preimage)
+    }
+
+    /// Commits to every byte of one already-canonical private transfer intent.
+    ///
+    /// This is a candidate-only reference calculation. It does not constitute a
+    /// transaction identifier, a proof, or an authorization to settle funds.
+    pub fn hash_private_transfer_intent(
+        &self,
+        intent: &PrivateTransferIntentV2,
+    ) -> Result<PrivateTransferIntentCommitmentV2, Poseidon2P24PrivacyReferenceError> {
+        let digest = self.hash_intent_encoding(&intent.encode())?;
+        PrivateTransferIntentCommitmentV2::from_elements(digest).map_err(Into::into)
     }
 
     /// Shows the only candidate bytes-to-field conversion for one fixed domain.
@@ -95,6 +113,28 @@ impl Poseidon2P24PrivacyReference {
     ) -> Result<BabyBearDigestV2, Poseidon2P24PrivacyReferenceError> {
         let elements = Self::byte_pack3le(domain, input)?;
         let iv = CandidatePoseidon2P24NoteDomainsManifestV1::new().iv(domain)?;
+        self.hash_elements(&elements, iv)
+    }
+
+    fn hash_intent_encoding(
+        &self,
+        input: &[u8; P24_INTENT_COMMITMENT_INPUT_BYTES],
+    ) -> Result<BabyBearDigestV2, Poseidon2P24PrivacyReferenceError> {
+        let elements = byte_pack3le_fixed(
+            input,
+            P24_INTENT_COMMITMENT_INPUT_BYTES,
+            P24_INTENT_COMMITMENT_INPUT_ELEMENTS,
+        );
+        let iv = CandidatePoseidon2P24IntentCommitmentManifestV1::new()
+            .iv(Poseidon2P24IntentCommitmentDomainV1::Intent)?;
+        self.hash_elements(&elements, iv)
+    }
+
+    fn hash_elements(
+        &self,
+        elements: &[u32],
+        iv: [u32; 9],
+    ) -> Result<BabyBearDigestV2, Poseidon2P24PrivacyReferenceError> {
         let mut state = [0_u32; WIDTH];
         state[RATE..].copy_from_slice(&iv);
         for block in elements.chunks(RATE) {
@@ -111,6 +151,23 @@ impl Poseidon2P24PrivacyReference {
     }
 }
 
+fn byte_pack3le_fixed(input: &[u8], expected_bytes: usize, expected_elements: usize) -> Vec<u32> {
+    assert_eq!(input.len(), expected_bytes, "fixed candidate input length");
+    let packed: Vec<u32> = input
+        .chunks(P24_BYTE_PACK_WIDTH)
+        .map(|chunk| {
+            chunk
+                .iter()
+                .enumerate()
+                .fold(0_u32, |value, (offset, byte)| {
+                    value | (u32::from(*byte) << (offset * 8))
+                })
+        })
+        .collect();
+    debug_assert_eq!(packed.len(), expected_elements);
+    packed
+}
+
 fn add(left: u32, right: u32) -> u32 {
     ((u64::from(left) + u64::from(right)) % u64::from(BABYBEAR_MODULUS)) as u32
 }
@@ -120,6 +177,8 @@ fn add(left: u32, right: u32) -> u32 {
 pub enum Poseidon2P24PrivacyReferenceError {
     TreeReference(Poseidon2P24ReferenceError),
     Candidate(Poseidon2P24NoteDomainsCandidateError),
+    IntentCandidate(Poseidon2P24IntentCommitmentCandidateError),
+    PrivacyTypes(PrivacyTypesError),
     InvalidInputLength {
         domain: Poseidon2P24NoteDomainV1,
         actual: usize,
@@ -139,11 +198,25 @@ impl From<Poseidon2P24NoteDomainsCandidateError> for Poseidon2P24PrivacyReferenc
     }
 }
 
+impl From<Poseidon2P24IntentCommitmentCandidateError> for Poseidon2P24PrivacyReferenceError {
+    fn from(value: Poseidon2P24IntentCommitmentCandidateError) -> Self {
+        Self::IntentCandidate(value)
+    }
+}
+
+impl From<PrivacyTypesError> for Poseidon2P24PrivacyReferenceError {
+    fn from(value: PrivacyTypesError) -> Self {
+        Self::PrivacyTypes(value)
+    }
+}
+
 impl fmt::Display for Poseidon2P24PrivacyReferenceError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TreeReference(error) => write!(formatter, "invalid P24 reference: {error}"),
             Self::Candidate(error) => write!(formatter, "invalid NXPH candidate: {error}"),
+            Self::IntentCandidate(error) => write!(formatter, "invalid NXIC candidate: {error}"),
+            Self::PrivacyTypes(error) => write!(formatter, "invalid H_INTENT digest: {error}"),
             Self::InvalidInputLength {
                 domain,
                 actual,
@@ -165,6 +238,113 @@ mod tests {
 
     fn ascending<const N: usize>(start: u8) -> [u8; N] {
         core::array::from_fn(|index| start.wrapping_add(index as u8))
+    }
+
+    fn structural_baseline_input() -> [u8; 640] {
+        let mut bytes = Vec::with_capacity(640);
+        for value in [1_u8, 2, 3, 4, 5] {
+            bytes.extend_from_slice(&[value; 32]);
+        }
+        for value in [6_u32; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes.extend_from_slice(&[7; 32]);
+        for value in [8_u32; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [9_u32; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [10_u32; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [11_u32; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [12_u32; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [13_u32; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes.try_into().expect("external fixture has 640 bytes")
+    }
+
+    fn boundary_elements_input() -> [u8; 640] {
+        let mut bytes = Vec::with_capacity(640);
+        for value in [21_u8, 22, 23, 24, 25] {
+            bytes.extend_from_slice(&[value; 32]);
+        }
+        for index in 0..16 {
+            bytes.extend_from_slice(
+                &[0_u32, 1, BABYBEAR_MODULUS - 2, BABYBEAR_MODULUS - 1][index % 4].to_le_bytes(),
+            );
+        }
+        bytes.extend_from_slice(&[26; 32]);
+        for value in [0_u32; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [1_u32; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [0_u32; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [BABYBEAR_MODULUS - 1; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [BABYBEAR_MODULUS - 2; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [BABYBEAR_MODULUS - 1; 16] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes.try_into().expect("external fixture has 640 bytes")
+    }
+
+    #[test]
+    fn matches_externally_executed_intent_commitment_kats() {
+        let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
+        let inputs = [structural_baseline_input(), boundary_elements_input()];
+        let expected = [
+            [
+                1098549077, 1235522076, 1478424652, 1481381536, 528608958, 1330079375, 362586605,
+                1738919005, 1916043278, 1954911332, 1841702528, 1249444496, 400154715, 294159042,
+                1980980091, 376305720,
+            ],
+            [
+                1434497478, 1681194821, 1869074451, 1023130484, 560801581, 1937059648, 540867581,
+                1942987663, 730711795, 1218251084, 43830160, 533681248, 971936176, 1743410686,
+                1304665704, 981526481,
+            ],
+        ];
+        for (input, expected) in inputs.into_iter().zip(expected) {
+            let intent = PrivateTransferIntentV2::decode(&input).unwrap();
+            assert_eq!(
+                reference
+                    .hash_private_transfer_intent(&intent)
+                    .unwrap()
+                    .elements(),
+                expected
+            );
+            assert_eq!(reference.hash_intent_encoding(&input).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn intent_reference_changes_for_each_candidate_input_byte() {
+        let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
+        let original = structural_baseline_input();
+        let baseline = reference.hash_intent_encoding(&original).unwrap();
+        for index in 0..original.len() {
+            let mut changed = original;
+            changed[index] ^= 1;
+            assert_ne!(
+                reference.hash_intent_encoding(&changed).unwrap(),
+                baseline,
+                "collision in frozen KAT mutation at byte {index}"
+            );
+        }
     }
 
     #[test]

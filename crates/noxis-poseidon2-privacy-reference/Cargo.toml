@@ -7,6 +7,7 @@ rust-version.workspace = true
 
 [dependencies]
 noxis-poseidon2-reference = { path = "../noxis-poseidon2-reference" }
+noxis-privacy-types = { path = "../noxis-privacy-types" }
 noxis-tree-params = { path = "../noxis-tree-params" }
 
 [dev-dependencies]

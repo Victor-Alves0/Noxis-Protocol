@@ -16,4 +16,4 @@ O ID da candidata é `fec73e2b8238b749357042bdba55470d674fb12ca498c47bb761854ca8
 
 ## Limites deliberados
 
-Ainda não existe uma implementação pública de `H_INTENT`, corpus externo nem AIR/prova. O manifesto não deve ser adicionado a allowlists, mensagens de rede, ledger ou IDs ativos. A próxima entrega precisa produzir e verificar vetores externos antes de expor a função hash.
+Uma referência isolada de `H_INTENT` foi liberada somente após os vetores externos documentados em [`EXTERNAL_INTENT_COMMITMENT_KATS_V0_1.md`](EXTERNAL_INTENT_COMMITMENT_KATS_V0_1.md). Ainda falta congelar o corpus binário `NXIV`, integrar a relação à AIR e produzir/verificar provas. O manifesto e a referência não devem ser adicionados a allowlists, mensagens de rede, ledger ou IDs ativos.
