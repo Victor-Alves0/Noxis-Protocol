@@ -66,6 +66,7 @@ docs/
   CRYPTOGRAPHY_DECISION_V0_1.md Chosen cryptographic direction and safeguards.
   ECONOMIC_SECURITY_MODEL_V0_1.md  Boundaries for validator rewards, liquidity and future contracts.
   TREE_PARAMETER_FRAMING_V0_1.md   Canonical draft manifest and field-vector boundary for v2 trees.
+  POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md  Cross-validated permutation reference vectors.
   ARCHITECTURE.md                Module boundaries and implementation roadmap.
 ```
 

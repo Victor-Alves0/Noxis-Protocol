@@ -176,6 +176,78 @@ impl CanonicalBabyBearVectorV1 {
     }
 }
 
+/// A fixed Poseidon2 BabyBear-16 permutation vector from two independently
+/// executed external references.
+///
+/// This is an interoperability oracle only. It does not select a Noxis tree
+/// function, constants, sponge construction, domains, or a recognized
+/// `TreeParametersId`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Poseidon2BabyBear16ReferenceVectorV1 {
+    input: [u32; BABYBEAR_ELEMENTS_PER_VALUE],
+    output: [u32; BABYBEAR_ELEMENTS_PER_VALUE],
+}
+
+impl Poseidon2BabyBear16ReferenceVectorV1 {
+    /// Returns the two fixed permutation vectors: all zeroes and all 42s.
+    pub const fn frozen() -> [Self; 2] {
+        [
+            Self {
+                input: [0; BABYBEAR_ELEMENTS_PER_VALUE],
+                output: [
+                    1_337_856_655,
+                    1_843_094_405,
+                    328_115_114,
+                    964_209_316,
+                    1_365_212_758,
+                    1_431_554_563,
+                    210_126_733,
+                    1_214_932_203,
+                    1_929_553_766,
+                    1_647_595_522,
+                    1_496_863_878,
+                    324_695_999,
+                    1_569_728_319,
+                    1_634_598_391,
+                    597_968_641,
+                    679_989_771,
+                ],
+            },
+            Self {
+                input: [42; BABYBEAR_ELEMENTS_PER_VALUE],
+                output: [
+                    1_000_818_763,
+                    32_822_117,
+                    1_516_162_362,
+                    1_002_505_990,
+                    932_515_653,
+                    770_559_770,
+                    350_012_663,
+                    846_936_440,
+                    1_676_802_609,
+                    1_007_988_059,
+                    883_957_027,
+                    738_985_594,
+                    6_104_526,
+                    338_187_715,
+                    611_171_673,
+                    414_573_522,
+                ],
+            },
+        ]
+    }
+
+    /// Input elements in the permutation's semantic order.
+    pub const fn input(self) -> [u32; BABYBEAR_ELEMENTS_PER_VALUE] {
+        self.input
+    }
+
+    /// Expected output elements in the permutation's semantic order.
+    pub const fn output(self) -> [u32; BABYBEAR_ELEMENTS_PER_VALUE] {
+        self.output
+    }
+}
+
 /// Errors produced when parsing canonical parameter-candidate framing.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TreeParamsError {
@@ -255,5 +327,29 @@ mod tests {
         let commitment = NoteCommitmentV2::from_elements(vector.elements()).unwrap();
         assert_eq!(commitment.as_bytes(), vector.encoded());
         assert_eq!(commitment.elements(), vector.elements());
+    }
+
+    #[test]
+    fn frozen_poseidon2_reference_vectors_stay_canonical_and_distinct() {
+        let vectors = Poseidon2BabyBear16ReferenceVectorV1::frozen();
+        assert_eq!(vectors.len(), 2);
+        assert_eq!(vectors[0].input(), [0; BABYBEAR_ELEMENTS_PER_VALUE]);
+        assert_eq!(vectors[1].input(), [42; BABYBEAR_ELEMENTS_PER_VALUE]);
+        assert_ne!(vectors[0].output(), vectors[1].output());
+
+        for vector in vectors {
+            assert!(
+                vector
+                    .input()
+                    .into_iter()
+                    .all(|element| element < BABYBEAR_MODULUS)
+            );
+            assert!(
+                vector
+                    .output()
+                    .into_iter()
+                    .all(|element| element < BABYBEAR_MODULUS)
+            );
+        }
     }
 }

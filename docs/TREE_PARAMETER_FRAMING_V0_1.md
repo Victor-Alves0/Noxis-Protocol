@@ -29,10 +29,14 @@ Esse valor não é e não pode ser convertido em `TreeParametersId` aprovado. O 
 
 `CanonicalBabyBearVectorV1` fixa 16 inteiros de borda e seus 64 bytes little-endian esperados. Ele cobre `0`, `1`, `p - 2`, `p - 1` e valores de tamanhos variados. O teste compara o vetor com a implementação compartilhada de `noxis-privacy-types`; assim, mudança de endianness ou de módulo quebra a validação imediatamente.
 
-Este ainda não é vetor de Poseidon2. Vetores de permutação, folha, nó, árvore vazia e caminho só serão congelados depois de a referência Horizen BabyBear-16 e a implementação Zig independente reproduzirem o mesmo corpus.
+## Vetores de permutação de referência
+
+`Poseidon2BabyBear16ReferenceVectorV1` agora congela dois vetores de permutação width-16: estado inteiro `0` e estado inteiro `42`, ambos com suas 16 saídas BabyBear. O corpus está detalhado em [`POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md`](POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md).
+
+Eles foram reproduzidos pela implementação Rust da Horizen e pela implementação Zig independente. Isso reduz o risco de aceitar constantes ou endianness diferentes sem perceber, mas **não** transforma a candidata em parâmetro Noxis: ainda faltam o payload completo, sponge, domínios, compressão de folha/nó, árvore vazia e caminhos.
 
 ## Referência sob avaliação
 
-A referência primária em avaliação é a implementação BabyBear-16 da [HorizenLabs](https://github.com/HorizenLabs/poseidon2), com `p=2_013_265_921`, largura 16, S-box `x^7`, oito rounds externos e treze internos. Ela compilou e executou seus testes BabyBear no Rust 1.85. A publicação `zkhash 0.2.0` é usada apenas como oráculo independente de vetor BabyBear-24; não é backend de consenso nem AIR para Noxis.
+A referência primária em avaliação é a implementação BabyBear-16 da [HorizenLabs](https://github.com/HorizenLabs/poseidon2), com `p=2_013_265_921`, largura 16, S-box `x^7`, oito rounds externos e treze internos. Ela compilou e executou os vetores congelados no Rust 1.85. A implementação [blockblaz/zig-poseidon](https://github.com/blockblaz/zig-poseidon) os executou também com Zig 0.14.0. A publicação `zkhash 0.2.0` é usada apenas como oráculo independente de vetor BabyBear-24; não é backend de consenso nem AIR para Noxis.
 
-O próximo passo é fixar commits, gerar um corpus BabyBear-16 e exigir concordância entre Horizen, [blockblaz/zig-poseidon](https://github.com/blockblaz/zig-poseidon) e uma referência Noxis isolada. Sem essa concordância, `NXTM` permanece intencionalmente vazio.
+O próximo passo é definir um formato de corpus externo para vetores de folha, nó, árvore vazia e caminho, e só então avaliar um payload completo de parâmetros. Até haver revisão independente desse conjunto, `NXTM` permanece intencionalmente vazio.
