@@ -29,6 +29,10 @@ bytes. Não há campos opcionais, comprimentos variáveis, serialização genér
 nem reordenação. `value = 0` é permitido somente para uma saída de
 preenchimento do circuito 2×2; ainda exige `rho` e `rcm` inéditos.
 
+Uma abertura de padding não pode ser convertida em `SpendingWitnessV2`: o
+construtor local a rejeita antes de calcular nullifier ou caminho. Isso fixa a
+regra de padding no código candidato sem criar autorização de gasto.
+
 `rho` deve ser único entre notas do mesmo domínio de rede e `rcm` deve ser
 novo para cada commitment. A geração, cópia de segurança, rotação e apagamento
 seguro de segredos continuam fora deste artefato: nenhuma API deve oferecer
@@ -82,6 +86,12 @@ root      = H_NODE(...tree_leaf, siblings[0..32], leaf_position...)
 Ou seja, `note_commitment` não entra diretamente como raiz ou nó interno. A
 abertura local candidata calcula essa ponte apenas para conferir um caminho de
 32 níveis; ela não demonstra inclusão nem autorização perante o protocolo.
+
+O preflight candidato usa um adaptador explícito do ID do manifesto P24 como
+`TreeParametersId` apenas para detectar uma intenção local incoerente. O
+adaptador não seleciona, allowlista ou autoriza esse parâmetro em protocolo;
+seu uso completo está em
+[`PRIVATE_TRANSFER_LOCAL_PREFLIGHT_V0_1.md`](PRIVATE_TRANSFER_LOCAL_PREFLIGHT_V0_1.md).
 
 ## Codificação candidata bytes→campo
 

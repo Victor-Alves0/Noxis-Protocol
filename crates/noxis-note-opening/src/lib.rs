@@ -13,10 +13,15 @@ use noxis_poseidon2_privacy_reference::{
 use noxis_poseidon2_reference::{Poseidon2P24Reference, Poseidon2P24ReferenceError};
 use noxis_privacy_types::{
     MerkleRootV2, MerkleSiblingV2, NoteCommitmentV2, NullifierV2, PrivacyTypesError,
-    RecipientCommitmentV2,
+    RecipientCommitmentV2, TreeParametersId,
 };
+use noxis_tree_params::{CandidatePoseidon2P24ManifestV2, Poseidon2P24CandidateError};
 use noxis_types::AssetId;
 use zeroize::Zeroize;
+
+mod statement;
+
+pub use statement::{CandidatePrivateTransferWitnessV2, PrivateTransferStatementError};
 
 const NOTE_VERSION: u16 = 1;
 const NOTE_PREIMAGE_LENGTH: usize = 178;
@@ -56,6 +61,10 @@ impl NoteRandomnessV2 {
     fn bytes(&self) -> &[u8; 32] {
         &self.0
     }
+
+    fn same_bytes(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
 }
 
 impl Drop for NoteRandomnessV2 {
@@ -74,6 +83,10 @@ impl CommitmentRandomnessV2 {
 
     fn bytes(&self) -> &[u8; 32] {
         &self.0
+    }
+
+    fn same_bytes(&self, other: &Self) -> bool {
+        self.0 == other.0
     }
 }
 
@@ -171,6 +184,14 @@ impl NoteOpeningV2 {
         bytes[146..178].copy_from_slice(self.rcm.bytes());
         bytes
     }
+
+    fn has_same_rho(&self, other: &Self) -> bool {
+        self.rho.same_bytes(&other.rho)
+    }
+
+    fn has_same_rcm(&self, other: &Self) -> bool {
+        self.rcm.same_bytes(&other.rcm)
+    }
 }
 
 impl Drop for NoteOpeningV2 {
@@ -198,6 +219,9 @@ impl SpendingWitnessV2 {
         expected_root: MerkleRootV2,
         evaluator: &CandidateP24NoteOpeningEvaluatorV2,
     ) -> Result<Self, NoteOpeningError> {
+        if opening.value == 0 {
+            return Err(NoteOpeningError::PaddingNoteCannotBeSpent);
+        }
         let public = evaluate_witness(
             &opening,
             &nullifier_key,
@@ -320,6 +344,14 @@ impl CandidateP24NoteOpeningEvaluatorV2 {
         )?)
     }
 
+    /// Derives the candidate-only adapter used to bind a local P24 evaluation.
+    ///
+    /// It is not a selected or allowlisted protocol tree-parameter identity.
+    pub fn candidate_tree_parameters_id(&self) -> Result<TreeParametersId, NoteOpeningError> {
+        let candidate_id = CandidatePoseidon2P24ManifestV2::new().candidate_id()?;
+        Ok(TreeParametersId::new(candidate_id.as_bytes()))
+    }
+
     fn nullifier(
         &self,
         nullifier_key: &NullifierKeyV2,
@@ -343,11 +375,13 @@ impl CandidateP24NoteOpeningEvaluatorV2 {
 pub enum NoteOpeningError {
     RegularNoteHasZeroValue,
     PaddingNoteHasNonZeroValue,
+    PaddingNoteCannotBeSpent,
     RecipientCommitmentMismatch,
     MerkleRootMismatch,
     RetainedWitnessMismatch,
     PrivateReference(Poseidon2P24PrivacyReferenceError),
     TreeReference(Poseidon2P24ReferenceError),
+    TreeCandidate(Poseidon2P24CandidateError),
     PublicValue(PrivacyTypesError),
 }
 
@@ -360,6 +394,12 @@ impl From<Poseidon2P24PrivacyReferenceError> for NoteOpeningError {
 impl From<Poseidon2P24ReferenceError> for NoteOpeningError {
     fn from(value: Poseidon2P24ReferenceError) -> Self {
         Self::TreeReference(value)
+    }
+}
+
+impl From<Poseidon2P24CandidateError> for NoteOpeningError {
+    fn from(value: Poseidon2P24CandidateError) -> Self {
+        Self::TreeCandidate(value)
     }
 }
 
@@ -378,6 +418,9 @@ impl fmt::Display for NoteOpeningError {
             Self::PaddingNoteHasNonZeroValue => {
                 formatter.write_str("padding note value must be zero")
             }
+            Self::PaddingNoteCannotBeSpent => {
+                formatter.write_str("a zero-value padding note cannot be spent")
+            }
             Self::RecipientCommitmentMismatch => {
                 formatter.write_str("nullifier key does not match recipient commitment")
             }
@@ -391,6 +434,7 @@ impl fmt::Display for NoteOpeningError {
                 write!(formatter, "invalid private P24 reference: {error}")
             }
             Self::TreeReference(error) => write!(formatter, "invalid tree P24 reference: {error}"),
+            Self::TreeCandidate(error) => write!(formatter, "invalid tree P24 candidate: {error}"),
             Self::PublicValue(error) => write!(formatter, "invalid public v2 value: {error}"),
         }
     }
@@ -448,6 +492,28 @@ mod tests {
             Err(NoteOpeningError::PaddingNoteHasNonZeroValue)
         ));
         assert!(NoteOpeningV2::new_padding(opening_input(&evaluator, 0)).is_ok());
+    }
+
+    #[test]
+    fn padding_note_cannot_be_promoted_to_a_spending_witness() {
+        let evaluator = CandidateP24NoteOpeningEvaluatorV2::load_candidate().unwrap();
+        let opening = NoteOpeningV2::new_padding(opening_input(&evaluator, 0)).unwrap();
+        let commitment = opening.note_commitment(&evaluator).unwrap();
+        let (_, siblings, root) = evaluator
+            .tree_reference
+            .small_tree_path(&[commitment.elements()], 0)
+            .unwrap();
+        assert!(matches!(
+            SpendingWitnessV2::new(
+                opening,
+                key(),
+                0,
+                siblings.map(|value| MerkleSiblingV2::from_elements(value).unwrap()),
+                MerkleRootV2::from_elements(root).unwrap(),
+                &evaluator,
+            ),
+            Err(NoteOpeningError::PaddingNoteCannotBeSpent)
+        ));
     }
 
     #[test]

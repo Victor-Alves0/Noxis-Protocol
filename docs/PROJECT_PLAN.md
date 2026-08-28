@@ -78,32 +78,42 @@ Este último exige 50 vetores: permutações, folhas, duas ordens de nó,
 Ele fecha a cobertura de construção da árvore, sem alegar seleção de parâmetros
 nem ativação. Ver [`TREE_VECTOR_CORPUS_P24_V2.md`](TREE_VECTOR_CORPUS_P24_V2.md).
 
-**Fronteira de abertura de nota:** a estrutura privada canônica da nota e da
-testemunha de gasto está especificada, incluindo preimage de 178 bytes, caminho
-de 32 níveis e os vínculos que a AIR deverá demonstrar contra a intenção v2.
-Ela proíbe criar `H_NOTE` ou `H_NULLIFIER` antes de congelar domínios e vetores
-externos, portanto não adiciona criptografia ou integração ao ledger. Ver
-[`NOTE_OPENING_BOUNDARY_V0_1.md`](NOTE_OPENING_BOUNDARY_V0_1.md).
+**Abertura e preflight candidatos:** o crate isolado
+`noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem
+codec/`Debug`/`Clone`, caminho P24 de 32 níveis e uma declaração executável
+2×2. Ela confere parâmetros candidatos, raiz, ativo, nullifiers, commitments,
+conservação e padding, sem tocar ledger, rede ou consenso. Não cria prova nem
+habilita liquidação. Ver [`NOTE_OPENING_BOUNDARY_V0_1.md`](NOTE_OPENING_BOUNDARY_V0_1.md)
+e [`PRIVATE_TRANSFER_LOCAL_PREFLIGHT_V0_1.md`](PRIVATE_TRANSFER_LOCAL_PREFLIGHT_V0_1.md).
 
 **Candidata de domínios privados:** `ADDR`, `NOTE` e `NULLIFIER` possuem
 rótulos, packing e aridades candidatos ligados ao ID P24 pai sem modificá-lo.
 O manifesto `NXPH` com IVs rederiváveis, checksum e ID próprio está congelado;
-ainda faltam vetores externos e referência local, portanto não há função de
-hash de nota ativa. Ver
+vetores externos, referência local e corpus NXNV estão congelados, ainda sem
+seleção como hash de protocolo. Ver
 [`POSEIDON2_P24_NOTE_DOMAINS_CANDIDATE_V0_1.md`](POSEIDON2_P24_NOTE_DOMAINS_CANDIDATE_V0_1.md).
 
 **Referência de domínios privados:** o crate isolado
 `noxis-poseidon2-privacy-reference` reproduz seis KATs gerados no clone
 externo da Horizen para `ADDR`, `NOTE` e `NULLIFIER`, sem conexão com ledger
-ou consenso. O corpus `NXNV` e a abertura semântica ainda faltam. Ver
+ou consenso. O corpus `NXNV` e a abertura semântica candidata já a utilizam,
+sem convertê-la em criptografia ativa. Ver
 [`POSEIDON2_P24_NOTE_DOMAINS_REFERENCE_EVALUATION_V0_1.md`](POSEIDON2_P24_NOTE_DOMAINS_REFERENCE_EVALUATION_V0_1.md).
 
 **Corpus de domínios privados:** o framing `NXNV v1` foi especificado separado
 de `NXTV`, com seis KATs fechados, manifesto NXPH completo e recomputação do
-packing. O fixture binário e seu parser ainda são a próxima implementação. Ver
+packing. O fixture binário e parser estrito estão versionados e verificam
+tamanho, checksum, ordem e canonicidade. Ver
 [`NOTE_DOMAIN_VECTOR_CORPUS_V0_1.md`](NOTE_DOMAIN_VECTOR_CORPUS_V0_1.md).
 
-**Base de código v2:** o crate isolado `noxis-privacy-types` fixa a intenção canônica de transferência privada, sua aridade e tipos públicos sem acoplar provas, hashes, chaves ou carteira. Os valores públicos de 64 bytes já rejeitam encoding não canônico: são 16 elementos BabyBear little-endian, cada um abaixo do módulo do campo. O codec externo `NXPT` agora enquadra intenção, dois envelopes e prova com limites rígidos, ainda sem aceitar a transação no ledger v1. `noxis-tree-params` fixa os bytes e o ID de uma candidata explicitamente vazia, vetores de permutação BabyBear-16 comparados entre Horizen Rust e Zig independente e o framing `NXTV` pré-seleção para evidência de folha/nó/empty/árvore/caminho. A investigação confirmou que as referências não definem uma árvore/sponge comum; por isso a primeira candidata explícita usa P24. Seus 1.899 parâmetros e IVs já estão congelados, verificados por checksum, canonicidade de campo e rederivação de IV; a permutação e os primeiros vetores de sponge/árvore também foram comparados com execução externa, mas ainda faltam o perfil de cobertura completo, a abertura de nota, provas e revisão independente. Ver [`POSEIDON2_TREE_CONSTRUCTION_CANDIDATE_V0_1.md`](POSEIDON2_TREE_CONSTRUCTION_CANDIDATE_V0_1.md), [`POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md`](POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md), [`TREE_PARAMETER_FRAMING_V0_1.md`](TREE_PARAMETER_FRAMING_V0_1.md), [`TREE_VECTOR_CORPUS_FRAMING_V0_1.md`](TREE_VECTOR_CORPUS_FRAMING_V0_1.md), [`TREE_VECTOR_GENERATION_BLOCKER_V0_1.md`](TREE_VECTOR_GENERATION_BLOCKER_V0_1.md), [`POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md`](POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md), [`POSEIDON2_CANDIDATE_EVALUATION_V0_1.md`](POSEIDON2_CANDIDATE_EVALUATION_V0_1.md) e [`TREE_BACKEND_SELECTION_GATE_V0_1.md`](TREE_BACKEND_SELECTION_GATE_V0_1.md).
+**Base de código v2:** `noxis-privacy-types` fixa a intenção canônica de 640
+bytes e valores públicos BabyBear; `NXPT` apenas enquadra intenção, envelopes
+e uma prova opaca fora do ledger v1. `noxis-tree-params`, `NXTV` e `NXNV`
+congelam a candidata P24 e seus vetores completos, e as referências isoladas
+reproduzem as evidências externas. Ainda faltam o compromisso aritmetizado dos
+640 bytes da intenção, AIR, provas, política de chaves/envelopes e revisão
+independente. Ver [`PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md`](PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md)
+e [`TREE_BACKEND_SELECTION_GATE_V0_1.md`](TREE_BACKEND_SELECTION_GATE_V0_1.md).
 
 ### 6. Adaptadores de ativos e políticas de emissão
 
