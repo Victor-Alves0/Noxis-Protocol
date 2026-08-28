@@ -112,6 +112,10 @@ canonical_babybear_vector!(
     "Canonical sixteen-element BabyBear digest binding one recipient envelope to an output."
 );
 canonical_babybear_vector!(
+    PrivateTransferIntentCommitmentV2,
+    "Canonical sixteen-element BabyBear commitment to all 640 bytes of one v2 private-transfer intent."
+);
+canonical_babybear_vector!(
     NoteCommitmentV2,
     "Canonical sixteen-element BabyBear encoding of a v2 note commitment."
 );
@@ -167,6 +171,12 @@ mod tests {
                 index: 5,
                 value: BABYBEAR_MODULUS,
             })
+        );
+        assert_eq!(
+            PrivateTransferIntentCommitmentV2::from_elements([7; BABYBEAR_ELEMENTS_PER_VALUE])
+                .unwrap()
+                .elements(),
+            [7; BABYBEAR_ELEMENTS_PER_VALUE]
         );
         assert_eq!(
             NullifierV2::new([255; BABYBEAR_VECTOR_BYTES]),
