@@ -74,6 +74,7 @@ docs/
   NOTE_OPENING_BOUNDARY_V0_1.md  Canonical private-note opening boundary before hash selection.
   POSEIDON2_P24_NOTE_DOMAINS_CANDIDATE_V0_1.md  Unselected candidate for private note hash domains.
   POSEIDON2_P24_NOTE_DOMAINS_REFERENCE_EVALUATION_V0_1.md  External KATs for private P24 domains.
+  NOTE_DOMAIN_VECTOR_CORPUS_V0_1.md  Canonical NXNV framing for private-domain KATs.
   TREE_VECTOR_GENERATION_BLOCKER_V0_1.md  Evidence and prerequisites for complete tree vectors.
   POSEIDON2_TREE_CONSTRUCTION_CANDIDATE_V0_1.md  Unselected P24 tree-construction candidate.
   POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md  Frozen but unselected P24 parameter artifact.
