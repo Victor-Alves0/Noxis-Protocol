@@ -34,4 +34,4 @@ Uma próxima proposta deve satisfazer todas as condições abaixo antes de gerar
 
 ## Próximo micro-objetivo
 
-Transformar essas condições em uma especificação de seleção revisável, com alternativas de construção e critérios de segurança. Ela será uma candidata de design, não uma ativação do protocolo.
+Uma candidata de design P24 foi registrada em [`POSEIDON2_TREE_CONSTRUCTION_CANDIDATE_V0_1.md`](POSEIDON2_TREE_CONSTRUCTION_CANDIDATE_V0_1.md). O próximo passo é extrair os parâmetros completos e testar sua permutação/sponge em referências independentes; ela continua sem ativar o protocolo.
