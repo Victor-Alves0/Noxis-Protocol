@@ -204,6 +204,71 @@ impl Poseidon2P24Reference {
         }
         Ok(nodes[0])
     }
+
+    /// Builds one depth-32 path for a commitment appended in a small test tree.
+    pub fn small_tree_path(
+        &self,
+        commitments: &[BabyBearDigestV2],
+        leaf_index: usize,
+    ) -> Result<
+        (BabyBearDigestV2, [BabyBearDigestV2; 32], BabyBearDigestV2),
+        Poseidon2P24ReferenceError,
+    > {
+        const MAX_SMALL_TREE_NOTES: usize = 4;
+        if commitments.len() > MAX_SMALL_TREE_NOTES {
+            return Err(Poseidon2P24ReferenceError::TooManySmallTreeNotes {
+                actual: commitments.len(),
+                limit: MAX_SMALL_TREE_NOTES,
+            });
+        }
+        if leaf_index >= commitments.len() {
+            return Err(Poseidon2P24ReferenceError::SmallTreePathIndexOutOfBounds {
+                index: leaf_index,
+                count: commitments.len(),
+            });
+        }
+        let empty = self.empty_values()?;
+        let leaf = self.leaf(commitments[leaf_index])?;
+        let mut nodes = Vec::with_capacity(commitments.len());
+        for commitment in commitments {
+            nodes.push(self.leaf(*commitment)?);
+        }
+        let mut siblings = [[0_u32; P24_TREE_DIGEST_ELEMENTS]; 32];
+        let mut index = leaf_index;
+        for level in 0..32 {
+            siblings[level] = nodes.get(index ^ 1).copied().unwrap_or(empty[level]);
+            if nodes.len() % 2 == 1 {
+                nodes.push(empty[level]);
+            }
+            let mut parents = Vec::with_capacity(nodes.len() / 2);
+            for pair in nodes.chunks_exact(2) {
+                parents.push(self.node(pair[0], pair[1])?);
+            }
+            nodes = parents;
+            index >>= 1;
+        }
+        Ok((leaf, siblings, nodes[0]))
+    }
+
+    /// Reconstructs one root from a leaf, a depth-32 sibling path and index.
+    pub fn root_from_path(
+        &self,
+        leaf: BabyBearDigestV2,
+        leaf_index: u32,
+        siblings: [BabyBearDigestV2; 32],
+    ) -> Result<BabyBearDigestV2, Poseidon2P24ReferenceError> {
+        validate_digest(&leaf)?;
+        let mut current = leaf;
+        for (level, sibling) in siblings.into_iter().enumerate() {
+            validate_digest(&sibling)?;
+            current = if (leaf_index >> level) & 1 == 0 {
+                self.node(current, sibling)?
+            } else {
+                self.node(sibling, current)?
+            };
+        }
+        Ok(current)
+    }
 }
 
 fn decode_elements(payload: &[u8]) -> Result<Vec<u32>, Poseidon2P24ReferenceError> {
@@ -254,6 +319,18 @@ fn validate_state(state: &BabyBearStateP24) -> Result<(), Poseidon2P24ReferenceE
     for (index, value) in state.iter().copied().enumerate() {
         if value >= BABYBEAR_MODULUS {
             return Err(Poseidon2P24ReferenceError::NonCanonicalInput { index, value });
+        }
+    }
+    Ok(())
+}
+
+fn validate_digest(value: &BabyBearDigestV2) -> Result<(), Poseidon2P24ReferenceError> {
+    for (index, element) in value.iter().copied().enumerate() {
+        if element >= BABYBEAR_MODULUS {
+            return Err(Poseidon2P24ReferenceError::NonCanonicalHashInput {
+                index,
+                value: element,
+            });
         }
     }
     Ok(())
@@ -327,6 +404,10 @@ pub enum Poseidon2P24ReferenceError {
         actual: usize,
         limit: usize,
     },
+    SmallTreePathIndexOutOfBounds {
+        index: usize,
+        count: usize,
+    },
 }
 
 impl From<Poseidon2P24CandidateError> for Poseidon2P24ReferenceError {
@@ -370,6 +451,12 @@ impl fmt::Display for Poseidon2P24ReferenceError {
                 write!(
                     formatter,
                     "small P24 tree has {actual} notes, limit is {limit}"
+                )
+            }
+            Self::SmallTreePathIndexOutOfBounds { index, count } => {
+                write!(
+                    formatter,
+                    "small P24 tree path index {index} is outside {count} commitments"
                 )
             }
         }
@@ -521,6 +608,35 @@ mod tests {
             Err(Poseidon2P24ReferenceError::TooManySmallTreeNotes {
                 actual: 5,
                 limit: 4,
+            })
+        );
+    }
+
+    #[test]
+    fn small_tree_paths_reconstruct_the_same_root() {
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let commitments = [
+            core::array::from_fn(|index| index as u32),
+            [42; 16],
+            core::array::from_fn(|index| 100 + index as u32),
+            core::array::from_fn(|index| 200 + index as u32),
+        ];
+        let expected_root = reference.small_tree_root(&commitments).unwrap();
+        for index in 0..commitments.len() {
+            let (leaf, siblings, root) = reference.small_tree_path(&commitments, index).unwrap();
+            assert_eq!(root, expected_root);
+            assert_eq!(
+                reference
+                    .root_from_path(leaf, index as u32, siblings)
+                    .unwrap(),
+                root
+            );
+        }
+        assert_eq!(
+            reference.small_tree_path(&commitments, commitments.len()),
+            Err(Poseidon2P24ReferenceError::SmallTreePathIndexOutOfBounds {
+                index: commitments.len(),
+                count: commitments.len(),
             })
         );
     }
