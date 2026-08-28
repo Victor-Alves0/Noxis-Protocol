@@ -2,6 +2,7 @@
 members = [
     "crates/noxis-types",
     "crates/noxis-privacy-types",
+    "crates/noxis-tree-params",
     "crates/noxis-crypto",
     "crates/noxis-ledger",
     "crates/noxis-codec",

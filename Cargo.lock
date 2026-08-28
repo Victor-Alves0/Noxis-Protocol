@@ -231,6 +231,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "noxis-tree-params"
+version = "0.1.0"
+dependencies = [
+ "noxis-privacy-types",
+ "sha2",
+]
+
+[[package]]
 name = "noxis-types"
 version = "0.1.0"
 
