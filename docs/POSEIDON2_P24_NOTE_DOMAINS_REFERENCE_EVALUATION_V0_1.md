@@ -49,6 +49,7 @@ serializada em quatro bytes big-endian, não reduzida para um elemento BabyBear.
 
 Isto valida a referência e o formato da candidata, não uma implementação
 selecionada de hash, uma AIR, uma prova de posse, sigilo de chave ou uma
-transferência privada. Ainda é obrigatório criar o corpus canônico `NXNV`,
-testar a construção semântica da abertura de nota e obter revisão independente
-antes de expor carteira, prover ou serviço.
+transferência privada. O corpus canônico `NXNV` e seu parser estrito agora
+congelam essa evidência. Ainda é obrigatório testar a construção semântica da
+abertura de nota e obter revisão independente antes de expor carteira, prover
+ou serviço.

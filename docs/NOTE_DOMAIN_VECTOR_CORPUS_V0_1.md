@@ -58,8 +58,20 @@ domínio. Isso impede que uma amostra mais fraca seja apresentada como este
 corpus fechado. Os digests continuam conferidos pela referência em
 [`POSEIDON2_P24_NOTE_DOMAINS_REFERENCE_EVALUATION_V0_1.md`](POSEIDON2_P24_NOTE_DOMAINS_REFERENCE_EVALUATION_V0_1.md).
 
+## Artefato congelado e parser
+
+O fixture canônico está em
+[`poseidon2_babybear_p24_private_domain_vectors_v1.base64`](../crates/noxis-tree-params/fixtures/poseidon2_babybear_p24_private_domain_vectors_v1.base64).
+Ao decodificá-lo de Base64, ele mede 10.050 bytes e tem SHA-256
+`7d59452e61c2245b7c8f9e81279734fcb7ce51bdd8fe01e7764095f13d2b5827`.
+
+O parser isolado `note_corpus_v1` em `noxis-tree-params` reencoda cada corpus
+aceito e exige igualdade byte a byte com a entrada. Isso fixa também ordem,
+framing e todas as regras de validação descritas acima, sem importar a
+referência de hash nem qualquer módulo do protocolo ativo.
+
 ## Próximo passo
 
-Materializar o fixture binário `NXNV`, implementar seu parser isolado em
-`noxis-tree-params` e fixar tamanho/SHA-256. Depois, a abertura local poderá
-consumir a referência já confrontada com o corpus sem tocar no protocolo ativo.
+Implementar a abertura local de nota como crate independente, consumindo a
+referência já confrontada com o corpus. Os tipos de segredo não terão codec,
+`Clone`, `Debug` ou integração com o ledger nesta etapa.

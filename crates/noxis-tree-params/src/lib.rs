@@ -12,6 +12,7 @@ use sha2::{Digest, Sha256};
 
 mod corpus;
 mod corpus_v2;
+mod note_corpus_v1;
 mod p24;
 mod p24_note_domains;
 
@@ -23,6 +24,10 @@ pub use corpus_v2::{
     P24_TREE_VECTOR_HEADER_LENGTH, P24_TREE_VECTOR_LENGTH_LIMIT, P24_TREE_VECTOR_MAGIC,
     P24_TREE_VECTOR_VERSION, P24PermutationStateV2, P24TreeValueV2, P24TreeVectorCorpusV2,
     P24TreeVectorCoverageProfileV2, P24TreeVectorRecordV2, P24TreeVectorV2Error,
+};
+pub use note_corpus_v1::{
+    P24_NOTE_VECTOR_HEADER_LENGTH, P24_NOTE_VECTOR_LENGTH_LIMIT, P24_NOTE_VECTOR_MAGIC,
+    P24_NOTE_VECTOR_VERSION, P24NoteVectorCorpusV1, P24NoteVectorError, P24NoteVectorRecordV1,
 };
 pub use p24::{
     CandidatePoseidon2P24ManifestIdV2, CandidatePoseidon2P24ManifestV2,
