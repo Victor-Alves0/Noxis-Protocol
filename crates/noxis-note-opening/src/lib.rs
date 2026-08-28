@@ -13,7 +13,8 @@ use noxis_poseidon2_privacy_reference::{
 use noxis_poseidon2_reference::{Poseidon2P24Reference, Poseidon2P24ReferenceError};
 use noxis_privacy_types::{
     MerkleRootV2, MerkleSiblingV2, NoteCommitmentV2, NullifierV2, PrivacyTypesError,
-    RecipientCommitmentV2, TreeParametersId,
+    PrivateTransferIntentCommitmentV2, PrivateTransferIntentV2, RecipientCommitmentV2,
+    TreeParametersId,
 };
 use noxis_tree_params::{CandidatePoseidon2P24ManifestV2, Poseidon2P24CandidateError};
 use noxis_types::AssetId;
@@ -21,7 +22,10 @@ use zeroize::Zeroize;
 
 mod statement;
 
-pub use statement::{CandidatePrivateTransferWitnessV2, PrivateTransferStatementError};
+pub use statement::{
+    CandidatePrivateTransferAirPublicInputsV1, CandidatePrivateTransferWitnessV2,
+    PrivateTransferStatementError,
+};
 
 const NOTE_VERSION: u16 = 1;
 const NOTE_PREIMAGE_LENGTH: usize = 178;
@@ -342,6 +346,19 @@ impl CandidateP24NoteOpeningEvaluatorV2 {
         Ok(RecipientCommitmentV2::from_elements(
             self.private_reference.hash_addr(nullifier_key.bytes())?,
         )?)
+    }
+
+    /// Computes the candidate `H_INTENT` commitment for an already-canonical intent.
+    ///
+    /// The result is a future AIR public input only. It is not a transaction ID,
+    /// proof, deployment selection, or ledger authorization.
+    pub fn intent_commitment(
+        &self,
+        intent: &PrivateTransferIntentV2,
+    ) -> Result<PrivateTransferIntentCommitmentV2, NoteOpeningError> {
+        Ok(self
+            .private_reference
+            .hash_private_transfer_intent(intent)?)
     }
 
     /// Derives the candidate-only adapter used to bind a local P24 evaluation.
