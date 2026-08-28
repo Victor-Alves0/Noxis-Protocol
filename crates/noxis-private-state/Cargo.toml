@@ -1,0 +1,15 @@
+[package]
+name = "noxis-private-state"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+noxis-poseidon2-reference = { path = "../noxis-poseidon2-reference" }
+noxis-privacy-types = { path = "../noxis-privacy-types" }
+noxis-tree-params = { path = "../noxis-tree-params" }
+sha2 = "0.10.9"
+
+[lints]
+workspace = true
