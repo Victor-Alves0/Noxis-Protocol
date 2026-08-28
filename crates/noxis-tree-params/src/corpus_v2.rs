@@ -7,6 +7,8 @@
 
 use std::fmt;
 
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+
 use noxis_privacy_types::{
     BABYBEAR_ELEMENTS_PER_VALUE, BABYBEAR_MODULUS, BABYBEAR_VECTOR_BYTES, NoteCommitmentV2,
     PrivacyTypesError,
@@ -47,18 +49,22 @@ const PATH_TAG: u8 = 6;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum P24TreeVectorCoverageProfileV2 {
     Initial,
+    /// Full fixed P24 tree-construction evidence required before selection.
+    Complete,
 }
 
 impl P24TreeVectorCoverageProfileV2 {
     const fn encode(self) -> u16 {
         match self {
             Self::Initial => 0,
+            Self::Complete => 1,
         }
     }
 
     fn decode(value: u16) -> Result<Self, P24TreeVectorV2Error> {
         match value {
             0 => Ok(Self::Initial),
+            1 => Ok(Self::Complete),
             _ => Err(P24TreeVectorV2Error::UnsupportedCoverageProfile(value)),
         }
     }
@@ -238,7 +244,17 @@ pub struct P24TreeVectorCorpusV2 {
 
 impl P24TreeVectorCorpusV2 {
     /// Constructs a canonical candidate corpus after limits and ordering checks.
-    pub fn new_initial(
+    pub fn new_initial(records: Vec<P24TreeVectorRecordV2>) -> Result<Self, P24TreeVectorV2Error> {
+        Self::new(P24TreeVectorCoverageProfileV2::Initial, records)
+    }
+
+    /// Constructs the fixed, complete P24 evidence profile.
+    pub fn new_complete(records: Vec<P24TreeVectorRecordV2>) -> Result<Self, P24TreeVectorV2Error> {
+        Self::new(P24TreeVectorCoverageProfileV2::Complete, records)
+    }
+
+    fn new(
+        profile: P24TreeVectorCoverageProfileV2,
         mut records: Vec<P24TreeVectorRecordV2>,
     ) -> Result<Self, P24TreeVectorV2Error> {
         if records.len() > P24_MAX_RECORDS {
@@ -264,10 +280,10 @@ impl P24TreeVectorCorpusV2 {
                 limit: P24_TREE_VECTOR_LENGTH_LIMIT,
             });
         }
-        Ok(Self {
-            profile: P24TreeVectorCoverageProfileV2::Initial,
-            records,
-        })
+        if profile == P24TreeVectorCoverageProfileV2::Complete {
+            validate_complete_coverage(&records)?;
+        }
+        Ok(Self { profile, records })
     }
 
     /// Returns the explicit coverage declaration for this corpus.
@@ -455,6 +471,23 @@ impl P24TreeVectorCorpusV2 {
         .expect("frozen P24 candidate vectors are canonical")
     }
 
+    /// Returns the frozen externally generated corpus for the complete profile.
+    ///
+    /// The base64 source is a transport form for the exact canonical NXTV v2
+    /// bytes. Decoding it through the public parser also verifies its manifest
+    /// binding, record ordering, and complete-profile shape.
+    pub fn frozen_complete_candidate_corpus() -> Self {
+        let compact: String =
+            include_str!("../fixtures/poseidon2_babybear_p24_nxtv_complete_v2.base64")
+                .chars()
+                .filter(|character| !character.is_whitespace())
+                .collect();
+        let bytes = STANDARD
+            .decode(compact)
+            .expect("frozen complete P24 corpus base64 is valid");
+        Self::decode(&bytes).expect("frozen complete P24 corpus is canonical")
+    }
+
     /// Encodes this corpus with the full canonical candidate P24 manifest.
     pub fn encode(&self) -> Result<Vec<u8>, P24TreeVectorV2Error> {
         let manifest = CandidatePoseidon2P24ManifestV2::new();
@@ -528,6 +561,7 @@ impl P24TreeVectorCorpusV2 {
         }
         let corpus = match profile {
             P24TreeVectorCoverageProfileV2::Initial => Self::new_initial(records)?,
+            P24TreeVectorCoverageProfileV2::Complete => Self::new_complete(records)?,
         };
         if corpus.encode()? != bytes {
             return Err(P24TreeVectorV2Error::NonCanonicalRecordOrder);
@@ -559,6 +593,56 @@ fn validate_record(record: &P24TreeVectorRecordV2) -> Result<(), P24TreeVectorV2
             })
         }
         _ => Ok(()),
+    }
+}
+
+/// Enforces the deliberately small, fixed coverage contract of profile one.
+///
+/// This is a framing check, not a cryptographic verification: the values are
+/// independently generated before being frozen, while this check prevents a
+/// corpus from claiming complete coverage after records were removed or swapped.
+fn validate_complete_coverage(
+    records: &[P24TreeVectorRecordV2],
+) -> Result<(), P24TreeVectorV2Error> {
+    const COMPLETE_RECORD_COUNT: usize = 50;
+    if records.len() != COMPLETE_RECORD_COUNT {
+        return Err(P24TreeVectorV2Error::IncompleteCompleteCoverage);
+    }
+
+    let mut permutations = 0;
+    let mut leaves = 0;
+    let mut nodes = 0;
+    let mut empties = [false; P24_TREE_DEPTH + 1];
+    let mut small_trees = [false; P24_MAX_SMALL_TREE_NOTES + 1];
+    let mut paths = [false; 4];
+
+    for record in records {
+        match record {
+            P24TreeVectorRecordV2::Permutation { .. } => permutations += 1,
+            P24TreeVectorRecordV2::Leaf { .. } => leaves += 1,
+            P24TreeVectorRecordV2::Node { .. } => nodes += 1,
+            P24TreeVectorRecordV2::Empty { level, .. } => empties[*level as usize] = true,
+            P24TreeVectorRecordV2::SmallTree { notes, .. } => small_trees[notes.len()] = true,
+            P24TreeVectorRecordV2::Path { leaf_index, .. } => match *leaf_index {
+                0 => paths[0] = true,
+                1 => paths[1] = true,
+                2 => paths[2] = true,
+                u32::MAX => paths[3] = true,
+                _ => return Err(P24TreeVectorV2Error::IncompleteCompleteCoverage),
+            },
+        }
+    }
+
+    if permutations == 2
+        && leaves == 4
+        && nodes == 2
+        && empties.into_iter().all(|present| present)
+        && small_trees.into_iter().all(|present| present)
+        && paths.into_iter().all(|present| present)
+    {
+        Ok(())
+    } else {
+        Err(P24TreeVectorV2Error::IncompleteCompleteCoverage)
     }
 }
 
@@ -704,6 +788,7 @@ pub enum P24TreeVectorV2Error {
     NonCanonicalStateElement { index: usize, element: u32 },
     InvalidEmptyLevel(u8),
     TooManySmallTreeNotes { actual: usize, limit: usize },
+    IncompleteCompleteCoverage,
     DuplicateRecord,
     NonCanonicalRecordOrder,
     Truncated,
@@ -765,6 +850,9 @@ impl fmt::Display for P24TreeVectorV2Error {
                 formatter,
                 "NXTV v2 small tree has {actual} notes, limit is {limit}"
             ),
+            Self::IncompleteCompleteCoverage => formatter.write_str(
+                "NXTV v2 complete profile does not contain its required evidence coverage",
+            ),
             Self::DuplicateRecord => formatter.write_str("duplicate NXTV v2 record"),
             Self::NonCanonicalRecordOrder => {
                 formatter.write_str("non-canonical NXTV v2 record order")
@@ -780,6 +868,7 @@ impl std::error::Error for P24TreeVectorV2Error {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha2::{Digest, Sha256};
 
     fn state(seed: u32) -> P24PermutationStateV2 {
         P24PermutationStateV2::from_elements(core::array::from_fn(|index| seed + index as u32))
@@ -846,6 +935,20 @@ mod tests {
     }
 
     #[test]
+    fn frozen_complete_corpus_has_the_required_coverage_and_stable_bytes() {
+        let corpus = P24TreeVectorCorpusV2::frozen_complete_candidate_corpus();
+        assert_eq!(corpus.profile(), P24TreeVectorCoverageProfileV2::Complete);
+        assert_eq!(corpus.records().len(), 50);
+        let encoded = corpus.encode().unwrap();
+        assert_eq!(encoded.len(), 21_116);
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&encoded)),
+            "4f3ae2371bb9344f6ecd6b2e1d40945c43b7fa1d6d17de3ea177162de5039ce3"
+        );
+        assert_eq!(P24TreeVectorCorpusV2::decode(&encoded), Ok(corpus));
+    }
+
+    #[test]
     fn decoder_rejects_header_state_and_record_mutations() {
         let corpus = P24TreeVectorCorpusV2::new_initial(vec![P24TreeVectorRecordV2::Permutation {
             input: state(0),
@@ -874,10 +977,10 @@ mod tests {
         );
         let mut unsupported_profile = encoded;
         unsupported_profile[P24_TREE_VECTOR_HEADER_LENGTH - 4..P24_TREE_VECTOR_HEADER_LENGTH - 2]
-            .copy_from_slice(&1_u16.to_be_bytes());
+            .copy_from_slice(&2_u16.to_be_bytes());
         assert_eq!(
             P24TreeVectorCorpusV2::decode(&unsupported_profile),
-            Err(P24TreeVectorV2Error::UnsupportedCoverageProfile(1))
+            Err(P24TreeVectorV2Error::UnsupportedCoverageProfile(2))
         );
     }
 

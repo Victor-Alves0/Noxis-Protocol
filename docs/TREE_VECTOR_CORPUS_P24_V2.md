@@ -35,20 +35,26 @@ menores que `2_013_265_921`.
 O teto de arquivo é 1 MiB e o teto de registros é 4.096. Ambos são conferidos
 antes de alocação proporcional ao conteúdo anunciado.
 
-## Perfil de cobertura
+## Perfis de cobertura
 
-O único perfil aceito nesta versão é `0`, **Initial**. Ele afirma somente que
-o corpus contém uma amostra inicial de resultados já confrontados com uma
-execução externa; não pode ser apresentado como cobertura suficiente para
-selecionar parâmetros. Perfil desconhecido é erro, não extensão silenciosa.
+O perfil `0`, **Initial**, afirma somente que o corpus contém uma amostra
+inicial de resultados já confrontados com uma execução externa; não pode ser
+apresentado como cobertura suficiente para selecionar parâmetros.
 
 `frozen_initial_candidate_corpus()` contém sete registros externos verificados:
 duas permutações P24, uma folha, `EMPTY[0]` e raízes de profundidade 32 para
 zero, uma e duas notas. Sua codificação possui exatamente 8.712 bytes.
 
-Uma versão/perfil posterior precisará exigir a cobertura completa: ambas as
-ordens de nó, `EMPTY[0..32]`, raízes de 0 a 4 notas e caminhos. O perfil
-inicial existe justamente para não alegar que essa evidência futura já existe.
+O perfil `1`, **Complete**, é um contrato de cobertura rígido, não uma mera
+etiqueta. Ele exige exatamente 50 registros: duas permutações, quatro folhas,
+as duas ordens de um nó, `EMPTY[0..32]`, raízes com 0 a 4 commitments e quatro
+caminhos (índices `0`, `1`, `2` e `u32::MAX`). O parser rejeita o corpus se
+qualquer uma dessas partes faltar ou for trocada por um índice fora do contrato.
+
+`frozen_complete_candidate_corpus()` fornece esses bytes já confrontados com a
+referência externa. A codificação canônica tem 21.116 bytes e SHA-256
+`4f3ae2371bb9344f6ecd6b2e1d40945c43b7fa1d6d17de3ea177162de5039ce3`.
+Perfil desconhecido é erro, não extensão silenciosa.
 
 ## Registros
 
@@ -79,7 +85,7 @@ não há bitmap redundante.
 
 ## Próximo passo
 
-Expandir a evidência ao perfil completo, sempre confrontando o corpus com a
-referência externa antes de congelar novos bytes. Depois disso ainda restam a
-abertura de nota, a AIR/provas e revisão independente antes de qualquer
-ativação de protocolo.
+A cobertura de construção da árvore agora está congelada, mas ela ainda não é
+uma seleção nem uma ativação do protocolo. O próximo passo técnico é definir a
+abertura de nota e sua vinculação à intenção privada; depois vêm AIR/provas e
+revisão criptográfica independente antes de qualquer uso no ledger ou consenso.
