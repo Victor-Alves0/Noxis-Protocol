@@ -63,6 +63,7 @@ crates/
   noxis-runtime  Genesis-bound data directory and writer-lock lifecycle.
   noxis-node     Typed local-node API and guarded loopback CometBFT service.
 docs/
+  README.md                     Documentation map and reader routes.
   PROTOCOL_SPEC_V0_1.md         Scope, invariants and state machine.
   THREAT_MODEL_V0_1.md          Explicit security assumptions and acceptance criteria.
   CONSENSUS_DECISION_V0_1.md    Consensus decision and required security choices.
@@ -82,6 +83,10 @@ docs/
   POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md  Cross-validated permutation reference vectors.
   ARCHITECTURE.md                Module boundaries and implementation roadmap.
 ```
+
+For a guided route through protocol, security, architecture, consensus,
+durability and privacy research, start with
+[`docs/README.md`](docs/README.md).
 
 Run the checks with:
 
