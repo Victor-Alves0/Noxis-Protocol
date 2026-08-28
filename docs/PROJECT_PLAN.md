@@ -92,6 +92,12 @@ ainda faltam vetores externos e referência local, portanto não há função de
 hash de nota ativa. Ver
 [`POSEIDON2_P24_NOTE_DOMAINS_CANDIDATE_V0_1.md`](POSEIDON2_P24_NOTE_DOMAINS_CANDIDATE_V0_1.md).
 
+**Referência de domínios privados:** o crate isolado
+`noxis-poseidon2-privacy-reference` reproduz seis KATs gerados no clone
+externo da Horizen para `ADDR`, `NOTE` e `NULLIFIER`, sem conexão com ledger
+ou consenso. O corpus `NXNV` e a abertura semântica ainda faltam. Ver
+[`POSEIDON2_P24_NOTE_DOMAINS_REFERENCE_EVALUATION_V0_1.md`](POSEIDON2_P24_NOTE_DOMAINS_REFERENCE_EVALUATION_V0_1.md).
+
 **Base de código v2:** o crate isolado `noxis-privacy-types` fixa a intenção canônica de transferência privada, sua aridade e tipos públicos sem acoplar provas, hashes, chaves ou carteira. Os valores públicos de 64 bytes já rejeitam encoding não canônico: são 16 elementos BabyBear little-endian, cada um abaixo do módulo do campo. O codec externo `NXPT` agora enquadra intenção, dois envelopes e prova com limites rígidos, ainda sem aceitar a transação no ledger v1. `noxis-tree-params` fixa os bytes e o ID de uma candidata explicitamente vazia, vetores de permutação BabyBear-16 comparados entre Horizen Rust e Zig independente e o framing `NXTV` pré-seleção para evidência de folha/nó/empty/árvore/caminho. A investigação confirmou que as referências não definem uma árvore/sponge comum; por isso a primeira candidata explícita usa P24. Seus 1.899 parâmetros e IVs já estão congelados, verificados por checksum, canonicidade de campo e rederivação de IV; a permutação e os primeiros vetores de sponge/árvore também foram comparados com execução externa, mas ainda faltam o perfil de cobertura completo, a abertura de nota, provas e revisão independente. Ver [`POSEIDON2_TREE_CONSTRUCTION_CANDIDATE_V0_1.md`](POSEIDON2_TREE_CONSTRUCTION_CANDIDATE_V0_1.md), [`POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md`](POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md), [`TREE_PARAMETER_FRAMING_V0_1.md`](TREE_PARAMETER_FRAMING_V0_1.md), [`TREE_VECTOR_CORPUS_FRAMING_V0_1.md`](TREE_VECTOR_CORPUS_FRAMING_V0_1.md), [`TREE_VECTOR_GENERATION_BLOCKER_V0_1.md`](TREE_VECTOR_GENERATION_BLOCKER_V0_1.md), [`POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md`](POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md), [`POSEIDON2_CANDIDATE_EVALUATION_V0_1.md`](POSEIDON2_CANDIDATE_EVALUATION_V0_1.md) e [`TREE_BACKEND_SELECTION_GATE_V0_1.md`](TREE_BACKEND_SELECTION_GATE_V0_1.md).
 
 ### 6. Adaptadores de ativos e políticas de emissão
