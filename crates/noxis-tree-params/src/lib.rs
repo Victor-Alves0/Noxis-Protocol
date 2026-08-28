@@ -17,6 +17,7 @@ mod note_corpus_v1;
 mod p24;
 mod p24_intent_commitment;
 mod p24_note_domains;
+mod p24_nullifier_sparse;
 
 pub use corpus::{
     DRAFT_TREE_VECTOR_LENGTH_LIMIT, DRAFT_TREE_VECTOR_MAGIC, DRAFT_TREE_VECTOR_VERSION,
@@ -53,6 +54,12 @@ pub use p24_note_domains::{
     P24_BYTE_PACK_WIDTH, P24_NOTE_DOMAINS_CANDIDATE_ID_DOMAIN, P24_NOTE_DOMAINS_MANIFEST_LENGTH,
     P24_NOTE_DOMAINS_PAYLOAD_LENGTH, Poseidon2P24NoteDomainV1,
     Poseidon2P24NoteDomainsCandidateError,
+};
+pub use p24_nullifier_sparse::{
+    CandidatePoseidon2P24NullifierSparseIdV1, CandidatePoseidon2P24NullifierSparseManifestV1,
+    P24_NULLIFIER_SPARSE_CANDIDATE_ID_DOMAIN, P24_NULLIFIER_SPARSE_MANIFEST_LENGTH,
+    P24_NULLIFIER_SPARSE_PAYLOAD_LENGTH, Poseidon2P24NullifierSparseCandidateError,
+    Poseidon2P24NullifierSparseDomainV1,
 };
 
 /// Four-byte magic identifying a draft tree-parameter manifest.
