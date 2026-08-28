@@ -11,11 +11,17 @@ use noxis_privacy_types::{BABYBEAR_ELEMENTS_PER_VALUE, BABYBEAR_MODULUS, BABYBEA
 use sha2::{Digest, Sha256};
 
 mod corpus;
+mod corpus_v2;
 mod p24;
 
 pub use corpus::{
     DRAFT_TREE_VECTOR_LENGTH_LIMIT, DRAFT_TREE_VECTOR_MAGIC, DRAFT_TREE_VECTOR_VERSION,
     TreeVectorCorpusV1, TreeVectorError, TreeVectorRecordV1, TreeVectorValueV1,
+};
+pub use corpus_v2::{
+    P24_TREE_VECTOR_HEADER_LENGTH, P24_TREE_VECTOR_LENGTH_LIMIT, P24_TREE_VECTOR_MAGIC,
+    P24_TREE_VECTOR_VERSION, P24PermutationStateV2, P24TreeValueV2, P24TreeVectorCorpusV2,
+    P24TreeVectorCoverageProfileV2, P24TreeVectorRecordV2, P24TreeVectorV2Error,
 };
 pub use p24::{
     CandidatePoseidon2P24ManifestIdV2, CandidatePoseidon2P24ManifestV2,

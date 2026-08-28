@@ -4,6 +4,12 @@
 
 `NXTV` v1 é o formato binário canônico para transportar **evidência de teste** da futura árvore privada v2. O leitor/escritor está isolado em `noxis-tree-params`; ele não calcula Poseidon2, raiz, prova ou caminho e não autoriza nenhum `TreeParametersId`.
 
+Este documento permanece imutável para a candidata rascunho de largura 16. A
+candidata P24 usa framing separado em
+[`TREE_VECTOR_CORPUS_P24_V2.md`](TREE_VECTOR_CORPUS_P24_V2.md), pois seu estado
+de permutação tem 24 elementos e seu manifesto completo não cabe no cabeçalho
+v1.
+
 Em linguagem simples: é uma folha de respostas com formato rígido. Ela diz qual saída uma futura implementação precisa obter, mas não entrega uma calculadora que possa entrar no ledger.
 
 O corpus congelado nesta versão contém apenas os dois vetores de permutação BabyBear-16 já validados entre Rust e Zig. Os formatos de folha, nó, vazio, árvore pequena e caminho já existem para receber evidência externa posterior, mas ainda não carregam resultados criptográficos Noxis. O motivo e as condições de desbloqueio estão em [`TREE_VECTOR_GENERATION_BLOCKER_V0_1.md`](TREE_VECTOR_GENERATION_BLOCKER_V0_1.md).

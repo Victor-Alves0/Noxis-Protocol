@@ -70,6 +70,7 @@ docs/
   ECONOMIC_SECURITY_MODEL_V0_1.md  Boundaries for validator rewards, liquidity and future contracts.
   TREE_PARAMETER_FRAMING_V0_1.md   Canonical draft manifest and field-vector boundary for v2 trees.
   TREE_VECTOR_CORPUS_FRAMING_V0_1.md  NXTV framing for external tree-vector evidence.
+  TREE_VECTOR_CORPUS_P24_V2.md  NXTV v2 framing bound to the frozen P24 candidate.
   TREE_VECTOR_GENERATION_BLOCKER_V0_1.md  Evidence and prerequisites for complete tree vectors.
   POSEIDON2_TREE_CONSTRUCTION_CANDIDATE_V0_1.md  Unselected P24 tree-construction candidate.
   POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md  Frozen but unselected P24 parameter artifact.
