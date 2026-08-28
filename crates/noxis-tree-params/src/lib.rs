@@ -13,6 +13,7 @@ use sha2::{Digest, Sha256};
 mod corpus;
 mod corpus_v2;
 mod p24;
+mod p24_note_domains;
 
 pub use corpus::{
     DRAFT_TREE_VECTOR_LENGTH_LIMIT, DRAFT_TREE_VECTOR_MAGIC, DRAFT_TREE_VECTOR_VERSION,
@@ -27,6 +28,12 @@ pub use p24::{
     CandidatePoseidon2P24ManifestIdV2, CandidatePoseidon2P24ManifestV2,
     P24_CANDIDATE_MANIFEST_ID_DOMAIN, P24_CANDIDATE_MANIFEST_LENGTH, P24_PARAMETER_PAYLOAD_LENGTH,
     Poseidon2P24CandidateError, Poseidon2P24TreeDomainV1,
+};
+pub use p24_note_domains::{
+    CandidatePoseidon2P24NoteDomainsIdV1, CandidatePoseidon2P24NoteDomainsManifestV1,
+    P24_BYTE_PACK_WIDTH, P24_NOTE_DOMAINS_CANDIDATE_ID_DOMAIN, P24_NOTE_DOMAINS_MANIFEST_LENGTH,
+    P24_NOTE_DOMAINS_PAYLOAD_LENGTH, Poseidon2P24NoteDomainV1,
+    Poseidon2P24NoteDomainsCandidateError,
 };
 
 /// Four-byte magic identifying a draft tree-parameter manifest.

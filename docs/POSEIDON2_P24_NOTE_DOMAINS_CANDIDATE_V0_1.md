@@ -76,13 +76,25 @@ entrada vazia e squeezing de 15 lanes seguido da lane zero após outra
 permutação. Nenhuma função aceita bytes livres ou tamanho escolhido pelo
 chamador.
 
-## Artefato que deverá ser congelado
+## Artefato congelado
 
-Antes de implementar, `noxis-tree-params` deverá introduzir um manifesto
-separado `NXPH v1` contendo: ID e bytes do manifesto pai, perfil do sponge,
-perfil `BytePack3LE`, três labels, três IVs (27 elementos `u32le`), checksum e
-um ID de candidata próprio, derivado com domínio diferente do ID da árvore.
-Uma mudança no artefato cria candidata nova; não altera a candidata P24 pai.
+`noxis-tree-params` materializa o manifesto separado `NXPH v1`. Ele contém os
+7.660 bytes e o ID do manifesto pai, perfil do sponge, perfil `BytePack3LE`,
+descritores explícitos dos três labels, os 27 IVs `u32le`, checksum e ID de
+candidata próprio. Uma mudança no artefato cria candidata nova; não altera a
+candidata P24 pai.
+
+| Propriedade | Valor |
+| --- | --- |
+| Comprimento do payload de IVs | 108 bytes |
+| SHA-256 do payload | `d1ec18bc78ac13aad2edd6a0e99918a1ffb8964b0ead257730fabda2fa8df09c` |
+| Comprimento do manifesto NXPH | 7.980 bytes |
+| SHA-256 do manifesto | `bbcb4adab8627816a277247a4721a87f85167a1b8c4175b5a32fb4815a9d3e4c` |
+| ID candidato NXPH | `57e227fd9d4cbcc697190372b8983d2bdc5e3394177510eea54f9f90f3634b8e` |
+
+O checksum cobre, com domínio próprio, todos os bytes do manifesto antes do
+campo de checksum. O ID cobre o manifesto completo; nenhum deles é um
+`TreeParametersId` ou autorização de uso.
 
 O corpus também será separado (`NXNV v1`), preso ao manifesto `NXPH` e aos
 preimages artificiais públicos. Ele exigirá ao menos dois KATs externos por
@@ -91,11 +103,10 @@ nunca poderá ser reinterpretado como corpus de abertura de nota.
 
 ## Portões antes de código de nota
 
-1. materializar e revisar os bytes/IVs `NXPH` contra a derivação acima;
-2. executar o sponge em um wrapper externo independente e congelar KATs;
-3. implementar referência isolada e comparar byte a byte com os KATs;
-4. testar cada alteração de preimage, chave, posição e caminho;
-5. passar por revisão criptográfica independente antes de expor uma API de
+1. executar o sponge em um wrapper externo independente e congelar KATs;
+2. implementar referência isolada e comparar byte a byte com os KATs;
+3. testar cada alteração de preimage, chave, posição e caminho;
+4. passar por revisão criptográfica independente antes de expor uma API de
    carteira, prover, pacote de rede ou ledger.
 
 Esta candidata deixa as regras verificáveis, mas deliberadamente não afirma
