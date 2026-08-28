@@ -7,6 +7,9 @@
 
 mod comet_service;
 
+#[cfg(feature = "research-testing")]
+pub mod research_demo;
+
 pub use comet_service::{
     CometNodeService, CometNodeServiceConfig, CometNodeServiceError, LocalAbciEndpoint,
     LocalAbciEndpointError,

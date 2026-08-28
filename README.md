@@ -99,6 +99,29 @@ On Windows, run the checks from a Visual Studio Build Tools C++ developer
 shell (or initialize `VsDevCmd.bat`) so Rust's MSVC target can find the Windows
 SDK linker and libraries.
 
+## Local operational demo
+
+Run a complete, durable research-only sequence with:
+
+```powershell
+cargo run -p noxis-node --features research-testing -- demo-local
+# or, if `just` is installed:
+just demo
+# Windows convenience script:
+.\scripts\demo-local.ps1
+```
+
+On POSIX systems, use `./scripts/demo-local.sh`. The demo prints the initialized
+genesis and state identities, accepts a fixture-authorized mint and one research
+transfer, rejects the same nullifier on a second submission, then reopens the
+node to prove durable recovery. Pass `--data-dir PATH` to keep a chosen demo
+directory for inspection.
+
+This deliberately does **not** start CometBFT or claim consensus, custody or
+privacy: the displayed `AppHash` is explicitly unavailable in local-admission
+mode, and the transfer uses a research fixture rather than a private proof.
+See [`docs/LOCAL_OPERATIONAL_DEMO_V0_1.md`](docs/LOCAL_OPERATIONAL_DEMO_V0_1.md).
+
 ## Security boundary
 
 The `ProofVerifier` and `MintPolicy` interfaces are deliberately unimplemented for production. A transaction is never private merely because it contains a `Proof` byte array: privacy and conservation are established only when an audited proof system verifies the statement against a canonical state root. Post-quantum and hybrid cryptography are design reservations, not active protection in this codebase. The consensus service is fail-closed: no cryptographic context is approved to run settlement yet; the only research exception is an explicitly compiled E2E fixture. See [`docs/CRYPTO_SERVICE_GATE_V0_1.md`](docs/CRYPTO_SERVICE_GATE_V0_1.md).
