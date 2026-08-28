@@ -332,6 +332,19 @@ mod tests {
     }
 
     #[test]
+    fn matches_the_closed_nxiv_external_corpus() {
+        let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
+        let corpus = noxis_tree_params::P24IntentVectorCorpusV1::frozen_external_kat_corpus();
+        for record in corpus.records() {
+            let intent = PrivateTransferIntentV2::decode(record.intent()).unwrap();
+            assert_eq!(
+                reference.hash_private_transfer_intent(&intent).unwrap(),
+                record.digest()
+            );
+        }
+    }
+
+    #[test]
     fn intent_reference_changes_for_each_candidate_input_byte() {
         let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
         let original = structural_baseline_input();

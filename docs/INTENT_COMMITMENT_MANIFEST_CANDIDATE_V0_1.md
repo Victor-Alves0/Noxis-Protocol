@@ -16,4 +16,4 @@ O ID da candidata é `fec73e2b8238b749357042bdba55470d674fb12ca498c47bb761854ca8
 
 ## Limites deliberados
 
-Uma referência isolada de `H_INTENT` foi liberada somente após os vetores externos documentados em [`EXTERNAL_INTENT_COMMITMENT_KATS_V0_1.md`](EXTERNAL_INTENT_COMMITMENT_KATS_V0_1.md). Ainda falta congelar o corpus binário `NXIV`, integrar a relação à AIR e produzir/verificar provas. O manifesto e a referência não devem ser adicionados a allowlists, mensagens de rede, ledger ou IDs ativos.
+Uma referência isolada de `H_INTENT` foi liberada somente após os vetores externos documentados em [`EXTERNAL_INTENT_COMMITMENT_KATS_V0_1.md`](EXTERNAL_INTENT_COMMITMENT_KATS_V0_1.md), agora fixados no corpus [`NXIV`](INTENT_VECTOR_CORPUS_CANDIDATE_V0_1.md). Ainda falta integrar a relação à AIR e produzir/verificar provas. O manifesto, o corpus e a referência não devem ser adicionados a allowlists, mensagens de rede, ledger ou IDs ativos.

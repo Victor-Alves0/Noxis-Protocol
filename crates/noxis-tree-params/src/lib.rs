@@ -12,6 +12,7 @@ use sha2::{Digest, Sha256};
 
 mod corpus;
 mod corpus_v2;
+mod intent_corpus_v1;
 mod note_corpus_v1;
 mod p24;
 mod p24_intent_commitment;
@@ -25,6 +26,11 @@ pub use corpus_v2::{
     P24_TREE_VECTOR_HEADER_LENGTH, P24_TREE_VECTOR_LENGTH_LIMIT, P24_TREE_VECTOR_MAGIC,
     P24_TREE_VECTOR_VERSION, P24PermutationStateV2, P24TreeValueV2, P24TreeVectorCorpusV2,
     P24TreeVectorCoverageProfileV2, P24TreeVectorRecordV2, P24TreeVectorV2Error,
+};
+pub use intent_corpus_v1::{
+    P24_INTENT_VECTOR_HEADER_LENGTH, P24_INTENT_VECTOR_LENGTH, P24_INTENT_VECTOR_LENGTH_LIMIT,
+    P24_INTENT_VECTOR_MAGIC, P24_INTENT_VECTOR_VERSION, P24IntentVectorCaseV1,
+    P24IntentVectorCorpusV1, P24IntentVectorError, P24IntentVectorRecordV1,
 };
 pub use note_corpus_v1::{
     P24_NOTE_VECTOR_HEADER_LENGTH, P24_NOTE_VECTOR_LENGTH_LIMIT, P24_NOTE_VECTOR_MAGIC,
