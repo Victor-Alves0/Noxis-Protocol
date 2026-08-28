@@ -56,10 +56,14 @@ Depois de selecionar e revisar uma extensão de parâmetros, a AIR deverá usar
 estas relações, sem mudar o preimage acima:
 
 ```text
-recipient_commitment = H_ADDR(spending_public_material)
+recipient_commitment = H_ADDR(nullifier_key)
 note_commitment     = H_NOTE(note_preimage)
 nullifier           = H_NULLIFIER(nullifier_key, rho, note_commitment, leaf_position)
 ```
+
+`H_ADDR` recebe a mesma `nullifier_key` secreta usada pela terceira relação.
+Assim, a AIR deverá provar que o dono da chave comprometida pelo destinatário é
+o mesmo que deriva o nullifier; chaves de cifragem híbrida continuam separadas.
 
 `H_ADDR`, `H_NOTE` e `H_NULLIFIER` **não existem neste repositório hoje**. A
 candidata P24 congelada cobre apenas `LEAF`, `NODE` e `EMPTY`; reutilizá-la
@@ -67,6 +71,15 @@ silenciosamente para esses três domínios mudaria seus parâmetros, ID e corpus
 Antes de implementar qualquer uma das relações, uma nova candidata deverá
 fixar: domínio em bytes, absorção bytes→campo, padding, aridade, IV,
 separação entre domínios, saída de 16 elementos e vetores externos.
+
+## Codificação candidata bytes→campo
+
+Quando essa candidata for avaliada, bytes arbitrários são convertidos por
+`BytePack3LE`: cada grupo de até três octetos consecutivos vira um elemento
+`b0 + 256*b1 + 65_536*b2`; o grupo final é completado com zeroes. O maior
+resultado é `2^24 - 1`, portanto sempre é BabyBear canônico sem redução
+modular. Como cada função possui tamanho fixo, o complemento final não cria
+ambiguidade entre mensagens.
 
 ## Ligação obrigatória à intenção pública
 

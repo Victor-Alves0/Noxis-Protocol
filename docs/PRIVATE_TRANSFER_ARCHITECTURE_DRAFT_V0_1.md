@@ -37,12 +37,12 @@ merkle_path
 As funções recebem identificadores de parâmetro e domínios fixos antes de implementação:
 
 ```text
-recipient_commitment = H_addr(spending_public_material)
+recipient_commitment = H_addr(nullifier_key)
 cm = H_note(asset_id, value, recipient_commitment, rho, rcm)
 nf = H_nf(nullifier_key, rho, cm, leaf_position)
 ```
 
-A AIR deve provar conhecimento da nota e chave, recomputação de `cm`, inclusão na raiz, recomputação de `nf`, conservação/faixa e criação dos commitments de saída. O nullifier depende de segredo do dono e dados comprometidos pela nota; essa ligação impede gasto duplicado sem revelar a nota. A descrição de [Orchard](https://zcash.github.io/orchard/design/nullifiers.html) é referência conceitual, não especificação reutilizada.
+A AIR deve provar conhecimento da nota e chave, recomputação de `cm`, inclusão na raiz, recomputação de `nf`, conservação/faixa e criação dos commitments de saída. O mesmo `nullifier_key` precisa produzir `recipient_commitment` e o nullifier; assim, a AIR vincula posse e gasto sem revelar a nota. A descrição de [Orchard](https://zcash.github.io/orchard/design/nullifiers.html) é referência conceitual, não especificação reutilizada.
 
 ## Inputs públicos canônicos
 

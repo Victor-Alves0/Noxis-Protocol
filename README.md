@@ -72,6 +72,7 @@ docs/
   TREE_VECTOR_CORPUS_FRAMING_V0_1.md  NXTV framing for external tree-vector evidence.
   TREE_VECTOR_CORPUS_P24_V2.md  NXTV v2 framing bound to the frozen P24 candidate.
   NOTE_OPENING_BOUNDARY_V0_1.md  Canonical private-note opening boundary before hash selection.
+  POSEIDON2_P24_NOTE_DOMAINS_CANDIDATE_V0_1.md  Unselected candidate for private note hash domains.
   TREE_VECTOR_GENERATION_BLOCKER_V0_1.md  Evidence and prerequisites for complete tree vectors.
   POSEIDON2_TREE_CONSTRUCTION_CANDIDATE_V0_1.md  Unselected P24 tree-construction candidate.
   POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md  Frozen but unselected P24 parameter artifact.
