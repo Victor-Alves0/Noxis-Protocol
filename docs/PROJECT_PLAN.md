@@ -64,7 +64,7 @@ rascunhos e não habilitam criptografia: ver
 [`PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md`](PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md)
 e [`HYBRID_CRYPTO_PROFILE_DRAFT_V0_1.md`](HYBRID_CRYPTO_PROFILE_DRAFT_V0_1.md).
 
-**Base de código v2:** o crate isolado `noxis-privacy-types` fixa a intenção canônica de transferência privada, sua aridade e tipos públicos sem acoplar provas, hashes, chaves ou carteira. O codec externo `NXPT` agora enquadra intenção, dois envelopes e prova com limites rígidos, ainda sem aceitar a transação no ledger v1. O próximo incremento é especificar vetores de parâmetros da árvore v2 e uma implementação de referência para comparação futura com a AIR.
+**Base de código v2:** o crate isolado `noxis-privacy-types` fixa a intenção canônica de transferência privada, sua aridade e tipos públicos sem acoplar provas, hashes, chaves ou carteira. Os valores públicos de 64 bytes já rejeitam encoding não canônico: são 16 elementos BabyBear little-endian, cada um abaixo do módulo do campo. O codec externo `NXPT` agora enquadra intenção, dois envelopes e prova com limites rígidos, ainda sem aceitar a transação no ledger v1. A árvore ainda não existe: o próximo incremento é selecionar e congelar um backend Poseidon2 completo, seu manifesto e vetores independentes antes de escrever a referência que será comparada com a AIR; ver [`TREE_BACKEND_SELECTION_GATE_V0_1.md`](TREE_BACKEND_SELECTION_GATE_V0_1.md).
 
 ### 6. Adaptadores de ativos e políticas de emissão
 

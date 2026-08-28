@@ -181,19 +181,19 @@ impl PrivateTransferIntentV2 {
         let pre_state_id = StateId::new(read(bytes, &mut offset));
         let tree_parameters =
             TreeParametersV2::new(TreeParametersId::new(read(bytes, &mut offset)));
-        let pre_state_root = MerkleRootV2::new(read(bytes, &mut offset));
+        let pre_state_root = MerkleRootV2::new(read(bytes, &mut offset))?;
         let asset_id = AssetId::new(read(bytes, &mut offset));
         let nullifiers = [
-            NullifierV2::new(read(bytes, &mut offset)),
-            NullifierV2::new(read(bytes, &mut offset)),
+            NullifierV2::new(read(bytes, &mut offset))?,
+            NullifierV2::new(read(bytes, &mut offset))?,
         ];
         let output_commitments = [
-            NoteCommitmentV2::new(read(bytes, &mut offset)),
-            NoteCommitmentV2::new(read(bytes, &mut offset)),
+            NoteCommitmentV2::new(read(bytes, &mut offset))?,
+            NoteCommitmentV2::new(read(bytes, &mut offset))?,
         ];
         let ciphertext_digests = [
-            CiphertextDigestV2::new(read(bytes, &mut offset)),
-            CiphertextDigestV2::new(read(bytes, &mut offset)),
+            CiphertextDigestV2::new(read(bytes, &mut offset))?,
+            CiphertextDigestV2::new(read(bytes, &mut offset))?,
         ];
         debug_assert_eq!(offset, Self::ENCODED_LENGTH);
         Self::new(
@@ -239,16 +239,19 @@ mod tests {
             ValidationContextId::new([3; 32]),
             StateId::new([4; 32]),
             TreeParametersV2::new(TreeParametersId::new([5; 32])),
-            MerkleRootV2::new([6; 64]),
+            MerkleRootV2::new([6; 64]).unwrap(),
             AssetId::new([7; 32]),
-            [NullifierV2::new([8; 64]), NullifierV2::new([9; 64])],
             [
-                NoteCommitmentV2::new([10; 64]),
-                NoteCommitmentV2::new([11; 64]),
+                NullifierV2::new([8; 64]).unwrap(),
+                NullifierV2::new([9; 64]).unwrap(),
             ],
             [
-                CiphertextDigestV2::new([12; 64]),
-                CiphertextDigestV2::new([13; 64]),
+                NoteCommitmentV2::new([10; 64]).unwrap(),
+                NoteCommitmentV2::new([11; 64]).unwrap(),
+            ],
+            [
+                CiphertextDigestV2::new([12; 64]).unwrap(),
+                CiphertextDigestV2::new([13; 64]).unwrap(),
             ],
         )
         .unwrap()
@@ -270,7 +273,11 @@ mod tests {
         for index in 0..PrivateTransferIntentV2::ENCODED_LENGTH {
             let mut changed = original.encode();
             changed[index] ^= 1;
-            assert_ne!(PrivateTransferIntentV2::decode(&changed).unwrap(), original);
+            match PrivateTransferIntentV2::decode(&changed) {
+                Ok(decoded) => assert_ne!(decoded, original),
+                Err(PrivacyTypesError::NonCanonicalBabyBearElement { .. }) => {}
+                Err(error) => panic!("single-byte mutation returned unexpected error: {error}"),
+            }
         }
     }
 
@@ -288,16 +295,19 @@ mod tests {
                 ValidationContextId::new([3; 32]),
                 StateId::new([4; 32]),
                 TreeParametersV2::new(TreeParametersId::new([5; 32])),
-                MerkleRootV2::new([6; 64]),
+                MerkleRootV2::new([6; 64]).unwrap(),
                 AssetId::new([7; 32]),
-                [NullifierV2::new([8; 64]), NullifierV2::new([8; 64])],
                 [
-                    NoteCommitmentV2::new([10; 64]),
-                    NoteCommitmentV2::new([11; 64]),
+                    NullifierV2::new([8; 64]).unwrap(),
+                    NullifierV2::new([8; 64]).unwrap(),
                 ],
                 [
-                    CiphertextDigestV2::new([12; 64]),
-                    CiphertextDigestV2::new([13; 64]),
+                    NoteCommitmentV2::new([10; 64]).unwrap(),
+                    NoteCommitmentV2::new([11; 64]).unwrap(),
+                ],
+                [
+                    CiphertextDigestV2::new([12; 64]).unwrap(),
+                    CiphertextDigestV2::new([13; 64]).unwrap(),
                 ],
             ),
             Err(PrivacyTypesError::DuplicateInputNullifier)

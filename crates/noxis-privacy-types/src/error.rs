@@ -6,6 +6,7 @@ pub enum PrivacyTypesError {
     InvalidIntentLength { actual: usize, expected: usize },
     DuplicateInputNullifier,
     DuplicateOutputCommitment,
+    NonCanonicalBabyBearElement { index: usize, value: u32 },
 }
 
 impl fmt::Display for PrivacyTypesError {
@@ -21,6 +22,10 @@ impl fmt::Display for PrivacyTypesError {
             Self::DuplicateOutputCommitment => {
                 formatter.write_str("private-transfer intent repeats an output commitment")
             }
+            Self::NonCanonicalBabyBearElement { index, value } => write!(
+                formatter,
+                "private-transfer field element {index} is non-canonical: {value}"
+            ),
         }
     }
 }

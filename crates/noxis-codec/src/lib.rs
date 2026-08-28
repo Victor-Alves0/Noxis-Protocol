@@ -709,16 +709,19 @@ mod tests {
             noxis_types::ValidationContextId::new([22; 32]),
             noxis_types::StateId::new([23; 32]),
             TreeParametersV2::new(TreeParametersId::new([24; 32])),
-            MerkleRootV2::new([25; 64]),
+            MerkleRootV2::new([25; 64]).unwrap(),
             AssetId::new([26; 32]),
-            [NullifierV2::new([27; 64]), NullifierV2::new([28; 64])],
             [
-                NoteCommitmentV2::new([29; 64]),
-                NoteCommitmentV2::new([30; 64]),
+                NullifierV2::new([27; 64]).unwrap(),
+                NullifierV2::new([28; 64]).unwrap(),
             ],
             [
-                CiphertextDigestV2::new([31; 64]),
-                CiphertextDigestV2::new([32; 64]),
+                NoteCommitmentV2::new([29; 64]).unwrap(),
+                NoteCommitmentV2::new([30; 64]).unwrap(),
+            ],
+            [
+                CiphertextDigestV2::new([31; 64]).unwrap(),
+                CiphertextDigestV2::new([32; 64]).unwrap(),
             ],
         )
         .unwrap();

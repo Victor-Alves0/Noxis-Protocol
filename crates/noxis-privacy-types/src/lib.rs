@@ -10,7 +10,8 @@ mod transfer;
 
 pub use error::PrivacyTypesError;
 pub use identifiers::{
-    CiphertextDigestV2, CircuitId, MerkleRootV2, NoteCommitmentV2, NullifierV2, TreeParametersId,
+    BABYBEAR_ELEMENTS_PER_VALUE, BABYBEAR_MODULUS, BABYBEAR_VECTOR_BYTES, CiphertextDigestV2,
+    CircuitId, MerkleRootV2, NoteCommitmentV2, NullifierV2, TreeParametersId,
 };
 pub use transfer::{
     PRIVATE_TRANSFER_V2_INTENT_DOMAIN, PRIVATE_TRANSFER_V2_TREE_DEPTH, PrivateTransferIntentV2,
