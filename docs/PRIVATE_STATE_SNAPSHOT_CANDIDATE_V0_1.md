@@ -34,7 +34,9 @@ atual e nunca e convertido para ele.
 
 ## Proximo passo
 
-Publicar o manifesto de `H_STATE`, com codificacao, vetores e corpus de
-interoperabilidade. Somente depois disso sera possivel projetar uma transicao
-atomica: verificar a prova selecionada, conferir o estado anterior, impedir
-nullifier repetido, acrescentar commitments e produzir a nova raiz.
+O frame candidato `H_STATE` foi publicado separadamente em
+`PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md`. Ainda falta congelar os domínios de
+uma árvore esparsa de nullifiers e um corpus externo de interoperabilidade.
+Somente depois disso será possível projetar uma transição atômica: verificar a
+prova selecionada, conferir o estado anterior, impedir nullifier repetido,
+acrescentar commitments e produzir a nova raiz.

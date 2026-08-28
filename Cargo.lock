@@ -244,6 +244,7 @@ dependencies = [
  "noxis-poseidon2-reference",
  "noxis-privacy-types",
  "noxis-tree-params",
+ "noxis-types",
  "sha2",
 ]
 

@@ -14,6 +14,14 @@ use noxis_privacy_types::{MerkleRootV2, NoteCommitmentV2, NullifierV2, PrivacyTy
 use noxis_tree_params::{CandidatePoseidon2P24ManifestV2, Poseidon2P24CandidateError};
 use sha2::{Digest, Sha256};
 
+mod state_anchor;
+
+pub use state_anchor::{
+    PRIVATE_NULLIFIER_SET_COMMITMENT_DOMAIN, PRIVATE_STATE_ANCHOR_ENCODED_LENGTH,
+    PRIVATE_STATE_ANCHOR_ID_DOMAIN, PrivateNullifierSetCommitmentV1, PrivateStateAnchorError,
+    PrivateStateAnchorV1,
+};
+
 /// Deliberate local-only bound; a persistent v2 accumulator will replace it.
 pub const CANDIDATE_PRIVATE_STATE_MAX_NOTES: usize = 1_024;
 /// Domain for the canonical candidate-state identity.
