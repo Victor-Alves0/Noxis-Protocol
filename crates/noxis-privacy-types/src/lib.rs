@@ -16,5 +16,5 @@ pub use identifiers::{
 };
 pub use transfer::{
     PRIVATE_TRANSFER_V2_INTENT_DOMAIN, PRIVATE_TRANSFER_V2_TREE_DEPTH, PrivateTransferIntentV2,
-    TreeParametersV2,
+    PrivateTransferOutputV2, TreeParametersV2,
 };

@@ -55,15 +55,19 @@ Assim, trocar um único byte da intenção torna o compromisso incompatível. A
 AIR continua sem executar KEM/AEAD: ela só liga o digest público ao commitment
 da intenção.
 
-## Ordenação ainda a congelar
+## Ordenação canônica de slots
 
-A intenção atual preserva posições: trocar os dois nullifiers ou os dois pares
-`(commitment de saída, digest de envelope)` produz outra intenção canônica para
-a mesma transferência econômica. Antes de congelar `NXIC`, o protocolo deve
-escolher uma regra única: ordenar inputs por nullifier e outputs por commitment
-(mantendo o digest pareado), ou declarar e justificar que a posição é parte
-semântica. A implementação de `H_INTENT` fica deliberadamente bloqueada até
-essa escolha, para não perpetuar maleabilidade no compromisso.
+Os dois nullifiers devem estar em ordem estritamente crescente dos seus 64
+bytes canônicos, comparados como octetos unsigned em ordem lexicográfica. Os
+dois commitments de saída seguem a mesma regra. Isso é ordem dos bytes, não
+ordem numérica dos elementos BabyBear em `u32le`.
+
+Cada saída é o tipo estrutural `PrivateTransferOutputV2`, que carrega o par
+`(commitment, ciphertext_digest)`. Ao ordenar por commitment, o digest viaja
+com o mesmo slot; a codificação ainda preserva o layout de 640 bytes
+(`commitment[2]` seguido de `digest[2]`). Construção e decodificação rejeitam
+ordem inversa e duplicatas. O codec ainda não recalcula o digest do envelope:
+isso permanece uma obrigação do futuro verificador híbrido.
 
 ## Portões antes de implementação
 

@@ -22,6 +22,30 @@ pub struct TreeParametersV2 {
     id: TreeParametersId,
 }
 
+/// One public output slot, keeping its commitment and envelope digest paired.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PrivateTransferOutputV2 {
+    commitment: NoteCommitmentV2,
+    ciphertext_digest: CiphertextDigestV2,
+}
+
+impl PrivateTransferOutputV2 {
+    pub const fn new(commitment: NoteCommitmentV2, ciphertext_digest: CiphertextDigestV2) -> Self {
+        Self {
+            commitment,
+            ciphertext_digest,
+        }
+    }
+
+    pub const fn commitment(self) -> NoteCommitmentV2 {
+        self.commitment
+    }
+
+    pub const fn ciphertext_digest(self) -> CiphertextDigestV2 {
+        self.ciphertext_digest
+    }
+}
+
 impl TreeParametersV2 {
     pub const fn new(id: TreeParametersId) -> Self {
         Self { id }
@@ -52,8 +76,7 @@ pub struct PrivateTransferIntentV2 {
     pre_state_root: MerkleRootV2,
     asset_id: AssetId,
     nullifiers: [NullifierV2; INPUT_COUNT],
-    output_commitments: [NoteCommitmentV2; OUTPUT_COUNT],
-    ciphertext_digests: [CiphertextDigestV2; OUTPUT_COUNT],
+    outputs: [PrivateTransferOutputV2; OUTPUT_COUNT],
 }
 
 impl PrivateTransferIntentV2 {
@@ -75,14 +98,19 @@ impl PrivateTransferIntentV2 {
         pre_state_root: MerkleRootV2,
         asset_id: AssetId,
         nullifiers: [NullifierV2; INPUT_COUNT],
-        output_commitments: [NoteCommitmentV2; OUTPUT_COUNT],
-        ciphertext_digests: [CiphertextDigestV2; OUTPUT_COUNT],
+        outputs: [PrivateTransferOutputV2; OUTPUT_COUNT],
     ) -> Result<Self, PrivacyTypesError> {
         if nullifiers[0] == nullifiers[1] {
             return Err(PrivacyTypesError::DuplicateInputNullifier);
         }
-        if output_commitments[0] == output_commitments[1] {
+        if nullifiers[0].as_bytes() > nullifiers[1].as_bytes() {
+            return Err(PrivacyTypesError::NonCanonicalInputNullifierOrder);
+        }
+        if outputs[0].commitment == outputs[1].commitment {
             return Err(PrivacyTypesError::DuplicateOutputCommitment);
+        }
+        if outputs[0].commitment.as_bytes() > outputs[1].commitment.as_bytes() {
+            return Err(PrivacyTypesError::NonCanonicalOutputCommitmentOrder);
         }
         Ok(Self {
             circuit_id,
@@ -93,8 +121,7 @@ impl PrivateTransferIntentV2 {
             pre_state_root,
             asset_id,
             nullifiers,
-            output_commitments,
-            ciphertext_digests,
+            outputs,
         })
     }
 
@@ -130,12 +157,12 @@ impl PrivateTransferIntentV2 {
         &self.nullifiers
     }
 
-    pub const fn output_commitments(&self) -> &[NoteCommitmentV2; OUTPUT_COUNT] {
-        &self.output_commitments
+    pub fn output_commitments(&self) -> [NoteCommitmentV2; OUTPUT_COUNT] {
+        self.outputs.map(PrivateTransferOutputV2::commitment)
     }
 
-    pub const fn ciphertext_digests(&self) -> &[CiphertextDigestV2; OUTPUT_COUNT] {
-        &self.ciphertext_digests
+    pub const fn outputs(&self) -> &[PrivateTransferOutputV2; OUTPUT_COUNT] {
+        &self.outputs
     }
 
     /// Encodes all public, semantic transfer fields in their only permitted order.
@@ -156,10 +183,11 @@ impl PrivateTransferIntentV2 {
         for nullifier in &self.nullifiers {
             write(&mut bytes, &mut offset, &nullifier.as_bytes());
         }
-        for commitment in &self.output_commitments {
+        for commitment in self.output_commitments() {
             write(&mut bytes, &mut offset, &commitment.as_bytes());
         }
-        for digest in &self.ciphertext_digests {
+        for output in &self.outputs {
+            let digest = output.ciphertext_digest;
             write(&mut bytes, &mut offset, &digest.as_bytes());
         }
         debug_assert_eq!(offset, Self::ENCODED_LENGTH);
@@ -187,7 +215,7 @@ impl PrivateTransferIntentV2 {
             NullifierV2::new(read(bytes, &mut offset))?,
             NullifierV2::new(read(bytes, &mut offset))?,
         ];
-        let output_commitments = [
+        let commitments = [
             NoteCommitmentV2::new(read(bytes, &mut offset))?,
             NoteCommitmentV2::new(read(bytes, &mut offset))?,
         ];
@@ -205,8 +233,10 @@ impl PrivateTransferIntentV2 {
             pre_state_root,
             asset_id,
             nullifiers,
-            output_commitments,
-            ciphertext_digests,
+            [
+                PrivateTransferOutputV2::new(commitments[0], ciphertext_digests[0]),
+                PrivateTransferOutputV2::new(commitments[1], ciphertext_digests[1]),
+            ],
         )
     }
 }
@@ -246,12 +276,14 @@ mod tests {
                 NullifierV2::new([9; 64]).unwrap(),
             ],
             [
-                NoteCommitmentV2::new([10; 64]).unwrap(),
-                NoteCommitmentV2::new([11; 64]).unwrap(),
-            ],
-            [
-                CiphertextDigestV2::new([12; 64]).unwrap(),
-                CiphertextDigestV2::new([13; 64]).unwrap(),
+                PrivateTransferOutputV2::new(
+                    NoteCommitmentV2::new([10; 64]).unwrap(),
+                    CiphertextDigestV2::new([12; 64]).unwrap(),
+                ),
+                PrivateTransferOutputV2::new(
+                    NoteCommitmentV2::new([11; 64]).unwrap(),
+                    CiphertextDigestV2::new([13; 64]).unwrap(),
+                ),
             ],
         )
         .unwrap()
@@ -302,15 +334,50 @@ mod tests {
                     NullifierV2::new([8; 64]).unwrap(),
                 ],
                 [
-                    NoteCommitmentV2::new([10; 64]).unwrap(),
-                    NoteCommitmentV2::new([11; 64]).unwrap(),
-                ],
-                [
-                    CiphertextDigestV2::new([12; 64]).unwrap(),
-                    CiphertextDigestV2::new([13; 64]).unwrap(),
+                    PrivateTransferOutputV2::new(
+                        NoteCommitmentV2::new([10; 64]).unwrap(),
+                        CiphertextDigestV2::new([12; 64]).unwrap(),
+                    ),
+                    PrivateTransferOutputV2::new(
+                        NoteCommitmentV2::new([11; 64]).unwrap(),
+                        CiphertextDigestV2::new([13; 64]).unwrap(),
+                    ),
                 ],
             ),
             Err(PrivacyTypesError::DuplicateInputNullifier)
+        );
+    }
+
+    #[test]
+    fn intent_rejects_noncanonical_input_and_output_slot_order() {
+        let original = intent();
+        assert_eq!(
+            PrivateTransferIntentV2::new(
+                original.circuit_id(),
+                original.genesis_id(),
+                original.validation_context_id(),
+                original.pre_state_id(),
+                original.tree_parameters(),
+                original.pre_state_root(),
+                original.asset_id(),
+                [original.nullifiers()[1], original.nullifiers()[0]],
+                *original.outputs(),
+            ),
+            Err(PrivacyTypesError::NonCanonicalInputNullifierOrder)
+        );
+        assert_eq!(
+            PrivateTransferIntentV2::new(
+                original.circuit_id(),
+                original.genesis_id(),
+                original.validation_context_id(),
+                original.pre_state_id(),
+                original.tree_parameters(),
+                original.pre_state_root(),
+                original.asset_id(),
+                *original.nullifiers(),
+                [original.outputs()[1], original.outputs()[0]],
+            ),
+            Err(PrivacyTypesError::NonCanonicalOutputCommitmentOrder)
         );
     }
 }

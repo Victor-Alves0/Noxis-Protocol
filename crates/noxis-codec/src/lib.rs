@@ -670,7 +670,7 @@ mod tests {
     use super::*;
     use noxis_privacy_types::{
         CiphertextDigestV2, CircuitId, MerkleRootV2, NoteCommitmentV2, NullifierV2,
-        TreeParametersId, TreeParametersV2,
+        PrivateTransferOutputV2, TreeParametersId, TreeParametersV2,
     };
 
     fn transfer() -> Transaction {
@@ -716,12 +716,14 @@ mod tests {
                 NullifierV2::new([28; 64]).unwrap(),
             ],
             [
-                NoteCommitmentV2::new([29; 64]).unwrap(),
-                NoteCommitmentV2::new([30; 64]).unwrap(),
-            ],
-            [
-                CiphertextDigestV2::new([31; 64]).unwrap(),
-                CiphertextDigestV2::new([32; 64]).unwrap(),
+                PrivateTransferOutputV2::new(
+                    NoteCommitmentV2::new([29; 64]).unwrap(),
+                    CiphertextDigestV2::new([31; 64]).unwrap(),
+                ),
+                PrivateTransferOutputV2::new(
+                    NoteCommitmentV2::new([30; 64]).unwrap(),
+                    CiphertextDigestV2::new([32; 64]).unwrap(),
+                ),
             ],
         )
         .unwrap();

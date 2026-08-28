@@ -91,7 +91,7 @@ fn validate(
         output_openings[0].note_commitment(evaluator)?,
         output_openings[1].note_commitment(evaluator)?,
     ];
-    if output_commitments != *intent.output_commitments() {
+    if output_commitments != intent.output_commitments() {
         return Err(PrivateTransferStatementError::OutputCommitmentMismatch);
     }
     if output_commitments.contains(&public_inputs[0].note_commitment())
@@ -227,7 +227,8 @@ impl std::error::Error for PrivateTransferStatementError {}
 mod tests {
     use noxis_privacy_types::{
         CiphertextDigestV2, CircuitId, MerkleRootV2, MerkleSiblingV2, NoteCommitmentV2,
-        NullifierV2, RecipientCommitmentV2, TreeParametersId, TreeParametersV2,
+        NullifierV2, PrivateTransferOutputV2, RecipientCommitmentV2, TreeParametersId,
+        TreeParametersV2,
     };
     use noxis_types::{AssetId, GenesisId, StateId, ValidationContextId};
 
@@ -282,29 +283,30 @@ mod tests {
             .unwrap();
         let root = MerkleRootV2::from_elements(root).unwrap();
         assert_eq!(root, MerkleRootV2::from_elements(second_root).unwrap());
-        (
-            [
-                SpendingWitnessV2::new(
-                    first,
-                    key(10),
-                    0,
-                    first_siblings.map(|value| MerkleSiblingV2::from_elements(value).unwrap()),
-                    root,
-                    evaluator,
-                )
-                .unwrap(),
-                SpendingWitnessV2::new(
-                    second,
-                    key(20),
-                    1,
-                    second_siblings.map(|value| MerkleSiblingV2::from_elements(value).unwrap()),
-                    root,
-                    evaluator,
-                )
-                .unwrap(),
-            ],
+        let first = SpendingWitnessV2::new(
+            first,
+            key(10),
+            0,
+            first_siblings.map(|value| MerkleSiblingV2::from_elements(value).unwrap()),
             root,
+            evaluator,
         )
+        .unwrap();
+        let second = SpendingWitnessV2::new(
+            second,
+            key(20),
+            1,
+            second_siblings.map(|value| MerkleSiblingV2::from_elements(value).unwrap()),
+            root,
+            evaluator,
+        )
+        .unwrap();
+        let inputs = if first.public_values().nullifier() < second.public_values().nullifier() {
+            [first, second]
+        } else {
+            [second, first]
+        };
+        (inputs, root)
     }
 
     fn intent(
@@ -323,10 +325,15 @@ mod tests {
             root,
             asset,
             nullifiers,
-            outputs,
             [
-                CiphertextDigestV2::from_elements([6; 16]).unwrap(),
-                CiphertextDigestV2::from_elements([7; 16]).unwrap(),
+                PrivateTransferOutputV2::new(
+                    outputs[0],
+                    CiphertextDigestV2::from_elements([6; 16]).unwrap(),
+                ),
+                PrivateTransferOutputV2::new(
+                    outputs[1],
+                    CiphertextDigestV2::from_elements([7; 16]).unwrap(),
+                ),
             ],
         )
         .unwrap()
@@ -347,44 +354,53 @@ mod tests {
             inputs[0].public_values().nullifier(),
             inputs[1].public_values().nullifier(),
         ];
-        let outputs = [
+        let outputs = ordered_outputs(
+            evaluator,
             opening(evaluator, asset, 50, 30, 31, 32),
             opening(evaluator, asset, 0, 40, 41, 42),
-        ];
-        let commitments = [
+        );
+        let commitments = commitments_for_outputs(evaluator, &outputs);
+        (inputs, root, nullifiers, outputs, commitments)
+    }
+
+    fn ordered_outputs(
+        evaluator: &CandidateP24NoteOpeningEvaluatorV2,
+        first: NoteOpeningV2,
+        second: NoteOpeningV2,
+    ) -> [NoteOpeningV2; 2] {
+        if first.note_commitment(evaluator).unwrap() < second.note_commitment(evaluator).unwrap() {
+            [first, second]
+        } else {
+            [second, first]
+        }
+    }
+
+    fn commitments_for_outputs(
+        evaluator: &CandidateP24NoteOpeningEvaluatorV2,
+        outputs: &[NoteOpeningV2; 2],
+    ) -> [NoteCommitmentV2; 2] {
+        [
             outputs[0].note_commitment(evaluator).unwrap(),
             outputs[1].note_commitment(evaluator).unwrap(),
-        ];
-        (inputs, root, nullifiers, outputs, commitments)
+        ]
     }
 
     #[test]
     fn candidate_statement_binds_every_available_public_intent_relation() {
         let evaluator = CandidateP24NoteOpeningEvaluatorV2::load_candidate().unwrap();
         let asset = AssetId::new([8; 32]);
-        let ([first, second], root) = input_witnesses(&evaluator, asset);
-        let first_public = first.public_values();
-        let second_public = second.public_values();
-        let output_first = opening(&evaluator, asset, 50, 30, 31, 32);
-        let output_second = opening(&evaluator, asset, 0, 40, 41, 42);
-        let output_commitments = [
-            output_first.note_commitment(&evaluator).unwrap(),
-            output_second.note_commitment(&evaluator).unwrap(),
-        ];
+        let (inputs, root, nullifiers, outputs, output_commitments) =
+            valid_parts(&evaluator, asset);
         let candidate_intent = intent(
             asset,
             root,
             TreeParametersV2::new(evaluator.candidate_tree_parameters_id().unwrap()),
-            [first_public.nullifier(), second_public.nullifier()],
+            nullifiers,
             output_commitments,
         );
-        let witness = CandidatePrivateTransferWitnessV2::new(
-            candidate_intent,
-            [first, second],
-            [output_first, output_second],
-            &evaluator,
-        )
-        .unwrap();
+        let witness =
+            CandidatePrivateTransferWitnessV2::new(candidate_intent, inputs, outputs, &evaluator)
+                .unwrap();
         assert_eq!(witness.intent().asset_id(), asset);
         witness.revalidate(&evaluator).unwrap();
     }
@@ -396,23 +412,23 @@ mod tests {
         let ([first, second], root) = input_witnesses(&evaluator, asset);
         let first_public = first.public_values();
         let second_public = second.public_values();
-        let output_first = opening(&evaluator, asset, 49, 30, 31, 32);
-        let output_second = opening(&evaluator, asset, 2, 40, 41, 42);
+        let outputs = ordered_outputs(
+            &evaluator,
+            opening(&evaluator, asset, 49, 30, 31, 32),
+            opening(&evaluator, asset, 2, 40, 41, 42),
+        );
         let candidate_intent = intent(
             asset,
             root,
             TreeParametersV2::new(evaluator.candidate_tree_parameters_id().unwrap()),
             [first_public.nullifier(), second_public.nullifier()],
-            [
-                output_first.note_commitment(&evaluator).unwrap(),
-                output_second.note_commitment(&evaluator).unwrap(),
-            ],
+            commitments_for_outputs(&evaluator, &outputs),
         );
         assert!(matches!(
             CandidatePrivateTransferWitnessV2::new(
                 candidate_intent,
                 [first, second],
-                [output_first, output_second],
+                outputs,
                 &evaluator,
             ),
             Err(PrivateTransferStatementError::ValueNotConserved)
@@ -438,7 +454,7 @@ mod tests {
         ));
 
         let (inputs, root, mut nullifiers, outputs, commitments) = valid_parts(&evaluator, asset);
-        nullifiers[1] = NullifierV2::from_elements([99; 16]).unwrap();
+        nullifiers[0] = NullifierV2::from_elements([0; 16]).unwrap();
         let candidate_intent = intent(
             asset,
             root,
