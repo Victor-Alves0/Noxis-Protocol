@@ -229,6 +229,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "noxis-private-proof-contract"
+version = "0.1.0"
+dependencies = [
+ "noxis-privacy-types",
+ "noxis-tree-params",
+ "sha2",
+]
+
+[[package]]
 name = "noxis-record-chain"
 version = "0.1.0"
 dependencies = [
