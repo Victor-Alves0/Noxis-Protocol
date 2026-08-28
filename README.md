@@ -64,6 +64,7 @@ docs/
   THREAT_MODEL_V0_1.md          Explicit security assumptions and acceptance criteria.
   CONSENSUS_DECISION_V0_1.md    Consensus decision and required security choices.
   CRYPTOGRAPHY_DECISION_V0_1.md Chosen cryptographic direction and safeguards.
+  ECONOMIC_SECURITY_MODEL_V0_1.md  Boundaries for validator rewards, liquidity and future contracts.
   ARCHITECTURE.md                Module boundaries and implementation roadmap.
 ```
 

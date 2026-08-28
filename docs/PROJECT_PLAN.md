@@ -70,6 +70,10 @@ e [`HYBRID_CRYPTO_PROFILE_DRAFT_V0_1.md`](HYBRID_CRYPTO_PROFILE_DRAFT_V0_1.md).
 
 Conecta ativos apenas onde o backing, a custódia, resgate, falhas e responsabilidades forem explicitamente especificados. Fiat externo nunca é aceito como prova automática de backing.
 
+### 7. Economia de segurança, liquidez e execução programável
+
+Validação e liquidez têm fontes de receita e riscos distintos. O Noxis começa sem token, taxas, stake, pool ou contratos: a primeira implementação futura será taxa canônica e reserva por época, sem emissão automática. Staking, delegação, slashing, mercado e VM vêm depois e em módulos separados, sempre com conservação por ativo, limites de recurso e governança com atraso. Ver [`ECONOMIC_SECURITY_MODEL_V0_1.md`](ECONOMIC_SECURITY_MODEL_V0_1.md).
+
 ### 7. Revisão e testnet fechada
 
 Inclui modelagem formal quando aplicável, fuzzing, testes de propriedade, análise de dependências, auditoria independente e operação em ambiente isolado antes de qualquer rede aberta.
