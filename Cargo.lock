@@ -193,6 +193,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "noxis-poseidon2-reference"
+version = "0.1.0"
+dependencies = [
+ "noxis-tree-params",
+]
+
+[[package]]
 name = "noxis-privacy-types"
 version = "0.1.0"
 dependencies = [

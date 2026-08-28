@@ -46,6 +46,9 @@ commit without a proven directory-durability barrier.
 ```text
 crates/
   noxis-types    Identifiers, amounts and asset definitions.
+  noxis-privacy-types  Canonical public v2 private-transfer values and intent framing.
+  noxis-tree-params  Frozen unselected tree-parameter candidates and vector framing.
+  noxis-poseidon2-reference  Isolated dense reference evaluator for the unselected P24 candidate.
   noxis-crypto   CryptoSuite metadata and proof-verifier boundary.
   noxis-ledger   Transactions, validation and deterministic state transitions.
   noxis-codec    Canonical binary transaction encoding and decoding.
@@ -70,6 +73,7 @@ docs/
   TREE_VECTOR_GENERATION_BLOCKER_V0_1.md  Evidence and prerequisites for complete tree vectors.
   POSEIDON2_TREE_CONSTRUCTION_CANDIDATE_V0_1.md  Unselected P24 tree-construction candidate.
   POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md  Frozen but unselected P24 parameter artifact.
+  POSEIDON2_P24_REFERENCE_EVALUATION_V0_1.md  Cross-validated P24 permutation and candidate-tree vectors.
   POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md  Cross-validated permutation reference vectors.
   ARCHITECTURE.md                Module boundaries and implementation roadmap.
 ```

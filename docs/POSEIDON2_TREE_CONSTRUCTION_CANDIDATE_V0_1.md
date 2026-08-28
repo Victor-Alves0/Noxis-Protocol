@@ -74,6 +74,11 @@ return O0 || [O1]                            # 16 elementos
 
 Não há padding variável, squeezing da capacidade, feed-forward ou truncamento diferente. Uma função de nota com campos variáveis precisa de especificação própria e não pode reutilizar esta candidata silenciosamente.
 
+A permutação P24, este sponge e os primeiros resultados de árvore foram
+comparados entre a referência externa Horizen e a referência densa isolada do
+Noxis. A evidência e seus limites estão em
+[`POSEIDON2_P24_REFERENCE_EVALUATION_V0_1.md`](POSEIDON2_P24_REFERENCE_EVALUATION_V0_1.md).
+
 ## Funções da árvore
 
 `V` denota um vetor canônico de 16 elementos BabyBear (`64` bytes).
@@ -108,9 +113,8 @@ O caminho de uma nota no índice `i` tem 32 siblings, começando pelo vizinho da
 
 Esta candidata só pode seguir para um manifesto completo se todos os itens abaixo forem cumpridos:
 
-1. reproduzir KATs P24 e o sponge desta especificação em duas implementações independentes funcionais;
-2. gerar `NXTV v2`, vinculado a esse manifesto completo, com `LEAF`, as duas ordens de `NODE`, `EMPTY[0..32]`, raízes 0–4 e caminhos `0`, `1`, `2` e `2^32 - 1`;
-3. definir a abertura de `NoteCommitmentV2`, incluindo vínculo ao `CiphertextDigestV2` e endereço/chave do destinatário; e
-4. obter revisão criptográfica independente da instância, do modo sponge, do AIR e da integração.
+1. gerar `NXTV v2`, vinculado a esse manifesto completo, com `LEAF`, as duas ordens de `NODE`, `EMPTY[0..32]`, raízes 0–4 e caminhos `0`, `1`, `2` e `2^32 - 1`;
+2. definir a abertura de `NoteCommitmentV2`, incluindo vínculo ao `CiphertextDigestV2` e endereço/chave do destinatário; e
+3. obter revisão criptográfica independente da instância, do modo sponge, do AIR e da integração.
 
 Até esses pontos, este documento é uma candidata de engenharia versionada e auditável — não uma alegação de segurança nem uma mudança de rede.

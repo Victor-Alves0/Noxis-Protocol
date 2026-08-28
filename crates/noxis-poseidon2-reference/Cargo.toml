@@ -1,0 +1,12 @@
+[package]
+name = "noxis-poseidon2-reference"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+noxis-tree-params = { path = "../noxis-tree-params" }
+
+[lints]
+workspace = true
