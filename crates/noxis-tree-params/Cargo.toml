@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+base64 = "0.22.1"
 noxis-privacy-types = { path = "../noxis-privacy-types" }
 sha2 = "0.10.9"
 

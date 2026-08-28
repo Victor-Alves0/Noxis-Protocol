@@ -11,10 +11,16 @@ use noxis_privacy_types::{BABYBEAR_ELEMENTS_PER_VALUE, BABYBEAR_MODULUS, BABYBEA
 use sha2::{Digest, Sha256};
 
 mod corpus;
+mod p24;
 
 pub use corpus::{
     DRAFT_TREE_VECTOR_LENGTH_LIMIT, DRAFT_TREE_VECTOR_MAGIC, DRAFT_TREE_VECTOR_VERSION,
     TreeVectorCorpusV1, TreeVectorError, TreeVectorRecordV1, TreeVectorValueV1,
+};
+pub use p24::{
+    CandidatePoseidon2P24ManifestIdV2, CandidatePoseidon2P24ManifestV2,
+    P24_CANDIDATE_MANIFEST_ID_DOMAIN, P24_CANDIDATE_MANIFEST_LENGTH, P24_PARAMETER_PAYLOAD_LENGTH,
+    Poseidon2P24CandidateError, Poseidon2P24TreeDomainV1,
 };
 
 /// Four-byte magic identifying a draft tree-parameter manifest.

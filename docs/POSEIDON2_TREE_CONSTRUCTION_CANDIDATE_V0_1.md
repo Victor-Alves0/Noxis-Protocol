@@ -47,7 +47,7 @@ Aceitar cada candidate estritamente menor que p até obter nove valores,
 mantendo a ordem de aceitação. Descartar os demais valores sem reduzi-los módulo p.
 ```
 
-Assim, toda lane é canônica e nenhuma redução modular introduz uma regra implícita. Os nove valores derivados serão incluídos como bytes no futuro manifesto, de modo que a AIR ou o nó nunca precisem calcular SHA-256 para construir o IV.
+Assim, toda lane é canônica e nenhuma redução modular introduz uma regra implícita. Os nove valores derivados já estão incluídos no artefato candidato, e o leitor os rederiva para checagem; a AIR ou o nó futuros não precisarão calcular SHA-256 para construir o IV. Ver [`POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md`](POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md).
 
 ## `Hash16(D, X)` de aridade fixa
 
@@ -108,10 +108,9 @@ O caminho de uma nota no índice `i` tem 32 siblings, começando pelo vizinho da
 
 Esta candidata só pode seguir para um manifesto completo se todos os itens abaixo forem cumpridos:
 
-1. extrair e congelar matriz, constantes e parâmetros completos de P24 em bytes canônicos;
-2. reproduzir KATs P24 e o sponge desta especificação em duas implementações independentes funcionais;
-3. gerar `NXTV v2`, vinculado a esse manifesto completo, com `LEAF`, as duas ordens de `NODE`, `EMPTY[0..32]`, raízes 0–4 e caminhos `0`, `1`, `2` e `2^32 - 1`;
-4. definir a abertura de `NoteCommitmentV2`, incluindo vínculo ao `CiphertextDigestV2` e endereço/chave do destinatário; e
-5. obter revisão criptográfica independente da instância, do modo sponge, do AIR e da integração.
+1. reproduzir KATs P24 e o sponge desta especificação em duas implementações independentes funcionais;
+2. gerar `NXTV v2`, vinculado a esse manifesto completo, com `LEAF`, as duas ordens de `NODE`, `EMPTY[0..32]`, raízes 0–4 e caminhos `0`, `1`, `2` e `2^32 - 1`;
+3. definir a abertura de `NoteCommitmentV2`, incluindo vínculo ao `CiphertextDigestV2` e endereço/chave do destinatário; e
+4. obter revisão criptográfica independente da instância, do modo sponge, do AIR e da integração.
 
 Até esses pontos, este documento é uma candidata de engenharia versionada e auditável — não uma alegação de segurança nem uma mudança de rede.
