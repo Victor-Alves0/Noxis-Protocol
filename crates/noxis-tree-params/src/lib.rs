@@ -10,6 +10,13 @@ use std::fmt;
 use noxis_privacy_types::{BABYBEAR_ELEMENTS_PER_VALUE, BABYBEAR_MODULUS, BABYBEAR_VECTOR_BYTES};
 use sha2::{Digest, Sha256};
 
+mod corpus;
+
+pub use corpus::{
+    DRAFT_TREE_VECTOR_LENGTH_LIMIT, DRAFT_TREE_VECTOR_MAGIC, DRAFT_TREE_VECTOR_VERSION,
+    TreeVectorCorpusV1, TreeVectorError, TreeVectorRecordV1, TreeVectorValueV1,
+};
+
 /// Four-byte magic identifying a draft tree-parameter manifest.
 pub const DRAFT_TREE_MANIFEST_MAGIC: [u8; 4] = *b"NXTM";
 /// Framing version of a draft tree-parameter manifest.

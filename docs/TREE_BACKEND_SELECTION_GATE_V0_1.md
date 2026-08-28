@@ -22,7 +22,7 @@ O manifesto precisa conter as constantes matemáticas completas como elementos B
 
 ## Evidência exigida para a seleção
 
-1. Vetores separados em framing canônico `NXTV` v1: manifesto/ID, conversão bytes-para-campo, `EMPTY[0..32]`, folhas, nós nas duas ordens, raiz vazia, árvores com 1 a 4 folhas, caminhos nos índices `0`, `1`, `2` e `2^32 - 1`, e rejeições. Eles devem vir de implementação independente ou do gerador oficial de parâmetros — nunca somente dos próprios testes da implementação Noxis.
+1. Vetores separados em framing canônico `NXTV` v1: manifesto/ID, conversão bytes-para-campo, `EMPTY[0..32]`, folhas, nós nas duas ordens, raiz vazia, árvores com 1 a 4 folhas, caminhos nos índices `0`, `1`, `2` e `2^32 - 1`, e rejeições. O framing e os vetores iniciais de permutação já existem em [`TREE_VECTOR_CORPUS_FRAMING_V0_1.md`](TREE_VECTOR_CORPUS_FRAMING_V0_1.md); os vetores de árvore ainda devem vir de implementação independente ou do gerador oficial de parâmetros — nunca somente dos próprios testes da implementação Noxis.
 2. Teste diferencial que compare a referência Rust, os vetores e, depois, a AIR/STARK; cada um deve gerar a mesma raiz para os mesmos bytes.
 3. Casos negativos para encodings fora do campo, ordem de filhos invertida, domínio trocado, posição trocada, caminho truncado e raiz divergente.
 4. Dependência presa no `Cargo.lock`, verificada com Rust 1.85, e testes de parser/fuzzing e benchmark de memória/CPU com entradas adversariais.
@@ -32,6 +32,6 @@ O resolvedor futuro de parâmetros aceitará somente `TreeParametersId` presente
 
 ## Próxima decisão limitada
 
-A avaliação inicial rejeitou os candidatos Plonky3 que não compilam no Rust 1.85 e a linha antiga que não fecha testes publicados; detalhes em [`POSEIDON2_CANDIDATE_EVALUATION_V0_1.md`](POSEIDON2_CANDIDATE_EVALUATION_V0_1.md). A próxima entrega decidirá a política de MSRV ou uma referência equivalente. Só então ela poderá produzir o manifesto e os vetores antes de introduzir uma árvore no ledger. O artigo [Poseidon2](https://eprint.iacr.org/2023/323.pdf) orienta a família de construção, mas não fornece os parâmetros próprios do Noxis.
+A avaliação inicial rejeitou os candidatos Plonky3 que não compilam no Rust 1.85 e a linha antiga que não fecha testes publicados; detalhes em [`POSEIDON2_CANDIDATE_EVALUATION_V0_1.md`](POSEIDON2_CANDIDATE_EVALUATION_V0_1.md). A referência Rust Horizen e a implementação Zig independente já reproduziram dois vetores de permutação, registrados em [`POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md`](POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md). A próxima entrega é completar o corpus de árvore em `NXTV`, ainda sem introduzir backend no ledger. O artigo [Poseidon2](https://eprint.iacr.org/2023/323.pdf) orienta a família de construção, mas não fornece os parâmetros próprios do Noxis.
 
 Enquanto este gate não for satisfeito, o serviço permanece fechado pela [`CRYPTO_SERVICE_GATE_V0_1.md`](CRYPTO_SERVICE_GATE_V0_1.md).
