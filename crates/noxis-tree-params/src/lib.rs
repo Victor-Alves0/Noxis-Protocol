@@ -14,6 +14,7 @@ mod corpus;
 mod corpus_v2;
 mod note_corpus_v1;
 mod p24;
+mod p24_intent_commitment;
 mod p24_note_domains;
 
 pub use corpus::{
@@ -33,6 +34,13 @@ pub use p24::{
     CandidatePoseidon2P24ManifestIdV2, CandidatePoseidon2P24ManifestV2,
     P24_CANDIDATE_MANIFEST_ID_DOMAIN, P24_CANDIDATE_MANIFEST_LENGTH, P24_PARAMETER_PAYLOAD_LENGTH,
     Poseidon2P24CandidateError, Poseidon2P24TreeDomainV1,
+};
+pub use p24_intent_commitment::{
+    CandidatePoseidon2P24IntentCommitmentIdV1, CandidatePoseidon2P24IntentCommitmentManifestV1,
+    P24_INTENT_COMMITMENT_CANDIDATE_ID_DOMAIN, P24_INTENT_COMMITMENT_INPUT_BYTES,
+    P24_INTENT_COMMITMENT_INPUT_ELEMENTS, P24_INTENT_COMMITMENT_MANIFEST_LENGTH,
+    P24_INTENT_COMMITMENT_PAYLOAD_LENGTH, Poseidon2P24IntentCommitmentCandidateError,
+    Poseidon2P24IntentCommitmentDomainV1,
 };
 pub use p24_note_domains::{
     CandidatePoseidon2P24NoteDomainsIdV1, CandidatePoseidon2P24NoteDomainsManifestV1,
