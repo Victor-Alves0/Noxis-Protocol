@@ -6,7 +6,7 @@
 
 Em linguagem simples: é uma folha de respostas com formato rígido. Ela diz qual saída uma futura implementação precisa obter, mas não entrega uma calculadora que possa entrar no ledger.
 
-O corpus congelado nesta versão contém apenas os dois vetores de permutação BabyBear-16 já validados entre Rust e Zig. Os formatos de folha, nó, vazio, árvore pequena e caminho já existem para receber evidência externa posterior, mas ainda não carregam resultados criptográficos Noxis.
+O corpus congelado nesta versão contém apenas os dois vetores de permutação BabyBear-16 já validados entre Rust e Zig. Os formatos de folha, nó, vazio, árvore pequena e caminho já existem para receber evidência externa posterior, mas ainda não carregam resultados criptográficos Noxis. O motivo e as condições de desbloqueio estão em [`TREE_VECTOR_GENERATION_BLOCKER_V0_1.md`](TREE_VECTOR_GENERATION_BLOCKER_V0_1.md).
 
 ## Cabeçalho canônico
 
@@ -18,7 +18,7 @@ Todo corpus inicia com exatamente 70 bytes:
 | CandidateTreeManifestId[32] | record_count=u32be
 ```
 
-O `NXTM` precisa ser os bytes exatos do manifesto rascunho atual, com `kind=unselected` e payload vazio. O ID é recalculado pelo parser; portanto, um cabeçalho que troca o manifesto ou apenas o ID é recusado. Isso não cria um `TreeParametersId` aprovado.
+O `NXTM` precisa ser os bytes exatos do manifesto rascunho atual, com `kind=unselected` e payload vazio. O parser confere o ID de candidata correspondente a esse único manifesto rascunho; portanto, um cabeçalho que troca o manifesto ou apenas o ID é recusado. Isso não cria um `TreeParametersId` aprovado. Um futuro corpus de seleção precisará de nova versão ligada a um manifesto completo; `NXTV` v1 não pode ser reinterpretado como tal corpus.
 
 O arquivo completo tem limite de 1 MiB e no máximo 4.096 registros. Esses limites são verificados antes de alocações proporcionais ao conteúdo declarado.
 
@@ -59,4 +59,4 @@ Não valida se uma raiz, um nó ou um caminho é matematicamente correto. Essa v
 
 ## Próximo micro-objetivo
 
-Produzir, em referências independentes, entradas e saídas para `LEAF`, as duas ordens de `NODE`, todos os `EMPTY[0..32]`, árvores de 0 a 4 folhas e caminhos nos índices `0`, `1`, `2` e `2^32 - 1`. Antes disso não haverá backend, raiz ou transação privada v2.
+Definir e revisar uma construção completa de árvore antes de pedir resultados de `LEAF` e `NODE` às referências. A avaliação atual demonstrou que as bibliotecas de permutação não oferecem essa construção por conta própria; detalhes em [`TREE_VECTOR_GENERATION_BLOCKER_V0_1.md`](TREE_VECTOR_GENERATION_BLOCKER_V0_1.md). Antes disso não haverá backend, raiz ou transação privada v2.

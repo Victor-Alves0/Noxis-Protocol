@@ -17,7 +17,6 @@ pub const DRAFT_TREE_VECTOR_MAGIC: [u8; 4] = *b"NXTV";
 pub const DRAFT_TREE_VECTOR_VERSION: u16 = 1;
 /// Maximum total encoded corpus size accepted before any record allocation.
 pub const DRAFT_TREE_VECTOR_LENGTH_LIMIT: usize = 1_048_576;
-#[cfg(test)]
 const DRAFT_TREE_VECTOR_HEADER_LENGTH: usize = 70;
 const DRAFT_TREE_VECTOR_MAX_RECORDS: usize = 4_096;
 const DRAFT_TREE_VECTOR_FLAGS: u16 = 0;
@@ -205,6 +204,13 @@ impl TreeVectorCorpusV1 {
         {
             return Err(TreeVectorError::DuplicateRecord);
         }
+        let encoded_length = encoded_length(&records)?;
+        if encoded_length > DRAFT_TREE_VECTOR_LENGTH_LIMIT {
+            return Err(TreeVectorError::CorpusTooLarge {
+                actual: encoded_length,
+                limit: DRAFT_TREE_VECTOR_LENGTH_LIMIT,
+            });
+        }
         Ok(Self { records })
     }
 
@@ -313,6 +319,20 @@ fn validate_record(record: &TreeVectorRecordV1) -> Result<(), TreeVectorError> {
         }
         _ => Ok(()),
     }
+}
+
+fn encoded_length(records: &[TreeVectorRecordV1]) -> Result<usize, TreeVectorError> {
+    let mut length = DRAFT_TREE_VECTOR_HEADER_LENGTH;
+    for record in records {
+        let record_length = record.canonical_bytes().len();
+        length = length
+            .checked_add(record_length)
+            .ok_or(TreeVectorError::CorpusTooLarge {
+                actual: usize::MAX,
+                limit: DRAFT_TREE_VECTOR_LENGTH_LIMIT,
+            })?;
+    }
+    Ok(length)
 }
 
 fn decode_record(tag: u8, payload: &[u8]) -> Result<TreeVectorRecordV1, TreeVectorError> {
@@ -601,5 +621,28 @@ mod tests {
             TreeVectorCorpusV1::new(vec![record.clone(), record]),
             Err(TreeVectorError::DuplicateRecord)
         );
+    }
+
+    #[test]
+    fn constructor_refuses_a_corpus_the_decoder_would_refuse_for_size() {
+        let path = TreeVectorRecordV1::Path {
+            leaf_index: 0,
+            leaf: value(1),
+            siblings: Box::new(core::array::from_fn(|index| value(2 + index as u32))),
+            root: value(34),
+        };
+        let records = (0..480)
+            .map(|index| {
+                let mut record = path.clone();
+                if let TreeVectorRecordV1::Path { leaf_index, .. } = &mut record {
+                    *leaf_index = index;
+                }
+                record
+            })
+            .collect();
+        assert!(matches!(
+            TreeVectorCorpusV1::new(records),
+            Err(TreeVectorError::CorpusTooLarge { .. })
+        ));
     }
 }

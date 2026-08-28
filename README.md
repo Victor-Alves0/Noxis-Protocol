@@ -67,6 +67,7 @@ docs/
   ECONOMIC_SECURITY_MODEL_V0_1.md  Boundaries for validator rewards, liquidity and future contracts.
   TREE_PARAMETER_FRAMING_V0_1.md   Canonical draft manifest and field-vector boundary for v2 trees.
   TREE_VECTOR_CORPUS_FRAMING_V0_1.md  NXTV framing for external tree-vector evidence.
+  TREE_VECTOR_GENERATION_BLOCKER_V0_1.md  Evidence and prerequisites for complete tree vectors.
   POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md  Cross-validated permutation reference vectors.
   ARCHITECTURE.md                Module boundaries and implementation roadmap.
 ```
