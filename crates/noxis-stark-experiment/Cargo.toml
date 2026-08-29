@@ -1,0 +1,25 @@
+[package]
+name = "noxis-stark-experiment"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+p3-air = "0.6.3"
+p3-baby-bear = "0.6.3"
+p3-challenger = "0.6.3"
+p3-commit = "0.6.3"
+p3-dft = "0.6.3"
+p3-field = "0.6.3"
+p3-fri = "0.6.3"
+p3-keccak = "0.6.3"
+p3-matrix = "0.6.3"
+p3-merkle-tree = "0.6.3"
+p3-symmetric = "0.6.3"
+p3-uni-stark = "0.6.3"
+rand = "=0.10.1"
+rand_chacha = "0.10.0"
+
+[lints]
+workspace = true
