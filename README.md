@@ -131,6 +131,10 @@ transfer, rejects the same nullifier on a second submission, then reopens the
 node to prove durable recovery. Pass `--data-dir PATH` to keep a chosen demo
 directory for inspection.
 
+For an explicit persistent research-node lifecycle, use
+`research init --data-dir PATH` and `research status --data-dir PATH`; see
+[`docs/LOCAL_OPERATIONAL_DEMO_V0_1.md`](docs/LOCAL_OPERATIONAL_DEMO_V0_1.md).
+
 This deliberately does **not** start CometBFT or claim consensus, custody or
 privacy: the displayed `AppHash` is explicitly unavailable in local-admission
 mode, and the transfer uses a research fixture rather than a private proof.

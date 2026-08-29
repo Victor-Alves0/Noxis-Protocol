@@ -30,6 +30,26 @@ O argumento `--data-dir CAMINHO` conserva os artefatos para inspeção. Sem ele,
 o binário cria uma pasta única em `target/noxis-demo-local`; os scripts também
 criam um caminho único sob `target`.
 
+## Ciclo de vida explícito do nó de pesquisa
+
+Além do demo completo, o mesmo binário pode inicializar e consultar um nó
+local persistente. Esses comandos não abrem uma porta de rede: eles mostram o
+estado realmente recuperado do diretório escolhido.
+
+```powershell
+cargo run -p noxis-node --features research-testing -- research init --data-dir .\target\noxis-research
+cargo run -p noxis-node --features research-testing -- research status --data-dir .\target\noxis-research
+
+# Executa mint, transferência de fixture e rejeição de double spend em um
+# diretório vazio, depois deixa o estado disponível para `research status`.
+cargo run -p noxis-node --features research-testing -- research demo --data-dir .\target\noxis-research-demo
+```
+
+`research init` cria ou reabre o diretório ligado à gênese de pesquisa.
+`research status` usa o mesmo caminho de abertura e, portanto, falha se o
+manifesto ou a recuperação durável não forem válidos. A altura exibida é a
+sequência local; não é altura de consenso.
+
 ## Limites deliberados
 
 O comando exige `research-testing` e imprime esse aviso. A política de mint e

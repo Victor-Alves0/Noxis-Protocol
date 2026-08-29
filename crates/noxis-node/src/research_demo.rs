@@ -47,14 +47,27 @@ pub struct ResearchDemoReport {
     pub recovered: LocalNodeStatus,
 }
 
+/// Opens the explicit research-only node and returns its durable local status.
+///
+/// This initializes an empty directory when needed and reopens an existing
+/// one when its genesis-bound manifest is valid. It exposes no network
+/// listener, proof backend or production authorization.
+pub fn initialize_local(directory: DataDirectory) -> Result<LocalNodeStatus, ResearchDemoError> {
+    let runtime = open_local_runtime(directory)?;
+    Ok(runtime.node().status())
+}
+
+/// Reopens a research node using the deterministic fixture configuration.
+///
+/// The function is intentionally the same fail-closed open path used by the
+/// demo, so a status response is evidence that durable state can be recovered.
+pub fn status_local(directory: DataDirectory) -> Result<LocalNodeStatus, ResearchDemoError> {
+    initialize_local(directory)
+}
+
 /// Runs the complete durable sequence in `directory` and then reopens it.
 pub fn run_local(directory: DataDirectory) -> Result<ResearchDemoReport, ResearchDemoError> {
-    let genesis = demo_genesis()?;
-    let config =
-        NodeConfig::new(genesis, directory.ledger_path()).map_err(ResearchDemoError::Config)?;
-    let mut runtime =
-        LocalNodeRuntime::open(directory.clone(), &config, DemoVerifier, DemoMintPolicy)
-            .map_err(ResearchDemoError::Runtime)?;
+    let mut runtime = open_local_runtime(directory.clone())?;
     let initial = runtime.node().status();
     if initial.sequence != 0 {
         return Err(ResearchDemoError::DirectoryNotEmpty {
@@ -83,9 +96,7 @@ pub fn run_local(directory: DataDirectory) -> Result<ResearchDemoReport, Researc
     ))?;
 
     drop(runtime);
-    let recovered_runtime =
-        LocalNodeRuntime::open(directory, &config, DemoVerifier, DemoMintPolicy)
-            .map_err(ResearchDemoError::Runtime)?;
+    let recovered_runtime = open_local_runtime(directory)?;
     let recovered = recovered_runtime.node().status();
     if recovered != after_transfer {
         return Err(ResearchDemoError::RecoveryMismatch);
@@ -98,6 +109,16 @@ pub fn run_local(directory: DataDirectory) -> Result<ResearchDemoReport, Researc
         duplicate_rejection,
         recovered,
     })
+}
+
+fn open_local_runtime(
+    directory: DataDirectory,
+) -> Result<LocalNodeRuntime<DemoVerifier, DemoMintPolicy>, ResearchDemoError> {
+    let genesis = demo_genesis()?;
+    let config =
+        NodeConfig::new(genesis, directory.ledger_path()).map_err(ResearchDemoError::Config)?;
+    LocalNodeRuntime::open(directory, &config, DemoVerifier, DemoMintPolicy)
+        .map_err(ResearchDemoError::Runtime)
 }
 
 fn demo_genesis() -> Result<GenesisConfig, ResearchDemoError> {
@@ -321,6 +342,21 @@ mod tests {
             LedgerError::NullifierAlreadySpent(_)
         ));
         assert_eq!(report.after_transfer, report.recovered);
+        fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn research_node_initialization_and_status_reopen_the_same_empty_state() {
+        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("noxis-research-node-{suffix}-{sequence}"));
+        let initial = initialize_local(DataDirectory::new(&path).unwrap()).unwrap();
+        let reopened = status_local(DataDirectory::new(&path).unwrap()).unwrap();
+        assert_eq!(initial.sequence, 0);
+        assert_eq!(initial, reopened);
         fs::remove_dir_all(path).unwrap();
     }
 }
