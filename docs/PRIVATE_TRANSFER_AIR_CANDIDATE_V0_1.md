@@ -23,7 +23,7 @@ H[0..16)  = H_INTENT(intent[640])
 
 `M[0]` até `M[212]` devem ser menores que `2^24`; `M[213]` deve ser menor que `2^8`. A AIR decompõe os elementos em bytes, recompõe exatamente os 640 bytes, faz o range-check e reavalia `H_INTENT`. Assim, `H` não pode ser apresentado como compromisso de outra intenção.
 
-Os bytes recompostos carregam, na ordem já congelada: circuito, gênese, contexto de validação, estado anterior, parâmetros da árvore, raiz privada, ativo, dois nullifiers, dois commitments de saída e dois digests de envelopes. A moldura [`CandidatePrivateTransferAirPublicInputsV1`](../crates/noxis-note-opening/src/statement.rs) só pode ser construída de uma `PrivateTransferIntentV2` canônica e rederiva `H_INTENT`.
+Os bytes recompostos carregam, na ordem já congelada: circuito, gênese, contexto de validação, estado anterior, parâmetros da árvore, raiz privada, ativo, dois nullifiers, dois commitments de saída e dois digests de envelopes. A moldura [`CandidatePrivateTransferAirPublicInputsV1`](../crates/noxis-private-proof-contract/src/public_inputs.rs) só pode ser construída de uma `PrivateTransferIntentV2` canônica e rederiva `H_INTENT`.
 
 ## Testemunha privada e restrições
 
@@ -50,4 +50,4 @@ O deployment AIR precisa comprometer os IDs e bytes completos de P24, NXPH e NXI
 - A declaração [`NXPU v1`](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md) já une a moldura de notas, `NXPS v2` e `NXNT v1`, mas ainda não há AIR que demonstre a relação em zero conhecimento nem que atualize a raiz de notas.
 - `CircuitId`, `ProofVerifierId`, digest do programa AIR e backend STARK permanecem não selecionados.
 
-Essas lacunas são bloqueios de segurança, não detalhes de implementação. O próximo artefato deve ser um manifesto de deployment de prova que as represente e continue falhando fechado até existir backend auditado.
+Essas lacunas são bloqueios de segurança, não detalhes de implementação. O perfil [`NXAR v1`](PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md) já congela a forma e as famílias de restrição existentes; o próximo artefato deve ser um programa AIR executável que continue falhando fechado até existir backend auditado.

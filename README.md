@@ -89,6 +89,7 @@ docs/
   PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md  Candidate transparent before/after NXSM nullifier relation.
   PRIVATE_TRANSFER_WITNESS_CONSTRAINT_INTERFACE_CANDIDATE_V0_1.md  Candidate local witness contract for sequential NXSM constraints.
   PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md  Candidate unified public statement joining note and NXSM relations.
+  PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md  Candidate machine-readable AIR constraint profile.
   ARCHITECTURE.md                Module boundaries and implementation roadmap.
 ```
 
