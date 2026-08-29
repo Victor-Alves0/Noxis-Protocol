@@ -6,8 +6,10 @@
 
 use std::fmt;
 
-use noxis_privacy_types::{PrivateTransferIntentCommitmentV2, PrivateTransferIntentV2};
-use noxis_tree_params::{P24_BYTE_PACK_WIDTH, P24_INTENT_COMMITMENT_INPUT_ELEMENTS};
+use noxis_privacy_types::PrivateTransferIntentV2;
+use noxis_private_proof_contract::{
+    CandidatePrivateTransferAirPublicInputsError, CandidatePrivateTransferAirPublicInputsV1,
+};
 
 use crate::{
     CandidateP24NoteOpeningEvaluatorV2, DerivedNotePublicV2, NoteOpeningError, NoteOpeningV2,
@@ -70,87 +72,10 @@ impl CandidatePrivateTransferWitnessV2 {
         evaluator: &CandidateP24NoteOpeningEvaluatorV2,
     ) -> Result<CandidatePrivateTransferAirPublicInputsV1, PrivateTransferStatementError> {
         self.revalidate(evaluator)?;
-        CandidatePrivateTransferAirPublicInputsV1::from_intent(self.intent.clone(), evaluator)
+        Ok(CandidatePrivateTransferAirPublicInputsV1::from_intent(
+            self.intent.clone(),
+        )?)
     }
-}
-
-/// Candidate public frame for the future private-transfer AIR.
-///
-/// The complete public intent remains available to a verifier, while
-/// `intent_commitment` forces the AIR/proof relation to bind exactly its 640
-/// canonical bytes. This type has no wire codec and cannot authorize a state
-/// transition until a separate private-state and proof deployment are audited.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CandidatePrivateTransferAirPublicInputsV1 {
-    intent: PrivateTransferIntentV2,
-    intent_elements: [u32; P24_INTENT_COMMITMENT_INPUT_ELEMENTS],
-    intent_commitment: PrivateTransferIntentCommitmentV2,
-}
-
-impl CandidatePrivateTransferAirPublicInputsV1 {
-    /// Binds a canonical intent to the frozen candidate `H_INTENT` reference.
-    pub fn from_intent(
-        intent: PrivateTransferIntentV2,
-        evaluator: &CandidateP24NoteOpeningEvaluatorV2,
-    ) -> Result<Self, PrivateTransferStatementError> {
-        if intent.tree_parameters().id() != evaluator.candidate_tree_parameters_id()? {
-            return Err(PrivateTransferStatementError::CandidateTreeParametersMismatch);
-        }
-        let intent_commitment = evaluator.intent_commitment(&intent)?;
-        Ok(Self {
-            intent_elements: byte_pack3le_intent(&intent),
-            intent,
-            intent_commitment,
-        })
-    }
-
-    /// The full canonical public statement whose bytes are committed below.
-    pub const fn intent(&self) -> &PrivateTransferIntentV2 {
-        &self.intent
-    }
-
-    /// Candidate `H_INTENT(intent.encode())` in canonical BabyBear encoding.
-    pub const fn intent_commitment(&self) -> PrivateTransferIntentCommitmentV2 {
-        self.intent_commitment
-    }
-
-    /// The 214 canonical `BytePack3LE` public elements consumed by the AIR.
-    ///
-    /// The first 213 elements encode three bytes each and the last is below
-    /// 256, so the mapping back to the fixed 640-byte intent is unambiguous.
-    pub const fn intent_elements(&self) -> &[u32; P24_INTENT_COMMITMENT_INPUT_ELEMENTS] {
-        &self.intent_elements
-    }
-
-    /// Recomputes the binding before a future prover or verifier consumes it.
-    pub fn revalidate(
-        &self,
-        evaluator: &CandidateP24NoteOpeningEvaluatorV2,
-    ) -> Result<(), PrivateTransferStatementError> {
-        let expected = Self::from_intent(self.intent.clone(), evaluator)?;
-        if expected.intent_commitment != self.intent_commitment {
-            return Err(PrivateTransferStatementError::IntentCommitmentMismatch);
-        }
-        if expected.intent_elements != self.intent_elements {
-            return Err(PrivateTransferStatementError::IntentPackingMismatch);
-        }
-        Ok(())
-    }
-}
-
-fn byte_pack3le_intent(
-    intent: &PrivateTransferIntentV2,
-) -> [u32; P24_INTENT_COMMITMENT_INPUT_ELEMENTS] {
-    let encoded = intent.encode();
-    core::array::from_fn(|index| {
-        encoded[index * P24_BYTE_PACK_WIDTH
-            ..core::cmp::min((index + 1) * P24_BYTE_PACK_WIDTH, encoded.len())]
-            .iter()
-            .enumerate()
-            .fold(0_u32, |value, (offset, byte)| {
-                value | (u32::from(*byte) << (offset * 8))
-            })
-    })
 }
 
 fn validate(
@@ -256,6 +181,7 @@ fn validate_input_bindings(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PrivateTransferStatementError {
     NoteOpening(NoteOpeningError),
+    AirPublicInputs(CandidatePrivateTransferAirPublicInputsError),
     CandidateTreeParametersMismatch,
     IntentCommitmentMismatch,
     IntentPackingMismatch,
@@ -279,11 +205,20 @@ impl From<NoteOpeningError> for PrivateTransferStatementError {
     }
 }
 
+impl From<CandidatePrivateTransferAirPublicInputsError> for PrivateTransferStatementError {
+    fn from(value: CandidatePrivateTransferAirPublicInputsError) -> Self {
+        Self::AirPublicInputs(value)
+    }
+}
+
 impl fmt::Display for PrivateTransferStatementError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoteOpening(error) => {
                 write!(formatter, "invalid candidate note opening: {error}")
+            }
+            Self::AirPublicInputs(error) => {
+                write!(formatter, "invalid candidate AIR public inputs: {error}")
             }
             Self::CandidateTreeParametersMismatch => {
                 formatter.write_str("intent tree parameters do not bind the local P24 candidate")
@@ -513,7 +448,7 @@ mod tests {
                 .all(|element| *element < (1 << 24))
         );
         assert!(air.intent_elements()[213] < 256);
-        air.revalidate(&evaluator).unwrap();
+        air.revalidate().unwrap();
     }
 
     #[test]

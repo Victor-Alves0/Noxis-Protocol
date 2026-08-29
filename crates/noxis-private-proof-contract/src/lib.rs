@@ -15,6 +15,8 @@ use sha2::{Digest, Sha256};
 
 mod nxsm_transition;
 mod nxsm_witness;
+mod public_inputs;
+mod public_statement;
 
 pub use nxsm_transition::{
     CANDIDATE_NXSM_NULLIFIER_TRANSITION_ENCODED_LENGTH,
@@ -23,6 +25,16 @@ pub use nxsm_transition::{
 };
 pub use nxsm_witness::{
     CandidateNxsmNullifierTransitionWitnessError, CandidateNxsmNullifierTransitionWitnessV1,
+};
+pub use public_inputs::{
+    CandidatePrivateTransferAirPublicInputsError, CandidatePrivateTransferAirPublicInputsV1,
+};
+pub use public_statement::{
+    CANDIDATE_PRIVATE_TRANSFER_PROOF_PUBLIC_STATEMENT_ENCODED_LENGTH,
+    CANDIDATE_PRIVATE_TRANSFER_PROOF_PUBLIC_STATEMENT_ID_DOMAIN,
+    CandidatePrivateTransferProofPublicStatementError,
+    CandidatePrivateTransferProofPublicStatementIdV1,
+    CandidatePrivateTransferProofPublicStatementV1,
 };
 
 /// SHA-256 domain for the full candidate-deployment checksum.

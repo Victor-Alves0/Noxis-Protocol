@@ -22,10 +22,8 @@ use zeroize::Zeroize;
 
 mod statement;
 
-pub use statement::{
-    CandidatePrivateTransferAirPublicInputsV1, CandidatePrivateTransferWitnessV2,
-    PrivateTransferStatementError,
-};
+pub use noxis_private_proof_contract::CandidatePrivateTransferAirPublicInputsV1;
+pub use statement::{CandidatePrivateTransferWitnessV2, PrivateTransferStatementError};
 
 const NOTE_VERSION: u16 = 1;
 const NOTE_PREIMAGE_LENGTH: usize = 178;

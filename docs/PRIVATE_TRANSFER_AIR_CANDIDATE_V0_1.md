@@ -8,6 +8,12 @@ Ela permanece deliberadamente isolada do ledger v1: aquele usa raízes, commitme
 
 ## Instância pública canônica
 
+A moldura original de 230 elementos continua sendo a parte da relação de
+notas. A relação completa também tem uma declaração unificada local
+[`NXPU v1`](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md), que vincula
+essa moldura à âncora `NXPS v2` e à transição `NXNT v1`. `NXPU` ainda não é uma
+lista de entradas AIR selecionada: essa tradução exige backend e revisão.
+
 A instância tem 230 elementos BabyBear, nesta ordem:
 
 ```text
@@ -41,7 +47,7 @@ O deployment AIR precisa comprometer os IDs e bytes completos de P24, NXPH e NXI
 - Não há especificação de cifra/envelope que prove que cada digest de ciphertext corresponde à nota, slot, AAD e chave do destinatário.
 - A chave ligada por `H_ADDR` ainda não está ligada a uma chave de recebimento X25519/ML-KEM.
 - Não existe estado privado persistente v2, política de raízes, conjunto global de nullifiers ou inserção atômica das saídas.
-- A relação transparente [`NXNT v1`](PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md) já vincula `NXPS v2`, ausência dos dois nullifiers e raiz `NXSM` posterior, mas ainda não há AIR que demonstre essa relação em zero conhecimento nem que atualize a raiz de notas.
+- A declaração [`NXPU v1`](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md) já une a moldura de notas, `NXPS v2` e `NXNT v1`, mas ainda não há AIR que demonstre a relação em zero conhecimento nem que atualize a raiz de notas.
 - `CircuitId`, `ProofVerifierId`, digest do programa AIR e backend STARK permanecem não selecionados.
 
 Essas lacunas são bloqueios de segurança, não detalhes de implementação. O próximo artefato deve ser um manifesto de deployment de prova que as represente e continue falhando fechado até existir backend auditado.

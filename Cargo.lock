@@ -199,6 +199,7 @@ dependencies = [
  "noxis-poseidon2-privacy-reference",
  "noxis-poseidon2-reference",
  "noxis-privacy-types",
+ "noxis-private-proof-contract",
  "noxis-tree-params",
  "noxis-types",
  "zeroize",

@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+noxis-private-proof-contract = { path = "../noxis-private-proof-contract" }
 noxis-poseidon2-privacy-reference = { path = "../noxis-poseidon2-privacy-reference" }
 noxis-poseidon2-reference = { path = "../noxis-poseidon2-reference" }
 noxis-privacy-types = { path = "../noxis-privacy-types" }

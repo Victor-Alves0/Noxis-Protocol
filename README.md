@@ -88,6 +88,7 @@ docs/
   PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md  Candidate typed binding between a private snapshot and NXSM root.
   PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md  Candidate transparent before/after NXSM nullifier relation.
   PRIVATE_TRANSFER_WITNESS_CONSTRAINT_INTERFACE_CANDIDATE_V0_1.md  Candidate local witness contract for sequential NXSM constraints.
+  PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md  Candidate unified public statement joining note and NXSM relations.
   ARCHITECTURE.md                Module boundaries and implementation roadmap.
 ```
 

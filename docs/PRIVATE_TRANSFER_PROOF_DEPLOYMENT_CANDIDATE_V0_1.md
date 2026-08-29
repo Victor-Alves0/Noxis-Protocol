@@ -6,6 +6,12 @@ O arquivo tem 19.598 bytes, SHA-256 `c2bedaaa24a6ed12818e731ee038bbaaa8b2fb58629
 
 O parser valida o checksum, `NXIC`, `NXIV` e, por consequência, toda a cadeia `NXPD → NXIC → NXPH → P24/NXTM`. Também fixa campo, largura/taxa/capacidade, rounds e funções requeridas da relação. Qualquer mudança no cabeçalho, em um ancestral ou no checksum é recusada.
 
+`NXPD v1` antecede a declaração pública unificada
+[`NXPU v1`](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md). Por isso,
+ele não compromete `NXPS v2`, `NXSM`, `NXNT` ou o frame de 1.440 bytes. Um
+futuro `NXPD v2` deverá fazer isso explicitamente; não é permitido ampliar o
+significado de `NXPD v1` por compatibilidade informal.
+
 ## O que ele não é
 
 - Não escolhe STARK, FRI, transcript, parâmetros, chave verificadora, `CircuitId` ou `ProofVerifierId`.
