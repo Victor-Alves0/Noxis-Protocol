@@ -20,6 +20,7 @@ Dependencies point inward. Domain types never depend on storage, transport, cryp
 | --- | --- | --- |
 | `noxis-types` | stable IDs, amounts, asset taxonomy | state, I/O, cryptography |
 | `noxis-crypto` | suite versioning, proof-verifier contract | ledger mutation, keys, network clients |
+| `noxis-nullifier-tree-state` | isolated mutable state and immutable proof paths for the unselected `NXSM` candidate | ledger mutation, persistence, proof packets, network or settlement |
 | `noxis-ledger` | transaction shape, transition validation, state | concrete cryptography, databases, P2P |
 | `noxis-record-chain` | canonical record encoding, sequence and state-link validation | ledger mutation, filesystem I/O, consensus |
 | `noxis-checkpoint` | canonical `NXCP` encoding and snapshot integrity validation | filesystem I/O, replay policy, consensus |
@@ -32,15 +33,20 @@ Dependencies point inward. Domain types never depend on storage, transport, cryp
 
 ## Incremental roadmap
 
-1. A identidade, o compromisso de parâmetros e o mapeamento exato dos
-   validadores Comet v0.38 já estão ancorados no genesis, no manifesto `NXMF`
-   v7, em cada decisão `NXCB` v2 e no `AppHash`. O núcleo exige que
-   `InitChain` apresente esses mesmos parâmetros e validadores. O servidor TCP
-   ABCI v0.38 já existe; em seguida, executar cenários ponta a ponta contra um
-   binário CometBFT v0.38 fixado, completar a recuperação coordenada e provar
-   a finalidade da engine separadamente do certificado genérico Noxis.
-2. Implementar checkpoint de ponta de bloco, incluindo altura, `BlockId`, `AppHash` e futura prova de finalidade.
-3. Substituir a fronteira abstrata de provas por um backend auditado e revisado independentemente, com construção canônica da raiz de estado.
-4. Adicionar testes de propriedade/fuzz e injeção de falhas de escrita do sistema operacional à persistência.
-5. Adicionar carteira e adaptadores de cadeia somente após especificar seus modelos de ameaça, falhas e resgate.
-6. Exigir auditoria externa de criptografia e segurança antes de qualquer testnet com valor transferível.
+1. The engine identity, parameter commitment and exact Comet v0.38 validator
+   mapping are bound to genesis, the `NXMF` v7 manifest, every `NXCB` v2
+   decision and `AppHash`. The core requires `InitChain` to present the same
+   parameters and validators. The TCP ABCI v0.38 server exists; next, run
+   end-to-end scenarios against a checksum-pinned CometBFT v0.38 binary,
+   complete coordinated recovery, and establish engine finality separately
+   from the generic Noxis certificate.
+2. Implement a block-tip checkpoint containing height, `BlockId`, `AppHash`,
+   and a future finality proof.
+3. Replace the abstract proof boundary with an audited, independently reviewed
+   backend and canonical state-root construction.
+4. Add property and fuzz tests plus operating-system write-fault injection to
+   persistence.
+5. Add a wallet and chain adapters only after their threat models, failure
+   modes, and recovery paths are specified.
+6. Require an external cryptography and security audit before any testnet can
+   carry transferable value.
