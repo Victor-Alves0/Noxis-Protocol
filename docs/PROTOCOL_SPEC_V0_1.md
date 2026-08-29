@@ -2,7 +2,13 @@
 
 ## Status and scope
 
-This document defines the initial safety boundary. Version 0.1 models the settlement core only; it intentionally excludes real custody, bridges, fiat settlement, price-oracle operation, liquidity-provider execution, networking, consensus, wallets, and production zero-knowledge cryptography.
+This document defines the initial safety boundary of the settlement core and
+its deterministic execution interface. Version 0.1 intentionally excludes
+real custody, bridges, fiat settlement, price-oracle operation,
+liquidity-provider execution, public peer networking, a multi-validator BFT
+deployment or finality claim, wallets, and production zero-knowledge
+cryptography. The repository's local CometBFT ABCI integration supplies an
+ordering boundary around this core; it does not expand these exclusions.
 
 ## Design principles
 

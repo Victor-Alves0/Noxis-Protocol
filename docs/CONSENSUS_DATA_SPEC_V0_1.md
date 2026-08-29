@@ -2,11 +2,11 @@
 
 ## Finalidade deste módulo
 
-`noxis-consensus` descreve os bytes e as verificações locais que uma futura
-engine BFT deve usar para decidir blocos Noxis. Não abre portas de rede, não
-guarda chaves privadas e não escolhe líderes. Essa separação permite testar a
-parte mais sensível — o que exatamente foi votado — sem misturá-la com sockets
-ou armazenamento.
+`noxis-consensus` descreve os bytes e as verificações locais usados pela
+integração CometBFT e que qualquer engine BFT deve usar para decidir blocos
+Noxis. A crate não abre portas de rede, não guarda chaves privadas e não
+escolhe líderes. Essa separação permite testar a parte mais sensível — o que
+exatamente foi votado — sem misturá-la com sockets ou armazenamento.
 
 ## Configuração e validadores
 
@@ -34,10 +34,10 @@ um validador. A crate ainda não implementa nenhum algoritmo de assinatura: o
 adaptador da engine deve suportar explicitamente o esquema declarado e usar a
 chave configurada ao implementar `FinalityVerifier`.
 
-Por isso, a presença de uma chave na gênese não torna a rede inicializável por
-si só. O bootstrap do futuro adaptador Comet deverá recusar todo esquema que
-ele não implemente e conferir a correspondência entre a chave Noxis, a chave
-da engine e o peso do validador antes de abrir a rede.
+Por isso, a presença de uma chave na gênese não torna uma rede inicializável
+por si só. O adaptador Comet atual ainda precisa recusar todo esquema que não
+implemente e conferir, em um bootstrap multi-validador, a correspondência entre
+a chave Noxis, a chave da engine e o peso do validador antes de abrir uma rede.
 
 ## Cabeçalho de bloco
 

@@ -8,22 +8,25 @@ policy, configuration, and persistent repository for one operator.
 
 The current v0.1 code implements a typed, embedded local API that composes
 validated genesis configuration with durable transaction replay, plus a
-genesis-bound data directory and cooperative writer lock. It does not yet
-implement the audit files, lifecycle manager, stale-lock recovery procedure,
-or transport adapter described here. This specification keeps those remaining
-service responsibilities explicit before the node is presented as an
+genesis-bound data directory and cooperative writer exclusion. A separate
+strict TCP ABCI v0.38 adapter composes the Comet execution path; it is
+specified in [CONSENSUS_DECISION_V0_1.md](CONSENSUS_DECISION_V0_1.md), not as
+this embedded local API. Audit files, lifecycle management and a stale-lock
+recovery procedure remain unimplemented. This specification keeps those
+remaining service responsibilities explicit before the node is presented as an
 operator-ready service.
 
-This is intentionally not a network-node specification. It provides no peer
-discovery, remote API, consensus, block production, finality, replication,
-data availability, or protection from an operator who runs different local
-states for different users.
+This is intentionally not a network-node specification. It does not specify
+peer discovery, a remote API, multi-validator operation, client-verifiable
+finality, replication, data availability, or protection from an operator who
+runs different local states for different users. The separate local Comet
+integration does not provide those properties.
 
 ## Service purpose
 
 The service has one responsibility: safely apply validated transactions to one
-operator-controlled ledger history, preserve that history across restarts once
-the durability component exists, and expose clear local operational status.
+operator-controlled ledger history, preserve that history across restarts with
+the local durability component, and expose clear local operational status.
 
 It must not create assets implicitly, bypass the `ProofVerifier` or
 `MintPolicy`, alter accepted history in place, or report a transaction as

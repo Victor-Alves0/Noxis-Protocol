@@ -2,8 +2,8 @@
 
 ## Status and scope
 
-This document specifies the state-chain contract for a future persistent Noxis
-ledger. It defines how an ordered transaction record identifies its predecessor
+This document specifies the legacy local-record state-chain contract for the
+`NXRF` persistent Noxis ledger mode. It defines how an ordered transaction record identifies its predecessor
 and resulting ledger state, how checkpoints bind to that history, and when
 recovery must fail closed.
 
@@ -21,9 +21,11 @@ statements now carry `GenesisId`, `ValidationContextId`, the transaction intent
 and pre-transition `StateId`; the intent ID itself remains deliberately free of
 those fields to avoid a binding cycle and is not a network identifier.
 
-The state chain is local storage history. It does not provide network consensus,
-distributed finality, Byzantine fault tolerance, proof soundness, or a defense
-against a malicious host or storage administrator.
+The `NXRF` state chain is local storage history. It is not the authority in
+`CometBlockJournalV1`, where `NXCB` recovery is specified separately in
+[DURABILITY_SPEC_V0_1.md](DURABILITY_SPEC_V0_1.md). Neither format alone
+provides distributed finality, Byzantine fault tolerance, proof soundness, or
+a defense against a malicious host or storage administrator.
 
 ## Definitions
 

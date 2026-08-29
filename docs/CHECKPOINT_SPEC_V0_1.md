@@ -6,8 +6,10 @@ O crate `noxis-checkpoint` implementa a codificação canônica `NXCP` v1 e
 `noxis-storage` a publica em `checkpoints/` sem sobrescrever arquivos
 existentes. O arquivo é gravado sob um nome temporário, sincronizado, publicado
 por link atômico no mesmo diretório e reaberto/decodificado antes do sucesso.
-O nó compara candidatos válidos com o replay integral de `NXRF/NXRC`; um
-arquivo isolado nunca acelera a abertura nesta versão.
+O nó no modo local `NXRF` compara candidatos válidos com o replay integral de
+`NXRF/NXRC`; um arquivo isolado nunca acelera a abertura nesta versão. `NXCP`
+não é hoje um acelerador de recuperação nem uma fonte de autoridade para o
+journal de blocos `NXCB` do modo Comet.
 
 ## Snapshot canônico
 
@@ -64,11 +66,12 @@ não será compactado nesta fase.
 ## Limite de segurança deliberado
 
 O hash de um checkpoint detecta alteração acidental; ele não é assinatura nem
-finalidade. Como `NXRC` ainda não é uma cadeia autenticada por consenso, um
-checkpoint não prova sozinho que o prefixo do log foi validado corretamente.
-Assim, a recuperação atual faz a validação estrita do histórico antes de
-restaurar e comparar o snapshot. Pular esse prefixo exigirá uma âncora
-autenticada, atestado assinado ou consenso, todos fora do escopo atual.
+finalidade. Como `NXRC` no modo legado não é uma cadeia autenticada por
+consenso, um checkpoint não prova sozinho que o prefixo do log foi validado
+corretamente. Assim, a recuperação `NXRF` atual faz a validação estrita do
+histórico antes de restaurar e comparar o snapshot. Pular esse prefixo exigirá
+uma âncora autenticada, atestado assinado ou integração específica ao caminho
+`NXCB`, todos fora do escopo atual.
 
 ## Pré-condição de contexto entregue
 

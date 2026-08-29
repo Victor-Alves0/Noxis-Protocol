@@ -6,10 +6,12 @@
 fonte de verdade para ordenar transações nem para declarar estados finais.
 
 Esta decisão muda o objetivo da camada de rede: nós validadores devem chegar à
-mesma sequência de transições ou rejeitar a proposta. Ela **não** significa que
-o código atual já tenha rede, assinaturas, votos ou finalidade. Hoje, `NXRF` é
-somente o histórico durável local de um processo, e uma resposta
-`LocallyDurable` não é confirmação de rede.
+mesma sequência de transições ou rejeitar a proposta. O repositório já contém
+o ciclo ABCI v0.38, journal `NXCB`, dados BFT canônicos e uma CI que inicia um
+processo CometBFT real contra o adaptador local. Isso **não** significa que já
+exista uma rede BFT operacional, assinaturas/votos geridos pelo Noxis ou uma
+alegação de finalidade para clientes. `NXRF` permanece histórico legado local;
+em modo Comet, somente `NXCB` é autoridade de `Commit`.
 
 ## Direção de implementação adotada
 
@@ -23,9 +25,10 @@ validadores e governança ainda exigem decisão explícita.
 
 Para a primeira integração, a direção escolhida é usar **CometBFT via ABCI
 2.0**, mantendo o Noxis como máquina de estados em Rust e o consenso/P2P na
-engine. Isto evita implementar um algoritmo BFT próprio. A integração ainda
-não existe no runtime: a próxima etapa cria o executor puro de blocos e a
-persistência atômica que o adaptador ABCI consumirá.
+engine. Isto evita implementar um algoritmo BFT próprio. O runtime já possui
+executor puro de blocos, persistência atômica via `NXCB` e adaptador TCP ABCI
+loopback; o trabalho restante é transformá-los em evidência operacional
+multi-validador e não presumir que a integração local equivale a uma rede.
 
 ## O que consenso deve garantir
 
@@ -148,13 +151,14 @@ explicitamente comprováveis.
 O resultado inclui `AppHash`, uma impressão digital canônica da posição da
 aplicação após o bloco — inclusive em blocos vazios. Ela vincula domínio da
 rede, configuração de consenso, altura, `BlockId`, sequência NXRC, registro
-terminal opcional e `StateId` resultante. O futuro adaptador ABCI poderá
-retornar esses bytes à engine segundo o mapeamento correto de alturas, mas
-isso ainda não constitui integração CometBFT nem prova de finalidade.
+terminal opcional e `StateId` resultante. O adaptador ABCI já retorna esses
+bytes à engine pelo mapeamento de alturas documentado. Esse vínculo não é, por
+si só, uma prova de finalidade remota nem uma alegação de rede BFT operacional.
 
 ## Micro-entrega concluída: núcleo do ciclo ABCI
 
-`noxis-comet-abci` implementa o ciclo de aplicação sem transporte: o
+`noxis-comet-abci` implementa o ciclo de aplicação e seu transporte TCP
+loopback: o
 mapeamento explícito entre alturas Comet e Noxis, `Info`, validação de
 identidade em `InitChain`, admissão local `CheckTx`, seleção estável em
 `PrepareProposal`, reexecução em `ProcessProposal`, finalização volátil em
@@ -181,10 +185,12 @@ aceitas como bytes opacos para preservar a disponibilidade quando a opção da
 engine estiver habilitada, mas ainda não participam da execução, do `AppHash`
 nem de uma política Noxis.
 
-O código ainda não foi validado contra um binário CometBFT e não implementa
-P2P, chaves privadas de validador, prova de finalidade nem uma rede com vários
-nós. Portanto não constitui rede BFT funcional nem prova de finalidade. A
-próxima etapa executa cenários ponta a ponta com uma versão CometBFT fixada.
+O código é validado em CI contra um binário CometBFT v0.38.17 fixado por
+hash: o cenário local cobre handshake, bloco vazio/`Commit`, `AppHash` e
+reinício contra o mesmo journal. Ele ainda não implementa P2P, chaves privadas
+de validador, prova de finalidade para clientes nem uma rede com vários nós.
+Portanto não constitui rede BFT funcional nem prova de finalidade. O próximo
+passo é cenário adversarial multi-validador, não apenas repetir o handshake.
 
 ## Micro-entrega concluída: âncora Comet e validadores no histórico
 
@@ -211,6 +217,7 @@ O núcleo ABCI agora recebe uma estrutura de `InitChain` com `chain_id`, altura,
 compromisso dos parâmetros e lista mapeada de validadores; qualquer divergência
 é rejeitada antes do primeiro bloco. O transporte TCP v0.38 constrói essa
 estrutura após decodificar o protobuf e calcula o SHA-256 dos bytes de
-`ConsensusParams` recebidos. Ainda faltam a ligação com um binário CometBFT
-v0.38 e um teste ponta a ponta. Esses itens continuam obrigatórios antes de
-declarar uma rede BFT operacional.
+`ConsensusParams` recebidos. A ligação com CometBFT v0.38.17 e o cenário ponta
+a ponta local já são executados em CI. Eles continuam insuficientes para
+declarar uma rede BFT operacional sem os cenários multi-validador, de partição
+e de operação de chaves descritos acima.

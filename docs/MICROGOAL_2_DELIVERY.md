@@ -1,5 +1,10 @@
 # Micro-goal 2 — Estado verificável e recuperação
 
+> Historical delivery record. Later milestones added canonical `NXCP`
+> artifacts, cooperative writer exclusion and the authoritative `NXCB` block
+> journal; the limits below describe this micro-goal at the time it was
+> completed.
+
 ## O que foi entregue
 
 - `noxis-merkle`: árvore binária de profundidade fixa para commitments, com raiz, prova de inclusão e verificação.

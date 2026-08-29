@@ -36,12 +36,14 @@ Dependencies point inward. Domain types never depend on storage, transport, cryp
 1. The engine identity, parameter commitment and exact Comet v0.38 validator
    mapping are bound to genesis, the `NXMF` v7 manifest, every `NXCB` v2
    decision and `AppHash`. The core requires `InitChain` to present the same
-   parameters and validators. The TCP ABCI v0.38 server exists; next, run
-   end-to-end scenarios against a checksum-pinned CometBFT v0.38 binary,
-   complete coordinated recovery, and establish engine finality separately
-   from the generic Noxis certificate.
-2. Implement a block-tip checkpoint containing height, `BlockId`, `AppHash`,
-   and a future finality proof.
+   parameters and validators. The TCP ABCI v0.38 server and one
+   checksum-pinned CometBFT v0.38.17 CI scenario now cover handshake, empty
+   block/`Commit` and restart. Next, expand this evidence to coordinated
+   recovery and adversarial multi-validator scenarios, then establish engine
+   finality separately from the generic Noxis certificate.
+2. Implement a consensus block-tip checkpoint containing height, `BlockId`,
+   `AppHash`, and a future finality proof. This is distinct from the existing
+   local `NXCP` snapshot artifact.
 3. Replace the abstract proof boundary with an audited, independently reviewed
    backend and canonical state-root construction.
 4. Add property and fuzz tests plus operating-system write-fault injection to
