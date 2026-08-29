@@ -48,6 +48,10 @@ const P24_HASH16_NODE_TRACE_ROWS: usize = 128;
 const P24_HASH16_NODE_TRACE_WIDTH: usize = P24_WIDTH + P24_HASH16_NODE_STEPS;
 const P24_HASH16_NODE_PUBLIC_VALUES: usize = 48;
 const P24_HASH16_DIGEST_ELEMENTS: usize = 16;
+const P24_MERKLE_STEP_PRIVATE_WITNESS_ELEMENTS: usize = (P24_HASH16_DIGEST_ELEMENTS * 2) + 1;
+const P24_MERKLE_STEP_TRACE_WIDTH: usize =
+    P24_HASH16_NODE_TRACE_WIDTH + P24_MERKLE_STEP_PRIVATE_WITNESS_ELEMENTS;
+const P24_MERKLE_STEP_PUBLIC_VALUES: usize = P24_HASH16_DIGEST_ELEMENTS;
 
 type Val = BabyBear;
 type Challenge = BinomialExtensionField<Val, 4>;
@@ -110,6 +114,15 @@ pub struct Poseidon2P24NodeExperimentResult {
     pub trace_rows: usize,
 }
 
+/// Public result of one candidate Merkle-path step. The current digest, its
+/// sibling and the left/right direction remain private witness values; only
+/// their ordered `Node` parent is public.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Poseidon2P24MerkleStepExperimentResult {
+    pub parent: BabyBearDigestV2,
+    pub trace_rows: usize,
+}
+
 /// The fixed AIR used only to establish the P3 integration boundary.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PrivateAccumulatorAir;
@@ -133,27 +146,28 @@ pub struct Poseidon2P24Air {
 enum Poseidon2P24Hash16Shape {
     Leaf,
     Node,
+    MerkleStep,
 }
 
 impl Poseidon2P24Hash16Shape {
     const fn domain(self) -> Poseidon2P24TreeDomainV1 {
         match self {
             Self::Leaf => Poseidon2P24TreeDomainV1::Leaf,
-            Self::Node => Poseidon2P24TreeDomainV1::Node,
+            Self::Node | Self::MerkleStep => Poseidon2P24TreeDomainV1::Node,
         }
     }
 
     const fn input_elements(self) -> usize {
         match self {
             Self::Leaf => P24_HASH16_DIGEST_ELEMENTS,
-            Self::Node => P24_HASH16_DIGEST_ELEMENTS * 2,
+            Self::Node | Self::MerkleStep => P24_HASH16_DIGEST_ELEMENTS * 2,
         }
     }
 
     const fn permutations(self) -> usize {
         match self {
             Self::Leaf => P24_HASH16_LEAF_PERMUTATIONS,
-            Self::Node => P24_HASH16_NODE_PERMUTATIONS,
+            Self::Node | Self::MerkleStep => P24_HASH16_NODE_PERMUTATIONS,
         }
     }
 
@@ -164,7 +178,7 @@ impl Poseidon2P24Hash16Shape {
     const fn trace_rows(self) -> usize {
         match self {
             Self::Leaf => P24_HASH16_LEAF_TRACE_ROWS,
-            Self::Node => P24_HASH16_NODE_TRACE_ROWS,
+            Self::Node | Self::MerkleStep => P24_HASH16_NODE_TRACE_ROWS,
         }
     }
 
@@ -172,6 +186,7 @@ impl Poseidon2P24Hash16Shape {
         match self {
             Self::Leaf => P24_HASH16_LEAF_TRACE_WIDTH,
             Self::Node => P24_HASH16_NODE_TRACE_WIDTH,
+            Self::MerkleStep => P24_MERKLE_STEP_TRACE_WIDTH,
         }
     }
 
@@ -179,6 +194,21 @@ impl Poseidon2P24Hash16Shape {
         match self {
             Self::Leaf => P24_HASH16_LEAF_PUBLIC_VALUES,
             Self::Node => P24_HASH16_NODE_PUBLIC_VALUES,
+            Self::MerkleStep => P24_MERKLE_STEP_PUBLIC_VALUES,
+        }
+    }
+
+    const fn output_offset(self) -> usize {
+        match self {
+            Self::Leaf | Self::Node => self.input_elements(),
+            Self::MerkleStep => 0,
+        }
+    }
+
+    const fn private_witness_offset(self) -> Option<usize> {
+        match self {
+            Self::MerkleStep => Some(P24_HASH16_NODE_TRACE_WIDTH),
+            Self::Leaf | Self::Node => None,
         }
     }
 }
@@ -188,8 +218,9 @@ impl Poseidon2P24Hash16Shape {
 /// It composes constrained P24 permutations with a frozen domain IV, its fixed
 /// absorption phases and the prescribed squeeze. The supported `Leaf` and
 /// ordered `Node` shapes share the same logic but have distinct arities and
-/// public-value layouts. This is not yet a Merkle path or private-transfer
-/// proof.
+/// public-value layouts. `MerkleStep` adds a private current digest, sibling
+/// and boolean direction, but it is only one step and not yet a membership or
+/// private-transfer proof.
 #[derive(Clone, Debug)]
 pub struct Poseidon2P24Hash16Air {
     permutation: Poseidon2P24Air,
@@ -344,14 +375,27 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16Air {
         let next = main.next_slice();
         let local_state = &local[..P24_WIDTH];
         let next_state = &next[..P24_WIDTH];
-        let selectors = &local[P24_SELECTOR_OFFSET..self.shape.trace_width()];
-        let next_selectors = &next[P24_SELECTOR_OFFSET..self.shape.trace_width()];
+        let selector_end = P24_SELECTOR_OFFSET + self.shape.steps();
+        let selectors = &local[P24_SELECTOR_OFFSET..selector_end];
+        let next_selectors = &next[P24_SELECTOR_OFFSET..selector_end];
 
-        let initial_state = self.initial_state_expression::<AB>(&public_values);
+        let initial_state = self.initial_state_expression::<AB>(local, &public_values);
         for lane in 0..P24_WIDTH {
             builder
                 .when_first_row()
                 .assert_eq(local_state[lane], initial_state[lane].clone());
+        }
+
+        if let Some(witness_offset) = self.shape.private_witness_offset() {
+            let witness = &local[witness_offset..];
+            let next_witness = &next[witness_offset..];
+            let direction: AB::Expr = witness[P24_MERKLE_STEP_PRIVATE_WITNESS_ELEMENTS - 1].into();
+            builder.assert_zero(direction.clone() * (direction - AB::Expr::ONE));
+            for lane in 0..P24_MERKLE_STEP_PRIVATE_WITNESS_ELEMENTS {
+                builder
+                    .when_transition()
+                    .assert_eq(next_witness[lane], witness[lane]);
+            }
         }
 
         for selector in 0..self.shape.steps() {
@@ -377,11 +421,12 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16Air {
                 self.phase_completion_expression::<AB>(
                     &round_states[P24_ROUNDS - 1],
                     phase,
+                    local,
                     &public_values,
                 )
             })
             .collect();
-        let output_offset = self.shape.input_elements();
+        let output_offset = self.shape.output_offset();
         let final_absorption_phase = (self.shape.input_elements() - 1) / 15;
         for lane in 0..15 {
             let output: AB::Expr = public_values[output_offset + lane].into();
@@ -436,12 +481,13 @@ impl Poseidon2P24Air {
 impl Poseidon2P24Hash16Air {
     fn initial_state_expression<AB: AirBuilder>(
         &self,
+        local: &[AB::Var],
         public_values: &[AB::PublicVar],
     ) -> Vec<AB::Expr> {
         let raw = (0..P24_WIDTH)
             .map(|lane| {
                 if lane < 15 && lane < self.shape.input_elements() {
-                    public_values[lane].into()
+                    self.input_expression::<AB>(lane, local, public_values)
                 } else {
                     AB::Expr::from_u32(self.iv[lane - 15])
                 }
@@ -454,21 +500,54 @@ impl Poseidon2P24Hash16Air {
         &self,
         final_round_state: &[AB::Expr],
         phase: usize,
+        local: &[AB::Var],
         public_values: &[AB::PublicVar],
     ) -> Vec<AB::Expr> {
         let mut absorbed = final_round_state.to_vec();
         match phase {
             phase if phase + 1 < self.shape.permutations() => {
                 let input_start = (phase + 1) * 15;
-                for lane in 0..15 {
+                for (lane, absorbed_lane) in absorbed.iter_mut().enumerate().take(15) {
                     if input_start + lane < self.shape.input_elements() {
-                        let input: AB::Expr = public_values[input_start + lane].into();
-                        absorbed[lane] = absorbed[lane].clone() + input;
+                        let input =
+                            self.input_expression::<AB>(input_start + lane, local, public_values);
+                        *absorbed_lane = absorbed_lane.clone() + input;
                     }
                 }
                 matrix_expression::<AB>(&self.permutation.external_matrix, &absorbed)
             }
             _ => absorbed,
+        }
+    }
+
+    fn input_expression<AB: AirBuilder>(
+        &self,
+        input_index: usize,
+        local: &[AB::Var],
+        public_values: &[AB::PublicVar],
+    ) -> AB::Expr {
+        match self.shape {
+            Poseidon2P24Hash16Shape::Leaf | Poseidon2P24Hash16Shape::Node => {
+                public_values[input_index].into()
+            }
+            Poseidon2P24Hash16Shape::MerkleStep => {
+                let witness_offset = self
+                    .shape
+                    .private_witness_offset()
+                    .expect("MerkleStep always has private witness columns");
+                let lane = input_index % P24_HASH16_DIGEST_ELEMENTS;
+                let current: AB::Expr = local[witness_offset + lane].into();
+                let sibling: AB::Expr =
+                    local[witness_offset + P24_HASH16_DIGEST_ELEMENTS + lane].into();
+                let direction: AB::Expr =
+                    local[witness_offset + (P24_HASH16_DIGEST_ELEMENTS * 2)].into();
+
+                if input_index < P24_HASH16_DIGEST_ELEMENTS {
+                    current.clone() + direction.clone() * (sibling.clone() - current)
+                } else {
+                    sibling.clone() + direction * (current - sibling)
+                }
+            }
         }
     }
 }
@@ -568,6 +647,39 @@ pub fn prove_and_verify_p24_node(
     })
 }
 
+/// Produces and verifies a hiding-FRI STARK for one candidate Merkle-path
+/// step. `current_is_right` is a private Boolean witness: it selects either
+/// `Node(current, sibling)` or `Node(sibling, current)`, while the verifier
+/// learns only the resulting public parent digest.
+///
+/// This proves a single ordered hash relation, not membership in a committed
+/// tree. A later path AIR must bind consecutive steps to a public root.
+pub fn prove_and_verify_p24_merkle_step(
+    current: BabyBearDigestV2,
+    sibling: BabyBearDigestV2,
+    current_is_right: bool,
+) -> Result<Poseidon2P24MerkleStepExperimentResult, StarkExperimentError> {
+    let reference = Poseidon2P24Reference::load_candidate()?;
+    let (left, right) = if current_is_right {
+        (sibling, current)
+    } else {
+        (current, sibling)
+    };
+    let parent = reference.node(left, right)?;
+    let air =
+        Poseidon2P24Hash16Air::from_reference(&reference, Poseidon2P24Hash16Shape::MerkleStep)?;
+    let trace = build_p24_merkle_step_trace(&air, current, sibling, current_is_right);
+    let public_values = parent.map(Val::from_u32);
+    let config = make_hiding_config();
+    let proof = prove(&config, &air, trace, &public_values);
+    verify(&config, &air, &proof, &public_values)
+        .map_err(|_| StarkExperimentError::VerificationFailed)?;
+    Ok(Poseidon2P24MerkleStepExperimentResult {
+        parent,
+        trace_rows: P24_HASH16_NODE_TRACE_ROWS,
+    })
+}
+
 fn prove_and_verify_p24_hash16(
     shape: Poseidon2P24Hash16Shape,
     input: &[u32],
@@ -603,6 +715,17 @@ pub fn run_p24_node_research_smoke()
     prove_and_verify_p24_node(
         core::array::from_fn(|index| index as u32 + 1),
         core::array::from_fn(|index| index as u32 + 17),
+    )
+}
+
+/// A command-friendly one-step candidate Merkle proof with a private right
+/// direction bit.
+pub fn run_p24_merkle_step_research_smoke()
+-> Result<Poseidon2P24MerkleStepExperimentResult, StarkExperimentError> {
+    prove_and_verify_p24_merkle_step(
+        core::array::from_fn(|index| index as u32 + 1),
+        core::array::from_fn(|index| index as u32 + 17),
+        true,
     )
 }
 
@@ -712,6 +835,45 @@ fn build_p24_hash16_trace(air: &Poseidon2P24Hash16Air, input: &[u32]) -> RowMajo
         }
     }
     RowMajorMatrix::new(values, air.shape.trace_width())
+}
+
+fn build_p24_merkle_step_trace(
+    air: &Poseidon2P24Hash16Air,
+    current: BabyBearDigestV2,
+    sibling: BabyBearDigestV2,
+    current_is_right: bool,
+) -> RowMajorMatrix<Val> {
+    debug_assert_eq!(air.shape, Poseidon2P24Hash16Shape::MerkleStep);
+
+    let (left, right) = if current_is_right {
+        (sibling, current)
+    } else {
+        (current, sibling)
+    };
+    let mut input = [0_u32; P24_HASH16_DIGEST_ELEMENTS * 2];
+    input[..P24_HASH16_DIGEST_ELEMENTS].copy_from_slice(&left);
+    input[P24_HASH16_DIGEST_ELEMENTS..].copy_from_slice(&right);
+
+    let mut trace = build_p24_hash16_trace(air, &input);
+    let witness_offset = air
+        .shape
+        .private_witness_offset()
+        .expect("MerkleStep always has private witness columns");
+    for row in 0..air.shape.trace_rows() {
+        let witness = &mut trace.values[row * air.shape.trace_width() + witness_offset
+            ..(row * air.shape.trace_width())
+                + witness_offset
+                + P24_MERKLE_STEP_PRIVATE_WITNESS_ELEMENTS];
+        witness[..P24_HASH16_DIGEST_ELEMENTS].copy_from_slice(&current.map(Val::from_u32));
+        witness[P24_HASH16_DIGEST_ELEMENTS..P24_HASH16_DIGEST_ELEMENTS * 2]
+            .copy_from_slice(&sibling.map(Val::from_u32));
+        witness[P24_MERKLE_STEP_PRIVATE_WITNESS_ELEMENTS - 1] = if current_is_right {
+            Val::ONE
+        } else {
+            Val::ZERO
+        };
+    }
+    trace
 }
 
 fn round_values(
@@ -980,6 +1142,97 @@ mod tests {
         let proof = prove(&config, &air, trace, &public_values);
         assert!(verify(&config, &air, &proof, &changed_parent).is_err());
         assert!(verify(&config, &air, &proof, &reversed_children).is_err());
+    }
+
+    #[test]
+    fn private_merkle_step_stark_matches_both_candidate_child_orders() {
+        let current = core::array::from_fn(|index| index as u32 + 1);
+        let sibling = core::array::from_fn(|index| index as u32 + 17);
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+
+        let current_left = prove_and_verify_p24_merkle_step(current, sibling, false).unwrap();
+        let current_right = prove_and_verify_p24_merkle_step(current, sibling, true).unwrap();
+
+        assert_eq!(
+            current_left.parent,
+            reference.node(current, sibling).unwrap()
+        );
+        assert_eq!(
+            current_right.parent,
+            reference.node(sibling, current).unwrap()
+        );
+        assert_ne!(current_left.parent, current_right.parent);
+        assert_eq!(current_left.trace_rows, P24_HASH16_NODE_TRACE_ROWS);
+    }
+
+    #[test]
+    fn private_merkle_step_air_rejects_a_changed_parent_or_invalid_direction() {
+        let current = core::array::from_fn(|index| index as u32 + 1);
+        let sibling = core::array::from_fn(|index| index as u32 + 17);
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let parent = reference.node(current, sibling).unwrap();
+        let air =
+            Poseidon2P24Hash16Air::from_reference(&reference, Poseidon2P24Hash16Shape::MerkleStep)
+                .unwrap();
+        let trace = build_p24_merkle_step_trace(&air, current, sibling, false);
+        let public_values = parent.map(Val::from_u32);
+        p3_air::check_constraints(&air, &trace, &public_values);
+
+        let mut changed_parent = public_values;
+        changed_parent[0] += Val::ONE;
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                p3_air::check_constraints(&air, &trace, &changed_parent);
+            }))
+            .is_err()
+        );
+
+        let mut non_boolean_direction = trace.clone();
+        let direction_offset =
+            P24_HASH16_NODE_TRACE_WIDTH + P24_MERKLE_STEP_PRIVATE_WITNESS_ELEMENTS - 1;
+        for row in 0..P24_HASH16_NODE_TRACE_ROWS {
+            non_boolean_direction.values[row * P24_MERKLE_STEP_TRACE_WIDTH + direction_offset] =
+                Val::from_u32(2);
+        }
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                p3_air::check_constraints(&air, &non_boolean_direction, &public_values);
+            }))
+            .is_err()
+        );
+
+        let mut reversed_direction = trace.clone();
+        for row in 0..P24_HASH16_NODE_TRACE_ROWS {
+            reversed_direction.values[row * P24_MERKLE_STEP_TRACE_WIDTH + direction_offset] =
+                Val::ONE;
+        }
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                p3_air::check_constraints(&air, &reversed_direction, &public_values);
+            }))
+            .is_err()
+        );
+
+        let mut changed_sibling = trace.clone();
+        let sibling_offset = P24_HASH16_NODE_TRACE_WIDTH + P24_HASH16_DIGEST_ELEMENTS;
+        for row in 0..P24_HASH16_NODE_TRACE_ROWS {
+            changed_sibling.values[row * P24_MERKLE_STEP_TRACE_WIDTH + sibling_offset] += Val::ONE;
+        }
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                p3_air::check_constraints(&air, &changed_sibling, &public_values);
+            }))
+            .is_err()
+        );
+
+        let mut changed_direction = trace;
+        changed_direction.values[P24_MERKLE_STEP_TRACE_WIDTH + direction_offset] = Val::ONE;
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                p3_air::check_constraints(&air, &changed_direction, &public_values);
+            }))
+            .is_err()
+        );
     }
 
     #[test]

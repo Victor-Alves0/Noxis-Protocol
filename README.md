@@ -49,9 +49,9 @@ review and testing expectations.
 - Versioned cryptographic-suite metadata to prevent permanent coupling to one primitive.
 - A research-only Plonky3 STARK experiment that proves the frozen
   Poseidon2-P24 candidate permutation, `Hash16(Leaf, commitment)` and ordered
-  `Hash16(Node, left || right)` constructions against external vectors. It is
-  not a note-membership, nullifier, value-conservation or private-transfer
-  proof.
+  `Hash16(Node, left || right)` constructions against external vectors, plus
+  one private ordered Merkle step. It is not a note-membership, nullifier,
+  value-conservation or private-transfer proof.
 - Canonical consensus data: weighted validator sets, block headers, record commitments and finality-certificate verification boundaries. This is not yet a running validator network or a finality claim.
 - Genesis and the protected local manifest commit to the validator set, public verification keys, declared fault budget and consensus limits. A node cannot reopen the same data directory with a different consensus configuration.
 - Tests for unauthorized issuance, duplicate nullifiers, duplicate commitments, and unknown assets.

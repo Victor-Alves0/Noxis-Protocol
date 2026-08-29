@@ -79,10 +79,12 @@ Ele fecha a cobertura de construção da árvore, sem alegar seleção de parâm
 nem ativação. Ver [`TREE_VECTOR_CORPUS_P24_V2.md`](TREE_VECTOR_CORPUS_P24_V2.md).
 
 **Smoke STARK P24:** o experimento Plonky3 agora prova e verifica a permutação
-P24, `Hash16(Leaf, commitment)` e o `Hash16(Node, left || right)` ordenado.
-Os dois vetores externos de nó, com filhos invertidos, são verificados para
-manter explícita a orientação. Ainda não há prova de caminho, de membership ou
-de transferência privada.
+P24, `Hash16(Leaf, commitment)`, o `Hash16(Node, left || right)` ordenado e
+um passo Merkle. Neste último, `current`, `sibling` e o bit esquerda/direita
+ficam privados no traço; somente o pai é público. Os dois vetores externos de
+nó, com filhos invertidos, são verificados para manter explícita a orientação.
+O passo sozinho só prova uma relação de hash: ainda não há prova de caminho,
+membership ou transferência privada.
 
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem
