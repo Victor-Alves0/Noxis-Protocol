@@ -18,6 +18,28 @@ specification and codec define field-level layout. A change to either must
 update both in one review; disagreement fails closed and never authorizes
 compatibility by guesswork.
 
+## Normative format descriptor
+
+Each row below is a complete format descriptor. The table deliberately keeps
+the following audit questions separate, even when a short row groups them in
+one cell to remain readable:
+
+| Audit field | Where it is stated in each registry row | Meaning |
+| --- | --- | --- |
+| **Magic** | `Key` | The exact four ASCII bytes, or the named external encoding when no Noxis magic exists. |
+| **Version** | `Key` | The exact accepted layout version. It is part of the format identity, never an advisory field. |
+| **Maximum size** | `Maximum accepted size / count` or `Maximum / exact size` | The allocation and nesting limit enforced before variable-size decoding. “Exact” means no other length is accepted. |
+| **Endianness** | `Canonical bytes and domain boundary` or `Canonicality and parser / upgrade rule` | The order of structural integers. Any BabyBear `u32le` exception is named explicitly. |
+| **Domain** | The same canonical-bytes column | The hash, checksum, candidate-ID or integrity boundary. `None` means that the artifact has no cryptographic domain claim. |
+| **Canonical encoding** | The same canonical-bytes column | Required tags, order, length framing, reserved values, nested exact encodings and EOF behavior. |
+| **Parser behavior** | `Parser / upgrade rule` | The fail-closed response to malformed, oversized, trailing or unsupported bytes. Encoder-only rows say so explicitly. |
+| **Upgrade rule** | `Parser / upgrade rule` | Whether old bytes are rejected, read only for migration, or require a separately approved activation/migration. |
+
+`magic + version` is still insufficient on its own when a magic is reused.
+The artifact class in `Key` is part of the identity. For example, `NXTM v1`
+and `NXTM v2`, and the two `NXPS` anchors, have deliberately incompatible
+meanings.
+
 ## Registry-wide rules
 
 | Rule | Requirement |
@@ -39,21 +61,21 @@ privacy or finality readiness.
 
 | Key | Role and status | Maximum accepted size / count | Canonical bytes and domain boundary | Parser / upgrade rule | Owner |
 | --- | --- | --- | --- | --- | --- |
-| `wire / NOXT / v1` | Current ledger transaction. | Collections ≤ 65,536; each opaque field ≤ 16 MiB. | BE structure, exact variant/tag order and EOF. Transaction/intent IDs have separately defined domains. | Strict structural revalidation; only v1 accepted. | [`PROTOCOL_SPEC_V0_1.md`](PROTOCOL_SPEC_V0_1.md); `noxis-codec`. |
+| `wire / NOXT / v1` | Current ledger transaction. | Collections ≤ 65,536; each opaque field ≤ 16 MiB. | BE structure, exact variant/tag order and EOF. **Frame domain: none**; its separately encoded `NXTI` intent is SHA-256 `NOXIS/TX-INTENT-ID/V1\\0`. | Strict structural revalidation; only v1 accepted. | [`PROTOCOL_SPEC_V0_1.md`](PROTOCOL_SPEC_V0_1.md); `noxis-codec`. |
 | `internal / NXTI / v1` | `TransactionIntentId` preimage; not standalone wire or storage. | Bounded by committed transaction fields. | BE deterministic construction; `NOXIS/TX-INTENT-ID/V1\\0`. | No public decoder. External use requires one and a security review. | `noxis-codec`. |
 | `record / NXRC / v1` | State-transition record embedded in legacy and Comet storage. | Transaction ≤ 32 MiB. | BE; exact sequence, state links, transaction and record hash; `NOXIS/RECORD-CHAIN/V1/RECORD\\0`. | Re-decodes transaction, rejects trailing/unknown data; only v1. | [`STATE_CHAIN_SPEC_V0_1.md`](STATE_CHAIN_SPEC_V0_1.md); `noxis-record-chain`. |
 | `legacy storage / NXRF / v1` | Local frame for one `NXRC`; never Comet `Commit` authority. | Payload ≤ 32 MiB + 146 bytes. | BE frame/length and exact nested `NXRC`; CRC-32 only. | Bad complete frame fails closed; documented recovery applies only to a structural incomplete final tail. | [`DURABILITY_SPEC_V0_1.md`](DURABILITY_SPEC_V0_1.md); `noxis-storage/record_log`. |
 | `legacy storage / NXLG / v1` | Superseded transaction-only frame. | Payload ≤ 32 MiB. | BE frame/length; CRC-32 only. | Read/detection/migration only; `NXRF` recovery rejects it as a state record. | [`DURABILITY_SPEC_V0_1.md`](DURABILITY_SPEC_V0_1.md); `noxis-storage`. |
-| `consensus component / NXCG / v3` | Canonical BFT configuration; not a running finality certificate. | ≤ 10,000 validators; key ≤ 8 KiB; block transaction budget ≤ 64 MiB. | BE, ordered unique validators and EOF; consensus hash domains. | Reject old/unknown versions, invalid tags/order and oversize fields. | [`CONSENSUS_DATA_SPEC_V0_1.md`](CONSENSUS_DATA_SPEC_V0_1.md); `noxis-consensus`. |
-| `consensus component / NXBH / v3` | Canonical Noxis block header inside `NXBP`. | ≤ 1,000,000 records, under configured 64 MiB aggregate transaction budget. | BE fixed canonical header; `BlockId`/`AppHash` owner domains. | Exact decode and EOF; only v3. | [`CONSENSUS_DATA_SPEC_V0_1.md`](CONSENSUS_DATA_SPEC_V0_1.md); `noxis-consensus`. |
-| `consensus component / NXFC / v3` | Generic finality-certificate interface, not a Comet vote proof or client-finality API. | ≤ 10,000 votes; signature ≤ 16 KiB. | BE, canonical vote order and EOF; `NOXIS/CONSENSUS/V1/PRECOMMIT`. | Exact decode plus quorum/weight checks; only v3. | [`CONSENSUS_DATA_SPEC_V0_1.md`](CONSENSUS_DATA_SPEC_V0_1.md); `noxis-consensus`. |
+| `consensus component / NXCG / v3` | Canonical BFT configuration; not a running finality certificate. | ≤ 10,000 validators; key ≤ 8 KiB; block transaction budget ≤ 64 MiB. | BE, ordered unique validators and EOF. SHA-256 identifiers: `NOXIS/CONSENSUS/V1/CONFIG` and `NOXIS/CONSENSUS/V1/VALIDATOR-SET`. | Reject old/unknown versions, invalid tags/order and oversize fields. | [`CONSENSUS_DATA_SPEC_V0_1.md`](CONSENSUS_DATA_SPEC_V0_1.md); `noxis-consensus`. |
+| `consensus component / NXBH / v3` | Canonical Noxis block header inside `NXBP`. | ≤ 1,000,000 records, under configured 64 MiB aggregate transaction budget. | BE fixed canonical header. SHA-256 `BlockId`: `NOXIS/CONSENSUS/V1/BLOCK`; record commitment: `NOXIS/CONSENSUS/V1/RECORDS`. | Exact decode and EOF; only v3. | [`CONSENSUS_DATA_SPEC_V0_1.md`](CONSENSUS_DATA_SPEC_V0_1.md); `noxis-consensus`. |
+| `consensus component / NXFC / v3` | Generic finality-certificate interface, not a Comet vote proof or client-finality API. | ≤ 10,000 votes; signature ≤ 16 KiB. | BE, canonical vote order and EOF. Vote preimage: `NOXIS/CONSENSUS/V1/PRECOMMIT`; certificate ID: `NOXIS/CONSENSUS/V1/FINALITY-CERTIFICATE`. | Exact decode plus quorum/weight checks; only v3. | [`CONSENSUS_DATA_SPEC_V0_1.md`](CONSENSUS_DATA_SPEC_V0_1.md); `noxis-consensus`. |
 | `consensus storage / NXCB / v2` | Authoritative outer frame for one committed Comet-mode block. | 64 MiB aggregate transaction budget plus bounded header/record envelopes. | BE outer frame containing exact `NXBP v2`; CRC-32 only. | Reject bad magic/version/length/CRC. A validated incomplete final tail is the sole removable case. | [`DURABILITY_SPEC_V0_1.md`](DURABILITY_SPEC_V0_1.md); `noxis-storage/block_journal`. |
 | `consensus storage / NXBP / v2` | Payload in `NXCB`: `NXBH`, Comet decision context, `AppHash`, ordered `NXRC`. | Enclosing `NXCB` bound; header ≤ 4 KiB. | BE structure and exact nested codecs. | Revalidates state links, record commitment, zero-record semantics and EOF; only v2. | [`DURABILITY_SPEC_V0_1.md`](DURABILITY_SPEC_V0_1.md); `noxis-storage/block_journal`. |
-| `node storage / NXMF / v7` | Immutable data-directory manifest and selected storage mode. It is authoritative configuration only; `NXCB` alone reconstructs committed Comet state. | `MAX_MANIFEST_BYTES`; consensus bytes ≤ 1 MiB; assets ≤ 4,096. | BE, canonical tagged mode/identities and EOF; binds genesis/context/consensus bytes. | Reject unsupported layout/mode/context. No automatic prior-version migration. | [`DATA_DIRECTORY_SPEC_V0_1.md`](DATA_DIRECTORY_SPEC_V0_1.md); `noxis-runtime`. |
+| `node storage / NXMF / v7` | Immutable data-directory manifest and selected storage mode. It is authoritative configuration only; `NXCB` alone reconstructs committed Comet state. | `MAX_MANIFEST_BYTES`; consensus bytes ≤ 1 MiB; assets ≤ 4,096. | BE, canonical tagged mode/identities and EOF. **Frame domain: none**; its embedded `GenesisId` is SHA-256 `NOXIS/GENESIS-ID/V1\\0` over the canonical genesis configuration. | Reject unsupported layout/mode/context. No automatic prior-version migration. | [`DATA_DIRECTORY_SPEC_V0_1.md`](DATA_DIRECTORY_SPEC_V0_1.md); `noxis-runtime`. |
 | `legacy checkpoint / NXCP / v1` | Snapshot artifact for strict legacy `NXRF` replay; never `NXCB` authority or accelerator. | Snapshot ≤ 128 MiB; assets ≤ 4,096; identifier collections ≤ 1,048,576. | BE ordered snapshot and EOF; `NOXIS/CHECKPOINT/V1/SNAPSHOT\\0`, `NOXIS/CHECKPOINT/V1\\0`. | Reject bad magic/version/hash/order/trailing bytes; compare only in complete legacy replay. | [`CHECKPOINT_SPEC_V0_1.md`](CHECKPOINT_SPEC_V0_1.md); `noxis-checkpoint`. |
-| `local experimental wire / NXPT / v1` | Private-transfer research packet, not a `NOXT` transaction. | Intent = 640 bytes; two envelopes = 1..4 KiB each; proof = 1..2 MiB. | BE framing/lengths and EOF; no selected proof/KEM/AEAD binding. | Strict bounded parser; promotion requires candidate activation. | [`PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md`](PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md); `noxis-codec`. |
-| `wallet experimental wire / NXPA / v1` | Diversified hybrid payment address; not ledger/network accepted. | Fixed v1 profile/ML-KEM-768 public-key length. | BE structure and EOF; recomputes address ID and validates ML-KEM key. | Strict v1 parser; activation separately gated. | `noxis-wallet-crypto/wire`. |
-| `wallet experimental wire / NXRE / v1` | Hybrid recipient envelope; not a private-payment protocol. | Ciphertext payload 16..2,048 bytes. | BE structure and EOF; inner AEAD is checked only during decryption. | Strict v1 parser; `NXPT` owns outer arity/resource limits. | `noxis-wallet-crypto/wire`. |
+| `local experimental wire / NXPT / v1` | Private-transfer research packet, not a `NOXT` transaction. | Intent = 640 bytes; two envelopes = 1..4 KiB each; proof = 1..2 MiB. | BE framing/lengths and EOF. **Frame domain: none**; no selected proof/KEM/AEAD binding. | Strict bounded parser; promotion requires candidate activation. | [`PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md`](PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md); `noxis-codec`. |
+| `wallet experimental wire / NXPA / v1` | Diversified hybrid payment address; not ledger/network accepted. | Fixed v1 profile/ML-KEM-768 public-key length. | BE structure and EOF; recomputes the SHA-256 address ID under `NOXIS/PAYMENT-ADDRESS/V1\\0` and validates ML-KEM key. | Strict v1 parser; activation separately gated. | `noxis-wallet-crypto/wire`. |
+| `wallet experimental wire / NXRE / v1` | Hybrid recipient envelope; not a private-payment protocol. | Ciphertext payload 16..2,048 bytes. | BE structure and EOF. **Frame hash domain: none**; the inner AEAD is checked only during decryption and the decoder does not claim authenticity. | Strict v1 parser; `NXPT` owns outer arity/resource limits. | `noxis-wallet-crypto/wire`. |
 | `external transport / Comet ABCI protobuf / v0.38` | Loopback TCP transport owned by CometBFT, not an `NX..` format. | Frame ≤ 80 MiB; Comet block ≤ 64 MiB. | Length-delimited Comet protobuf; no Noxis magic/domain. | Bounded framing and exact conversion; upgrades need pinned-Comet compatibility review. | [`COMETBFT_CI_V0_1.md`](COMETBFT_CI_V0_1.md); `noxis-comet-abci`. |
 
 ## Candidate and evidence formats
@@ -74,10 +96,10 @@ means every different length is rejected.
 | `candidate corpus / NXIV / v1` | External KAT evidence for `NXIC`. | Exact 11,340 bytes; 2 frozen records. | BE, BabyBear `u32le`, exact parent manifest/ID; strict parser; evidence only. | [`INTENT_VECTOR_CORPUS_CANDIDATE_V0_1.md`](INTENT_VECTOR_CORPUS_CANDIDATE_V0_1.md); `noxis-tree-params`. |
 | `candidate manifest / NXSM / v1` | Sparse-nullifier-tree manifest, not serialized mutable state. | Exact 8,347 bytes. | BE plus BabyBear `u32le`; checksum/candidate-ID domains; exact parser. | [`NULLIFIER_SPARSE_MANIFEST_CANDIDATE_V0_1.md`](NULLIFIER_SPARSE_MANIFEST_CANDIDATE_V0_1.md); `noxis-tree-params`. |
 | `candidate corpus / NXSV / v1` | External KAT evidence for `NXSM`. | ≤ 1 MiB; ≤ 128 records. | BE, BabyBear `u32le`, exact `NXSM` parent; strict parser; evidence only. | [`NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md`](NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md); `noxis-tree-params`. |
-| `candidate anchor / NXPS / v1` | First private-state anchor. | Exact 220 bytes. | BE plus BabyBear `u32le`; encoder-only local artifact, not received wire. | [`PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md`](PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md); `noxis-private-state`. |
-| `candidate anchor / NXPS / v2` | Typed private-state anchor including `NXSM`. | Exact 288 bytes. | BE plus BabyBear `u32le`; encoder-only and incompatible with v1. | [`PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md`](PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md); `noxis-private-state`. |
+| `candidate anchor / NXPS / v1` | First private-state anchor. | Exact 220 bytes. | BE plus BabyBear `u32le`; SHA-256 state ID `NOXIS/PRIVATE-STATE-ID/V1\\0` and nullifier-set commitment `NOXIS/PRIVATE-NULLIFIER-SET/V1\\0`; encoder-only local artifact, not received wire. | [`PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md`](PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md); `noxis-private-state`. |
+| `candidate anchor / NXPS / v2` | Typed private-state anchor including `NXSM`. | Exact 288 bytes. | BE plus BabyBear `u32le`; SHA-256 state ID `NOXIS/PRIVATE-STATE-ID/V2\\0`; encoder-only and incompatible with v1. | [`PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md`](PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md); `noxis-private-state`. |
 | `candidate relation / NXNT / v1` | Public two-nullifier `NXSM` transition. | Exact 408 bytes. | BE plus BabyBear `u32le`, domain-separated ID; encoder-only. Promotion needs decoder/fuzz review. | [`PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md`](PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md); `noxis-private-proof-contract`. |
-| `candidate statement / NXPU / v1` | Unified public private-transfer statement. | Exact 1,440 bytes. | BE plus nested candidate frames/BabyBear `u32le`; encoder-only, not proof or transaction. | [`PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md`](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md); `noxis-private-proof-contract`. |
+| `candidate statement / NXPU / v1` | Unified public private-transfer statement. | Exact 1,440 bytes. | BE plus nested candidate frames/BabyBear `u32le`; SHA-256 statement ID `NOXIS/PRIVATE-TRANSFER-PROOF-PUBLIC-STATEMENT-ID/V1\\0`; encoder-only, not proof or transaction. | [`PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md`](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md); `noxis-private-proof-contract`. |
 | `candidate AIR profile / NXAR / v1` | AIR constraint-profile candidate. | Exact 152 bytes. | BE fixed checksum/ID construction; exact fail-closed parser; no executable AIR follows. | [`PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md`](PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md); `noxis-private-proof-contract`. |
 | `candidate deployment / NXPD / v1` | Unselected proof-deployment prerequisite manifest. | Exact 19,598 bytes. | BE checksummed chain `NXPD → NXIC → NXPH → NXTM`; exact parser; not a verifier/proof format. | [`PRIVATE_TRANSFER_PROOF_DEPLOYMENT_CANDIDATE_V0_1.md`](PRIVATE_TRANSFER_PROOF_DEPLOYMENT_CANDIDATE_V0_1.md); `noxis-private-proof-contract`. |
 
@@ -96,6 +118,28 @@ Before adding a format, the change needs:
 4. malformed/truncation/trailing-byte tests and fuzz/property plan;
 5. domain-separation/canonical-ID review for hashed bytes; and
 6. explicit migration, rejection or legacy-read policy.
+
+## Mechanical inventory guard
+
+The registry has a deliberately small CI guard:
+
+```text
+pwsh -File scripts/audit/check-format-registry.ps1
+```
+
+It collects every literal `NX..` or `NOXT` magic declared by Rust source under
+`crates/` and requires a corresponding registry row. It also checks every
+supported **(artifact class, magic, version)** row against an explicit
+source-level version assertion, so changing (for example) `NXTM v2` to `v3`
+without updating the registry fails CI. It rejects a registry magic that has no
+implementation declaration and a registry identity without a supported-source
+assertion.
+
+The assertions are intentionally explicit rather than a naming heuristic:
+format-version constants use several legitimate Rust names. This cannot prove
+that a row's semantic limits are correct; owner-codec tests and review remain
+the authority for that. It does prevent a new binary identity or an unreviewed
+version change from silently losing its audit-home.
 
 Read [`DURABILITY_SPEC_V0_1.md`](DURABILITY_SPEC_V0_1.md) next for durable
 authority. For candidates, use the [private-transfer research trail](README.md#private-transfer-research-trail): their registry presence is an audit index, not activation.

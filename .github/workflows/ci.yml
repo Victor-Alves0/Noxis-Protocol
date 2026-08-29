@@ -26,6 +26,9 @@ jobs:
       - name: Check formatting
         run: cargo +1.93.0 fmt --all -- --check
 
+      - name: Check binary-format registry coverage
+        run: pwsh -File scripts/audit/check-format-registry.ps1
+
       - name: Check compilation
         run: cargo +1.93.0 check --workspace --all-targets --locked
 
