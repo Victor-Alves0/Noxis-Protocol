@@ -83,8 +83,11 @@ P24, `Hash16(Leaf, commitment)`, o `Hash16(Node, left || right)` ordenado e
 um passo Merkle. Neste último, `current`, `sibling` e o bit esquerda/direita
 ficam privados no traço; somente o pai é público. Os dois vetores externos de
 nó, com filhos invertidos, são verificados para manter explícita a orientação.
-O passo sozinho só prova uma relação de hash: ainda não há prova de caminho,
-membership ou transferência privada.
+O experimento agora também encadeia dois desses passos na mesma prova: folha,
+dois irmãos, dois bits e o pai intermediário ficam privados; apenas a raiz de
+dois níveis é pública. As quatro orientações iniciais do corpus externo de
+caminhos são verificadas. Ainda não há caminho de 32 níveis, membership ou
+transferência privada.
 
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem

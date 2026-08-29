@@ -25,7 +25,8 @@ without disclosing the witness.
 - A Plonky3 STARK experiment that proves the frozen Poseidon2-P24 candidate
   permutation, `Hash16(Leaf, commitment)` and ordered
   `Hash16(Node, left || right)` against external vectors, plus one private
-  ordered Merkle step; it is not a membership or private-transfer proof.
+  ordered Merkle step and a two-level private path; it is not a membership or
+  private-transfer proof.
 
 ## What does not exist yet
 
