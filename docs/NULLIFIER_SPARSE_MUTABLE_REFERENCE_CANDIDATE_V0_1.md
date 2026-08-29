@@ -52,15 +52,17 @@ contagem observável.
 
 Os testes cobrem raiz vazia e ausência, primeira inserção comparada à
 reconstrução pela referência, ordens diferentes de inserção, inserções nos bits
-0, 8 e 510, reutilização indevida de caminho e duplicata atômica.
+0, 8 e 510, reutilização indevida de caminho e duplicata atômica. Além disso,
+o corpus externo fechado `NXSV v1` valida folhas, nós, vazios selecionados e
+raízes de zero a dois gastos contra a referência e este estado mutável; veja
+[`NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md`](NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md).
 
 ## Limites intencionais
 
 Esta é uma estrutura de pesquisa em memória, não uma implementação pronta para
-produção. Ela ainda não possui corpus externo específico de `NXSM`, serialização
-canônica de estado ou prova, limite de memória/persistência, backend STARK/AIR,
-integração com `H_STATE`, transição de notas, consenso nem autorização de
-liquidação. Em especial, a âncora privada `NXPS v1` continua usando seu
+produção. Ela ainda não possui serialização canônica de estado ou prova, limite
+de memória/persistência, backend STARK/AIR, integração com `H_STATE`, transição
+de notas, consenso nem autorização de liquidação. Em especial, a âncora privada `NXPS v1` continua usando seu
 compromisso ordenado `H_NFSET`; ela não é reinterpretada como esta raiz.
 
 O próximo passo seguro é obter evidência externa de interoperabilidade da

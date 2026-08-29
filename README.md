@@ -83,6 +83,7 @@ docs/
   POSEIDON2_P24_REFERENCE_EVALUATION_V0_1.md  Cross-validated P24 permutation and candidate-tree vectors.
   POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md  Cross-validated permutation reference vectors.
   NULLIFIER_SPARSE_MUTABLE_REFERENCE_CANDIDATE_V0_1.md  Isolated mutable NXSM candidate state and limits.
+  NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md  Independently generated NXSV v1 evidence for the NXSM candidate.
   ARCHITECTURE.md                Module boundaries and implementation roadmap.
 ```
 

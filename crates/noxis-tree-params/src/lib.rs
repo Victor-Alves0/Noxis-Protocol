@@ -14,6 +14,7 @@ mod corpus;
 mod corpus_v2;
 mod intent_corpus_v1;
 mod note_corpus_v1;
+mod nullifier_sparse_corpus_v1;
 mod p24;
 mod p24_intent_commitment;
 mod p24_note_domains;
@@ -36,6 +37,13 @@ pub use intent_corpus_v1::{
 pub use note_corpus_v1::{
     P24_NOTE_VECTOR_HEADER_LENGTH, P24_NOTE_VECTOR_LENGTH_LIMIT, P24_NOTE_VECTOR_MAGIC,
     P24_NOTE_VECTOR_VERSION, P24NoteVectorCorpusV1, P24NoteVectorError, P24NoteVectorRecordV1,
+};
+pub use nullifier_sparse_corpus_v1::{
+    NullifierSparseVectorValueV1, P24_NULLIFIER_SPARSE_VECTOR_HEADER_LENGTH,
+    P24_NULLIFIER_SPARSE_VECTOR_LENGTH_LIMIT, P24_NULLIFIER_SPARSE_VECTOR_MAGIC,
+    P24_NULLIFIER_SPARSE_VECTOR_VERSION, P24NullifierSparseVectorCorpusV1,
+    P24NullifierSparseVectorCoverageV1, P24NullifierSparseVectorError,
+    P24NullifierSparseVectorRecordV1,
 };
 pub use p24::{
     CandidatePoseidon2P24ManifestIdV2, CandidatePoseidon2P24ManifestV2,

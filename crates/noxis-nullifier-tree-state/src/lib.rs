@@ -21,6 +21,7 @@ pub use transition::NullifierTreeUpdateV1;
 mod tests {
     use noxis_nullifier_tree_reference::NullifierSparseTreeReferenceV1;
     use noxis_privacy_types::NullifierV2;
+    use noxis_tree_params::{P24NullifierSparseVectorCorpusV1, P24NullifierSparseVectorRecordV1};
 
     use super::*;
 
@@ -149,5 +150,44 @@ mod tests {
 
         assert!(tree.verify_inclusion(root, other, &proof).is_err());
         assert!(tree.verify_absence(root, spent, &proof).is_err());
+    }
+
+    #[test]
+    fn externally_generated_nxsm_corpus_matches_reference_and_mutable_state() {
+        let corpus = P24NullifierSparseVectorCorpusV1::frozen_external_kat_corpus().unwrap();
+        let reference = NullifierSparseTreeReferenceV1::load_candidate().unwrap();
+        let empty = reference.empty_values();
+
+        for record in corpus.records() {
+            match record {
+                P24NullifierSparseVectorRecordV1::Leaf { nullifier, leaf } => {
+                    assert_eq!(reference.spent_leaf(*nullifier).unwrap(), leaf.elements());
+                }
+                P24NullifierSparseVectorRecordV1::Node {
+                    left,
+                    right,
+                    parent,
+                } => {
+                    let computed = reference.node(left.elements(), right.elements()).unwrap();
+                    assert_eq!(
+                        computed,
+                        parent.elements(),
+                        "external node inputs: left={:?}, right={:?}",
+                        left.elements(),
+                        right.elements(),
+                    );
+                }
+                P24NullifierSparseVectorRecordV1::Empty { level, value } => {
+                    assert_eq!(empty[*level as usize], value.elements());
+                }
+                P24NullifierSparseVectorRecordV1::Root { nullifiers, root } => {
+                    let mut tree = NullifierSparseTreeStateV1::new_candidate().unwrap();
+                    for nullifier in nullifiers {
+                        tree.mark_spent(*nullifier).unwrap();
+                    }
+                    assert_eq!(tree.root().unwrap().elements(), root.elements());
+                }
+            }
+        }
     }
 }

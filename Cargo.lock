@@ -220,6 +220,7 @@ dependencies = [
  "noxis-nullifier-tree-reference",
  "noxis-poseidon2-reference",
  "noxis-privacy-types",
+ "noxis-tree-params",
 ]
 
 [[package]]

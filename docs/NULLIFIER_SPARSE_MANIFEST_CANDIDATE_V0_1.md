@@ -26,9 +26,12 @@ chave de rede, nem uma autorização para aceitar gastos.
 
 ## Limites atuais
 
-Uma referência executável, provas de inclusão/ausência e um estado mutável em
-memória existem agora, mas continuam isolados como candidatos de pesquisa. Ainda
-não existe corpus externo específico de `NXSM`, serialização canônica de estado,
-backend STARK nem transição privada. O `H_STATE` atual continua comprometendo o
-conjunto ordenado com SHA-256; ele só será migrado para uma raiz `NXSM` em uma
-nova versão depois que vetores independentes verificarem a árvore.
+Uma referência executável, provas de inclusão/ausência, estado mutável em
+memória e um corpus externo focado (`NXSV v1`) existem agora, mas continuam
+isolados como candidatos de pesquisa. O corpus verifica folhas, nós ordenados,
+vazios e quatro raízes de conjuntos pequenos; veja
+[`NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md`](NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md).
+Ainda não existe serialização canônica de estado, backend STARK nem transição
+privada. O `H_STATE` atual continua comprometendo o conjunto ordenado com
+SHA-256; ele só será migrado para uma raiz `NXSM` em uma nova versão depois de
+revisão independente mais ampla.

@@ -10,5 +10,8 @@ noxis-poseidon2-reference = { path = "../noxis-poseidon2-reference" }
 noxis-nullifier-tree-reference = { path = "../noxis-nullifier-tree-reference" }
 noxis-privacy-types = { path = "../noxis-privacy-types" }
 
+[dev-dependencies]
+noxis-tree-params = { path = "../noxis-tree-params" }
+
 [lints]
 workspace = true

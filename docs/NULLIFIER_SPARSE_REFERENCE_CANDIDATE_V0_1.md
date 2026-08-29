@@ -29,5 +29,7 @@ um teste de regressão.
 O estado mutável candidato, a geração de caminhos e a rejeição atômica de
 duplicata vivem separadamente em `noxis-nullifier-tree-state`; ver
 `NULLIFIER_SPARSE_MUTABLE_REFERENCE_CANDIDATE_V0_1.md`. Esta referência ainda
-não substitui `H_NFSET` no `H_STATE`, nem fornece corpus externo, persistência,
-backend STARK ou uma transição privada.
+não substitui `H_NFSET` no `H_STATE`, nem fornece persistência, backend STARK
+ou uma transição privada. O corpus externo fechado `NXSV v1` é descrito em
+[`NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md`](NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md);
+ele cobre interoperabilidade focada, não ativação.
