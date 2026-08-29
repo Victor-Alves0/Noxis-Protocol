@@ -3,9 +3,10 @@
 //! This crate contains executable Plonky3 STARK experiments with a hiding FRI
 //! PCS. Its active smoke proof constrains the exact frozen Poseidon2-P24
 //! permutation behind the Noxis candidate privacy primitives. It now also
-//! proves standalone private `H_ADDR` and `H_NOTE` preimage relations. It does
-//! **not** yet prove note membership, nullifier absence, note-to-key binding,
-//! asset conservation, a private transfer, or any production privacy property.
+//! proves standalone private `H_ADDR` and `H_NOTE` preimage relations, plus a
+//! composed key-to-note-to-nullifier-to-leaf depth-32 membership relation. It
+//! does **not** yet prove nullifier absence, state-anchor acceptance, asset
+//! conservation, a private transfer, or any production privacy property.
 
 use noxis_poseidon2_privacy_reference::Poseidon2P24PrivacyReferenceError;
 use noxis_poseidon2_reference::{
@@ -43,9 +44,10 @@ pub use note::{
     Poseidon2P24NoteExperimentResult, prove_and_verify_p24_note, run_p24_note_research_smoke,
 };
 pub use ownership::{
-    Poseidon2P24OwnershipExperimentResult, prove_and_verify_p24_note_ownership,
-    prove_and_verify_p24_note_ownership_path2, prove_and_verify_p24_note_ownership_path32,
-    run_p24_note_ownership_research_smoke,
+    Poseidon2P24OwnershipExperimentResult, Poseidon2P24OwnershipProof,
+    prove_and_verify_p24_note_ownership, prove_and_verify_p24_note_ownership_path2,
+    prove_and_verify_p24_note_ownership_path32, prove_p24_note_ownership_path32,
+    run_p24_note_ownership_research_smoke, verify_p24_note_ownership_proof,
 };
 
 const TRACE_WIDTH: usize = 2;

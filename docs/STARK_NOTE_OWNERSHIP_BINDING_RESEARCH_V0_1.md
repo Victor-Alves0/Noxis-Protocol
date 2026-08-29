@@ -15,6 +15,18 @@ zero-knowledge properties, proof parameters and the underlying candidate have
 not received independent cryptographic review. It must not protect funds or
 personal data.
 
+## Local prover/verifier boundary
+
+`prove_p24_note_ownership_path32` returns an opaque in-memory proof object and
+its public result. `verify_p24_note_ownership_proof` reconstructs the frozen
+AIR and independently verifies that object using only its public nullifier and
+root. The compatibility helper still performs both steps in one call.
+
+There is deliberately no proof encoder, decoder, wire frame or ledger adapter.
+Plonky3 serialization details, the candidate parameters and a verifier profile
+must be selected and reviewed together before a proof can cross a process or
+network boundary.
+
 ## Statement
 
 The public inputs are a 16-element BabyBear nullifier digest and a 16-element

@@ -18,7 +18,7 @@ use noxis_tree_params::{
 use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::dense::RowMajorMatrix;
-use p3_uni_stark::{prove, verify};
+use p3_uni_stark::{Proof, prove, verify};
 
 use crate::{
     P24_ROUNDS, Poseidon2P24Air, StarkExperimentError, Val, make_hiding_config, matrix_expression,
@@ -104,6 +104,25 @@ pub struct Poseidon2P24OwnershipExperimentResult {
     pub root: BabyBearDigestV2,
     /// Number of rows in the fixed private trace.
     pub trace_rows: usize,
+}
+
+/// In-memory hiding-FRI proof for the private ownership relation.
+///
+/// The Plonky3 proof remains deliberately opaque. This separates a local
+/// prover from a local verifier without inventing a network or storage format
+/// before the candidate, proof parameters and serialization profile are
+/// selected and independently reviewed.
+pub struct Poseidon2P24OwnershipProof {
+    proof: Proof<crate::Config>,
+    public_result: Poseidon2P24OwnershipExperimentResult,
+}
+
+impl Poseidon2P24OwnershipProof {
+    /// Returns the public nullifier, candidate root and fixed trace shape
+    /// bound by this proof.
+    pub const fn public_result(&self) -> &Poseidon2P24OwnershipExperimentResult {
+        &self.public_result
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -763,10 +782,10 @@ impl Poseidon2P24OwnershipAir {
 
 /// Produces and independently verifies a hiding-FRI STARK that binds one
 /// private key, canonical note preimage and private leaf position to one public
-/// nullifier and one private candidate tree leaf.
+/// nullifier and one public candidate depth-32 tree root.
 ///
-/// This is not a spend authorization: it does not yet prove Merkle membership,
-/// nullifier absence, asset/value rules, state anchoring or ledger acceptance.
+/// This is not a spend authorization: it does not yet prove nullifier absence,
+/// state-anchor acceptance, asset/value rules or ledger acceptance.
 pub fn prove_and_verify_p24_note_ownership(
     nullifier_key: [u8; KEY_BYTES],
     note_preimage: [u8; NOTE_BYTES],
@@ -780,16 +799,16 @@ pub fn prove_and_verify_p24_note_ownership(
     )
 }
 
-/// Produces and verifies one ownership proof with 32 private ordered Merkle
-/// steps. The direction at every level is derived from the corresponding bit
-/// of the same private position serialized in `H_NULLIFIER`; only the
-/// nullifier and root are public.
-pub fn prove_and_verify_p24_note_ownership_path32(
+/// Produces one ownership proof with 32 private ordered Merkle steps. The
+/// direction at every level is derived from the corresponding bit of the same
+/// private position serialized in `H_NULLIFIER`; only the nullifier and root
+/// are public. Call [`verify_p24_note_ownership_proof`] in a verifier context.
+pub fn prove_p24_note_ownership_path32(
     nullifier_key: [u8; KEY_BYTES],
     note_preimage: [u8; NOTE_BYTES],
     leaf_position: u32,
     siblings: [BabyBearDigestV2; MEMBERSHIP_DEPTH],
-) -> Result<Poseidon2P24OwnershipExperimentResult, StarkExperimentError> {
+) -> Result<Poseidon2P24OwnershipProof, StarkExperimentError> {
     let reference = Poseidon2P24Reference::load_candidate()?;
     let private_reference = Poseidon2P24PrivacyReference::load_candidate()?;
     let recipient_commitment = private_reference.hash_addr(&nullifier_key)?;
@@ -835,18 +854,55 @@ pub fn prove_and_verify_p24_note_ownership_path32(
         .spawn(move || {
             let config = make_hiding_config();
             let proof = prove(&config, &air, trace, &public_values);
-            verify(&config, &air, &proof, &public_values)
-                .map_err(|_| StarkExperimentError::VerificationFailed)
+            Ok(Poseidon2P24OwnershipProof {
+                proof,
+                public_result: Poseidon2P24OwnershipExperimentResult {
+                    nullifier,
+                    root,
+                    trace_rows: TRACE_ROWS,
+                },
+            })
         })
         .map_err(|_| StarkExperimentError::ProverThreadFailed)?;
     prover
         .join()
-        .map_err(|_| StarkExperimentError::ProverThreadFailed)??;
-    Ok(Poseidon2P24OwnershipExperimentResult {
-        nullifier,
-        root,
-        trace_rows: TRACE_ROWS,
-    })
+        .map_err(|_| StarkExperimentError::ProverThreadFailed)?
+}
+
+/// Independently verifies a locally held ownership proof against exactly the
+/// public nullifier and depth-32 root stored with it.
+///
+/// The proof type has no encoder by design: it is not a transaction artifact,
+/// wire format or selected verifier integration.
+pub fn verify_p24_note_ownership_proof(
+    ownership_proof: &Poseidon2P24OwnershipProof,
+) -> Result<Poseidon2P24OwnershipExperimentResult, StarkExperimentError> {
+    let reference = Poseidon2P24Reference::load_candidate()?;
+    let air = Poseidon2P24OwnershipAir::from_reference(&reference)?;
+    let public_values = ownership_proof
+        .public_result
+        .nullifier
+        .into_iter()
+        .chain(ownership_proof.public_result.root)
+        .map(Val::from_u32)
+        .collect::<Vec<_>>();
+    let config = make_hiding_config();
+    verify(&config, &air, &ownership_proof.proof, &public_values)
+        .map_err(|_| StarkExperimentError::VerificationFailed)?;
+    Ok(ownership_proof.public_result.clone())
+}
+
+/// Compatibility convenience entry point that produces and verifies a
+/// depth-32 ownership proof in one process.
+pub fn prove_and_verify_p24_note_ownership_path32(
+    nullifier_key: [u8; KEY_BYTES],
+    note_preimage: [u8; NOTE_BYTES],
+    leaf_position: u32,
+    siblings: [BabyBearDigestV2; MEMBERSHIP_DEPTH],
+) -> Result<Poseidon2P24OwnershipExperimentResult, StarkExperimentError> {
+    let proof =
+        prove_p24_note_ownership_path32(nullifier_key, note_preimage, leaf_position, siblings)?;
+    verify_p24_note_ownership_proof(&proof)
 }
 
 /// Compatibility entry point retained while callers migrate to the explicit
@@ -1225,7 +1281,10 @@ mod tests {
     #[test]
     fn ownership_stark_binds_one_private_key_note_position_leaf_and_path_to_the_public_root() {
         let (key, note, position) = valid_witness();
-        let result = prove_and_verify_p24_note_ownership(key, note, position).unwrap();
+        let mut proof =
+            prove_p24_note_ownership_path32(key, note, position, synthetic_merkle_siblings())
+                .unwrap();
+        let result = verify_p24_note_ownership_proof(&proof).unwrap();
         let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
         let commitment = reference.hash_note(&note).unwrap();
         let expected = reference
@@ -1248,6 +1307,12 @@ mod tests {
         }
         assert_eq!(result.root, root);
         assert_eq!(result.trace_rows, TRACE_ROWS);
+
+        proof.public_result.root[0] = proof.public_result.root[0].wrapping_add(1);
+        assert!(matches!(
+            verify_p24_note_ownership_proof(&proof),
+            Err(StarkExperimentError::VerificationFailed)
+        ));
     }
 
     #[test]

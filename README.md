@@ -158,7 +158,8 @@ It proves private candidate `H_ADDR` and `H_NOTE` preimages, plus one composed
 private ownership-and-depth-32-membership binding with a public nullifier and
 root. This is an expensive research workload, not a wallet or validator
 operation; it does not yet prove state-anchor acceptance, nullifier absence or
-a private transfer.
+a private transfer. The research API now keeps local proving and independent
+verification as separate calls, but intentionally has no proof wire format.
 
 On POSIX systems, use `./scripts/demo-local.sh`. The demo prints the initialized
 genesis and state identities, accepts a fixture-authorized mint and one research
