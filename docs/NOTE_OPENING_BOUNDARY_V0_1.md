@@ -69,12 +69,14 @@ nullifier           = H_NULLIFIER(nullifier_key, rho, note_commitment, leaf_posi
 Assim, a AIR deverá provar que o dono da chave comprometida pelo destinatário é
 o mesmo que deriva o nullifier; chaves de cifragem híbrida continuam separadas.
 
-`H_ADDR`, `H_NOTE` e `H_NULLIFIER` existem somente como referência isolada da
-candidata `NXPH` P24. Ela tem manifesto, ID e corpus próprios e não reutiliza
-silenciosamente os domínios de árvore `LEAF`, `NODE` e `EMPTY`. A referência
-local não é um backend criptográfico selecionado, não habilita carteira nem
-autoriza liquidação. Antes de uso em AIR, prover ou rede, a candidata ainda
-precisa de seleção e revisão criptográfica independente.
+`H_ADDR`, `H_NOTE` e `H_NULLIFIER` têm referência isolada da candidata `NXPH`
+P24 e uma relação STARK de pesquisa que os vincula para uma nota. Ela tem
+manifesto, ID e corpus próprios e não reutiliza silenciosamente os domínios de
+árvore `LEAF`, `NODE` e `EMPTY`. A referência e a AIR de pesquisa não são
+backend criptográfico selecionado, não habilitam carteira nem autorizam
+liquidação. Antes de uso em prover ou rede, a candidata ainda precisa de
+seleção e revisão criptográfica independente; a AIR também precisa incorporar
+inclusão Merkle, estado e as regras completas de transferência.
 
 Para esta candidata, a ponte explícita para a árvore também é fixa:
 

@@ -79,15 +79,20 @@ Ele fecha a cobertura de construção da árvore, sem alegar seleção de parâm
 nem ativação. Ver [`TREE_VECTOR_CORPUS_P24_V2.md`](TREE_VECTOR_CORPUS_P24_V2.md).
 
 **Smoke STARK P24:** o experimento Plonky3 agora prova e verifica a permutação
-P24, pré-imagens privadas de `H_ADDR` e `H_NOTE`, `Hash16(Leaf, commitment)`,
-o `Hash16(Node, left || right)` ordenado e um passo Merkle. A AIR de `H_ADDR`
+P24, pré-imagens privadas de `H_ADDR` e `H_NOTE`, uma relação única de posse
+chave→nota→nullifier, `Hash16(Leaf, commitment)`, o
+`Hash16(Node, left || right)` ordenado e um passo Merkle. A AIR de `H_ADDR`
 decompõe cada um dos 32 bytes secretos em oito bits, recompõe os 11 elementos
 `BytePack3LE`, aplica as duas permutações P24 prescritas e torna público apenas
 o commitment de destinatário. A AIR de `H_NOTE` faz o mesmo para todos os 178
 bytes do preimage e seus 60 elementos, absorvidos em quatro blocos e seguidos
 pela permutação de squeezing; torna público apenas o note commitment. Ambas
 recusam bits não booleanos e bytes ou packing incoerentes. Elas ainda não
-vinculam a chave ao campo de destinatário da nota ou ao nullifier. No passo
+vinculam a chave ao campo de destinatário da nota ou ao nullifier quando usadas
+isoladamente. A AIR de posse executa as três funções na mesma prova: o
+destinatário dentro da nota é `H_ADDR(key)`, o commitment de nota entra em
+`H_NULLIFIER` em `u32le`, e a mesma chave, `rho` da nota e posição `u32be`
+privada formam o nullifier público. Ainda faltam inclusão Merkle e estado. No passo
 Merkle, `current`, `sibling` e o bit esquerda/direita ficam privados no traço;
 somente o pai é público. Os dois vetores externos de nó, com filhos invertidos,
 são verificados para manter explícita a orientação. O experimento agora também
@@ -99,8 +104,7 @@ irmãos, direções e 31 nós intermediários ficam privados e apenas a raiz é
 pública. A prova completa exige build `--release`, pilha dedicada de 64 MiB e
 perfil FRI com `log_blowup = 4`, pois o AIR compacto tem grau 10. É uma
 demonstração de pesquisa pesada, não um fluxo de carteira ou validador. Ainda
-falta o vínculo único `H_ADDR → H_NOTE → H_NULLIFIER`, âncora de estado e
-transferência privada.
+faltam o vínculo de posse à árvore/âncora de estado e a transferência privada.
 
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem

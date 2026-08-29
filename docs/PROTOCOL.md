@@ -23,11 +23,12 @@ without disclosing the witness.
 - Genesis/state identities, durable replay and guarded local-node lifecycle.
 - A research-only local operational demo.
 - A Plonky3 STARK experiment that proves the frozen Poseidon2-P24 candidate
-  permutation, byte-exact private `H_ADDR` and `H_NOTE` preimages,
-  `Hash16(Leaf, commitment)` and ordered `Hash16(Node, left || right)` against
-  external vectors, plus one private ordered Merkle step, a two-level private
-  path and a full depth-32 private path. These components remain unjoined: it
-  is not a note-ownership or private-transfer proof.
+  permutation, byte-exact private `H_ADDR` and `H_NOTE` preimages, a composed
+  private key-to-note-to-nullifier ownership binding, `Hash16(Leaf, commitment)`
+  and ordered `Hash16(Node, left || right)` against external vectors, plus one
+  private ordered Merkle step, a two-level private path and a full depth-32
+  private path. Ownership and membership remain unjoined: it is not a
+  private-transfer proof.
 
 ## What does not exist yet
 

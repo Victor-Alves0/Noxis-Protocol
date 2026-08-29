@@ -34,12 +34,17 @@ use rand_chacha::ChaCha12Rng;
 
 mod addr;
 mod note;
+mod ownership;
 
 pub use addr::{
     Poseidon2P24AddrExperimentResult, prove_and_verify_p24_addr, run_p24_addr_research_smoke,
 };
 pub use note::{
     Poseidon2P24NoteExperimentResult, prove_and_verify_p24_note, run_p24_note_research_smoke,
+};
+pub use ownership::{
+    Poseidon2P24OwnershipExperimentResult, prove_and_verify_p24_note_ownership,
+    run_p24_note_ownership_research_smoke,
 };
 
 const TRACE_WIDTH: usize = 2;

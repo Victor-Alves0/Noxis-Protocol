@@ -2,14 +2,16 @@
 
 ## Estado e dependência
 
-Esta é uma candidata de extensão de hash privada, ainda não implementada e não
-selecionada. Ela depende, sem alterá-la, da candidata P24 de árvore com ID
+Esta é uma candidata de extensão de hash privada, implementada somente como
+artefato congelado, avaliador de referência e relações STARK de pesquisa; ela
+continua não selecionada. Depende, sem alterá-la, da candidata P24 de árvore com ID
 `96d8c394fc3eca456b918b96bc532a3395d53b677d7989e77914314c077dfa3b`.
 Essa separação preserva os bytes, vetores e corpus `NXTV v2` já congelados para
 `LEAF`, `NODE` e `EMPTY`.
 
-Ela não cria `TreeParametersId`, nota utilizável, carteira, prova, anonimato,
-resistência pós-quântica ou integração com ledger/consenso.
+Ela não cria `TreeParametersId` selecionado, nota utilizável, carteira,
+anonimato, resistência pós-quântica ou integração com ledger/consenso. As
+provas de pesquisa existentes não são uma ativação de protocolo.
 
 ## Relações candidatas
 
@@ -96,18 +98,22 @@ O checksum cobre, com domínio próprio, todos os bytes do manifesto antes do
 campo de checksum. O ID cobre o manifesto completo; nenhum deles é um
 `TreeParametersId` ou autorização de uso.
 
-O corpus também será separado (`NXNV v1`), preso ao manifesto `NXPH` e aos
-preimages artificiais públicos. Ele exigirá ao menos dois KATs externos por
-domínio, packing explícito, digest esperado e rejeições de mutação. `NXTV`
-nunca poderá ser reinterpretado como corpus de abertura de nota.
+O corpus separado `NXNV v1` já está preso ao manifesto `NXPH` e aos preimages
+artificiais públicos. Ele contém dois KATs externos por domínio, packing
+explícito e digest esperado; testes recusam mutações. `NXTV` nunca poderá ser
+reinterpretado como corpus de abertura de nota.
 
-## Portões antes de código de nota
+## Evidência existente e portões antes de produção
 
-1. executar o sponge em um wrapper externo independente e congelar KATs;
-2. implementar referência isolada e comparar byte a byte com os KATs;
-3. testar cada alteração de preimage, chave, posição e caminho;
-4. passar por revisão criptográfica independente antes de expor uma API de
-   carteira, prover, pacote de rede ou ledger.
+Já existem: wrapper externo e KATs congelados, referência isolada comparada
+byte a byte, testes de mutação e relações STARK executáveis para `H_ADDR`,
+`H_NOTE` e seu vínculo de posse chave→nota→nullifier. A relação de posse ainda
+não inclui caminho Merkle ou estado.
+
+Antes de expor uma API de carteira, prover, pacote de rede ou ledger, ainda é
+obrigatória revisão criptográfica independente, seleção explícita de
+parâmetros/backend e uma prova de transferência inteira com estado e política
+de privacidade.
 
 Esta candidata deixa as regras verificáveis, mas deliberadamente não afirma
-que essas verificações, AIR ou primitivas foram implementadas.
+segurança de produção ou ativação das primitivas.
