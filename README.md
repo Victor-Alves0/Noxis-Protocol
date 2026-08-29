@@ -50,7 +50,7 @@ review and testing expectations.
 - A research-only Plonky3 STARK experiment that proves the frozen
   Poseidon2-P24 candidate permutation, private `H_ADDR(key)` and
   `H_NOTE(preimage)` relations, and a composed private key-to-note-to-nullifier
-  ownership binding, all with byte-exact `BytePack3LE`,
+  ownership-and-tree-leaf binding, all with byte-exact `BytePack3LE`,
   `Hash16(Leaf, commitment)` and ordered
   `Hash16(Node, left || right)` constructions against external vectors, plus
   one private ordered Merkle step, a two-level private path and a full private
@@ -155,8 +155,8 @@ cargo run --release -p noxis-stark-experiment --bin noxis-stark-smoke
 ```
 
 It proves private candidate `H_ADDR` and `H_NOTE` preimages, a composed private
-ownership binding with only the nullifier public, and a depth-32 Merkle path.
-The ownership and membership relations are still separate. This is an expensive
+ownership-and-tree-leaf binding with only the nullifier public, and a depth-32
+Merkle path. Ownership and membership remain separate. This is an expensive
 research workload, not a wallet or validator operation.
 
 On POSIX systems, use `./scripts/demo-local.sh`. The demo prints the initialized
