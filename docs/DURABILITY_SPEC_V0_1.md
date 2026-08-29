@@ -13,6 +13,10 @@ transactions and compares header, CometBFT context, records and `AppHash` before
 tip. A structurally incomplete final `NXCB` frame is removed only after the
 complete prefix has re-executed successfully.
 
+The cross-format registry for magic/version identity, bounds, canonical parser
+behavior and upgrade rules is [WIRE_STORAGE_FORMATS_V0_1.md](WIRE_STORAGE_FORMATS_V0_1.md).
+This document owns the durability and authority semantics of its storage rows.
+
 The older `NXLG` transaction-only log remains a legacy format. It is never
 automatically upgraded or silently replayed by `PersistentLedger`, because it
 lacks state links. `NXCP` publication and strict replay comparison are

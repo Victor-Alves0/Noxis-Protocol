@@ -41,6 +41,7 @@ they point to the versioned specifications rather than replacing them.
 | **How is the code organized?** | [Module architecture — `ARCHITECTURE.md`](ARCHITECTURE.md) | [Ledger internal boundaries](LEDGER_INTERNAL_MODULE_BOUNDARY_V0_1.md) for representation, invariants and mutation. |
 | **How does consensus / CometBFT fit in?** | [Consensus decision](CONSENSUS_DECISION_V0_1.md) | [Consensus data specification](CONSENSUS_DATA_SPEC_V0_1.md) and [CometBFT CI / end-to-end boundary](COMETBFT_CI_V0_1.md). |
 | **How is data persisted and recovered?** | [Durability specification](DURABILITY_SPEC_V0_1.md) | [State-chain rules](STATE_CHAIN_SPEC_V0_1.md), [checkpoint format](CHECKPOINT_SPEC_V0_1.md), [checkpoint attestation decision](CHECKPOINT_ATTESTATION_DECISION_V0_1.md) and [data-directory lifecycle](DATA_DIRECTORY_SPEC_V0_1.md). |
+| **Which bytes may be parsed or persisted?** | [Wire and storage format registry](WIRE_STORAGE_FORMATS_V0_1.md) | The owner specification and codec named in the registry row. |
 | **Can I run something now?** | [Local operational demo](LOCAL_OPERATIONAL_DEMO_V0_1.md) | [Node service boundary](NODE_SERVICE_SPEC_V0_1.md). The demo is local and research-only; it does not start a validator network or provide private transfers. |
 | **Where is the privacy and post-quantum roadmap?** | [Crypto service gate](CRYPTO_SERVICE_GATE_V0_1.md) — the current fail-closed boundary | Then read the [private-transfer architecture draft](PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md), [hybrid cryptography profile draft](HYBRID_CRYPTO_PROFILE_DRAFT_V0_1.md), [private-transfer AIR candidate](PRIVATE_TRANSFER_AIR_CANDIDATE_V0_1.md), [AIR profile](PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md) and [proof deployment candidate](PRIVATE_TRANSFER_PROOF_DEPLOYMENT_CANDIDATE_V0_1.md). |
 | **What is already checked for the private-transfer research path?** | [Local preflight](PRIVATE_TRANSFER_LOCAL_PREFLIGHT_V0_1.md) | [Intent commitment candidate](PRIVATE_TRANSFER_INTENT_COMMITMENT_CANDIDATE_V0_1.md), [private state snapshot](PRIVATE_STATE_SNAPSHOT_CANDIDATE_V0_1.md), [typed NXSM anchor v2](PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md), [NXSM transition](PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md), its [witness interface](PRIVATE_TRANSFER_WITNESS_CONSTRAINT_INTERFACE_CANDIDATE_V0_1.md) and the [unified public statement](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md). These are candidates, not privacy activation. |
@@ -64,8 +65,9 @@ next milestones before diving into implementation details.
 2. [Protocol semantics](PROTOCOL_SPEC_V0_1.md)
 3. [Validation context](VALIDATION_CONTEXT_SPEC_V0_1.md) and [identity binding](IDENTITY_SPEC_V0_1.md)
 4. [State chain](STATE_CHAIN_SPEC_V0_1.md), [durability](DURABILITY_SPEC_V0_1.md) and [checkpoints](CHECKPOINT_SPEC_V0_1.md)
-5. [Consensus data](CONSENSUS_DATA_SPEC_V0_1.md) and [crypto service gate](CRYPTO_SERVICE_GATE_V0_1.md)
-6. [Ledger internal boundaries](LEDGER_INTERNAL_MODULE_BOUNDARY_V0_1.md)
+5. [Wire and storage format registry](WIRE_STORAGE_FORMATS_V0_1.md)
+6. [Consensus data](CONSENSUS_DATA_SPEC_V0_1.md) and [crypto service gate](CRYPTO_SERVICE_GATE_V0_1.md)
+7. [Ledger internal boundaries](LEDGER_INTERNAL_MODULE_BOUNDARY_V0_1.md)
 
 This path moves from assumptions to invariants, then to the code boundaries
 where those invariants are enforced and recovered.
