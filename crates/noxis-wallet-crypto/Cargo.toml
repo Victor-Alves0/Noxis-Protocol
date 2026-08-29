@@ -6,10 +6,14 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+aead = "0.5.2"
+chacha20poly1305 = "0.10.1"
 ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
+hkdf = "0.12.4"
 ml-dsa = { version = "0.1.1", features = ["getrandom"] }
 ml-kem = { version = "0.3.2", features = ["getrandom", "zeroize"] }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
+sha2 = "0.10.9"
 x25519-dalek = { version = "2.0.1", features = ["getrandom", "static_secrets"] }
 zeroize = "1.8.1"
 
