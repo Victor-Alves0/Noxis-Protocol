@@ -42,8 +42,9 @@ tem allowlist nem escolhe uma implantação criptográfica.
 
 ## O que ainda falta
 
-Não há árvore esparsa autenticada de nullifiers, corpus externo de vetores,
-backend de prova, persistência nem transição atômica. O próximo marco deve
-congelar a extensão de domínios P24 para a árvore de nullifiers e produzir um
-corpus externo para `NXPS`; só depois será possível fazer a verificação dentro
-de uma AIR/STARK.
+Há uma árvore esparsa autenticada em memória, ainda candidata e isolada, mas
+`NXPS v1` não a usa: ele continua comprometendo `H_NFSET`. Não há corpus externo
+de vetores, backend de prova, persistência nem transição atômica. O próximo
+marco deve produzir evidência externa para `NXSM` e especificar uma nova âncora
+que comprometa sua raiz tipada; só depois será possível fazer a verificação
+dentro de uma AIR/STARK.

@@ -214,6 +214,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "noxis-nullifier-tree-state"
+version = "0.1.0"
+dependencies = [
+ "noxis-nullifier-tree-reference",
+ "noxis-poseidon2-reference",
+ "noxis-privacy-types",
+]
+
+[[package]]
 name = "noxis-poseidon2-privacy-reference"
 version = "0.1.0"
 dependencies = [

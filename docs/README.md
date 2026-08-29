@@ -93,7 +93,7 @@ not make a candidate a protocol parameter.
 | Tree parameter framing | [Tree parameter framing](TREE_PARAMETER_FRAMING_V0_1.md), [P24 manifest](POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md), [tree construction](POSEIDON2_TREE_CONSTRUCTION_CANDIDATE_V0_1.md) | [P24 reference evaluation](POSEIDON2_P24_REFERENCE_EVALUATION_V0_1.md), [BabyBear16 reference evaluation](POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md) |
 | Tree vectors | [Corpus framing](TREE_VECTOR_CORPUS_FRAMING_V0_1.md), [P24 v2 corpus](TREE_VECTOR_CORPUS_P24_V2.md) | [Generation blocker](TREE_VECTOR_GENERATION_BLOCKER_V0_1.md) |
 | Private-note domains | [Note-opening boundary](NOTE_OPENING_BOUNDARY_V0_1.md), [P24 note-domain candidate](POSEIDON2_P24_NOTE_DOMAINS_CANDIDATE_V0_1.md) | [Note-domain corpus](NOTE_DOMAIN_VECTOR_CORPUS_V0_1.md), [reference evaluation](POSEIDON2_P24_NOTE_DOMAINS_REFERENCE_EVALUATION_V0_1.md) |
-| Nullifier sparse tree | [Manifest candidate](NULLIFIER_SPARSE_MANIFEST_CANDIDATE_V0_1.md) | [Reference candidate](NULLIFIER_SPARSE_REFERENCE_CANDIDATE_V0_1.md) |
+| Nullifier sparse tree | [Manifest candidate](NULLIFIER_SPARSE_MANIFEST_CANDIDATE_V0_1.md), [mutable state candidate](NULLIFIER_SPARSE_MUTABLE_REFERENCE_CANDIDATE_V0_1.md) | [Reference candidate](NULLIFIER_SPARSE_REFERENCE_CANDIDATE_V0_1.md) |
 | Intent commitment | [Manifest candidate](INTENT_COMMITMENT_MANIFEST_CANDIDATE_V0_1.md), [vector corpus candidate](INTENT_VECTOR_CORPUS_CANDIDATE_V0_1.md) | [External KATs](EXTERNAL_INTENT_COMMITMENT_KATS_V0_1.md) |
 
 ## Keeping this map useful

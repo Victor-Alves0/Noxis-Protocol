@@ -26,7 +26,9 @@ chave de rede, nem uma autorização para aceitar gastos.
 
 ## Limites atuais
 
-Ainda não existe referência executável da árvore, provas de inclusão/ausência,
-corpus externo, backend STARK ou transição de estado. O `H_STATE` atual continua
-comprometendo o conjunto ordenado com SHA-256; ele só será migrado para a raiz
-`NXSM` depois que a referência e os vetores independentes verificarem a árvore.
+Uma referência executável, provas de inclusão/ausência e um estado mutável em
+memória existem agora, mas continuam isolados como candidatos de pesquisa. Ainda
+não existe corpus externo específico de `NXSM`, serialização canônica de estado,
+backend STARK nem transição privada. O `H_STATE` atual continua comprometendo o
+conjunto ordenado com SHA-256; ele só será migrado para uma raiz `NXSM` em uma
+nova versão depois que vetores independentes verificarem a árvore.

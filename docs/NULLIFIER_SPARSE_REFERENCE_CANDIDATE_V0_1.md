@@ -26,7 +26,8 @@ O crate carrega e valida `NXSM` antes de calcular, usa seu próprio sponge
 caminho diferente de 512 e raízes incompatíveis. A raiz vazia foi congelada em
 um teste de regressão.
 
-Ele ainda não mantém um mapa de nós, não gera provas a partir de um estado,
-não impede inserção duplicada e não substitui `H_NFSET` no `H_STATE`. Esses
-passos exigem vetores externos e uma estrutura mutável que preserve
-atomicidade, e permanecem fora desta entrega.
+O estado mutável candidato, a geração de caminhos e a rejeição atômica de
+duplicata vivem separadamente em `noxis-nullifier-tree-state`; ver
+`NULLIFIER_SPARSE_MUTABLE_REFERENCE_CANDIDATE_V0_1.md`. Esta referência ainda
+não substitui `H_NFSET` no `H_STATE`, nem fornece corpus externo, persistência,
+backend STARK ou uma transição privada.

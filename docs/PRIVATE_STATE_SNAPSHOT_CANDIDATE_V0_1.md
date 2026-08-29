@@ -35,8 +35,9 @@ atual e nunca e convertido para ele.
 ## Proximo passo
 
 O frame candidato `H_STATE` foi publicado separadamente em
-`PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md`. Ainda falta congelar os domínios de
-uma árvore esparsa de nullifiers e um corpus externo de interoperabilidade.
-Somente depois disso será possível projetar uma transição atômica: verificar a
-prova selecionada, conferir o estado anterior, impedir nullifier repetido,
-acrescentar commitments e produzir a nova raiz.
+`PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md`. Os domínios `NXSM` e um estado mutável
+isolado já estão congelados como candidatos, mas ainda falta um corpus externo
+de interoperabilidade e uma nova âncora que use sua raiz tipada. Somente depois
+disso será possível projetar uma transição atômica: verificar a prova
+selecionada, conferir o estado anterior, impedir nullifier repetido, acrescentar
+commitments e produzir a nova raiz.

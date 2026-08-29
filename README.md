@@ -49,6 +49,7 @@ crates/
   noxis-privacy-types  Canonical public v2 private-transfer values and intent framing.
   noxis-tree-params  Frozen unselected tree-parameter candidates and vector framing.
   noxis-poseidon2-reference  Isolated dense reference evaluator for the unselected P24 candidate.
+  noxis-nullifier-tree-state  Isolated mutable state and proof paths for the unselected NXSM candidate.
   noxis-crypto   CryptoSuite metadata and proof-verifier boundary.
   noxis-ledger   Transactions, validation and deterministic state transitions.
   noxis-codec    Canonical binary transaction encoding and decoding.
@@ -81,6 +82,7 @@ docs/
   POSEIDON2_P24_CANDIDATE_MANIFEST_V0_1.md  Frozen but unselected P24 parameter artifact.
   POSEIDON2_P24_REFERENCE_EVALUATION_V0_1.md  Cross-validated P24 permutation and candidate-tree vectors.
   POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md  Cross-validated permutation reference vectors.
+  NULLIFIER_SPARSE_MUTABLE_REFERENCE_CANDIDATE_V0_1.md  Isolated mutable NXSM candidate state and limits.
   ARCHITECTURE.md                Module boundaries and implementation roadmap.
 ```
 
