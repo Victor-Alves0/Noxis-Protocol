@@ -78,6 +78,12 @@ Este último exige 50 vetores: permutações, folhas, duas ordens de nó,
 Ele fecha a cobertura de construção da árvore, sem alegar seleção de parâmetros
 nem ativação. Ver [`TREE_VECTOR_CORPUS_P24_V2.md`](TREE_VECTOR_CORPUS_P24_V2.md).
 
+**Smoke STARK P24:** o experimento Plonky3 agora prova e verifica a permutação
+P24, `Hash16(Leaf, commitment)` e o `Hash16(Node, left || right)` ordenado.
+Os dois vetores externos de nó, com filhos invertidos, são verificados para
+manter explícita a orientação. Ainda não há prova de caminho, de membership ou
+de transferência privada.
+
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem
 codec/`Debug`/`Clone`, caminho P24 de 32 níveis e uma declaração executável

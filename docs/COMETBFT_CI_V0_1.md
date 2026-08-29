@@ -49,14 +49,14 @@ serviço ABCI Noxis e um validador CometBFT local. Sua forma é:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - run: rustup toolchain install 1.85.0 --profile minimal
+      - run: rustup toolchain install 1.93.0 --profile minimal
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
           go-version: '1.23.12'
       - id: cometbft
         uses: ./.github/actions/setup-cometbft
       - run: >-
-          cargo +1.85.0 test -p noxis-node --test cometbft_e2e --features research-testing --locked --
+          cargo +1.93.0 test -p noxis-node --test cometbft_e2e --features research-testing --locked --
           --ignored --exact real_cometbft_handshake_empty_block_and_process_restart
         env:
           COMETBFT_BIN: ${{ steps.cometbft.outputs.bin }}

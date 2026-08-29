@@ -33,8 +33,9 @@ review and testing expectations.
   only a finalized candidate can reach the durable `Commit` boundary. Its
   composed service accepts only loopback ABCI listeners, uses a dedicated
   consensus block journal and rejects a genesis or cryptographic components
-  that do not match. It still needs end-to-end verification against a real
-  CometBFT process; it is not yet a running multi-node network.
+  that do not match. CI runs a pinned real CometBFT process through handshake,
+  empty-block `Commit` and restart; this is not yet a running multi-node
+  network.
 - For a Comet-enabled genesis, the engine identity, parameter commitment and
   exact v0.38 Ed25519 validator mapping are bound to `GenesisId` and `NXMF`
   v7; each `NXCB` v2 block binds the exact Comet decision context into both
@@ -47,9 +48,10 @@ review and testing expectations.
 - Canonical `NXCP` checkpoints, atomically published under the protected data directory and verified against strict replay.
 - Versioned cryptographic-suite metadata to prevent permanent coupling to one primitive.
 - A research-only Plonky3 STARK experiment that proves the frozen
-  Poseidon2-P24 candidate permutation and its `Hash16(Leaf, commitment)`
-  construction against external leaf vectors. It is not a note-membership,
-  nullifier, value-conservation or private-transfer proof.
+  Poseidon2-P24 candidate permutation, `Hash16(Leaf, commitment)` and ordered
+  `Hash16(Node, left || right)` constructions against external vectors. It is
+  not a note-membership, nullifier, value-conservation or private-transfer
+  proof.
 - Canonical consensus data: weighted validator sets, block headers, record commitments and finality-certificate verification boundaries. This is not yet a running validator network or a finality claim.
 - Genesis and the protected local manifest commit to the validator set, public verification keys, declared fault budget and consensus limits. A node cannot reopen the same data directory with a different consensus configuration.
 - Tests for unauthorized issuance, duplicate nullifiers, duplicate commitments, and unknown assets.
@@ -122,7 +124,7 @@ cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-The CI workflow runs the same quality gate on Ubuntu with Rust 1.85, the
+The CI workflow runs the same quality gate on Ubuntu with Rust 1.93, the
 minimum supported compiler. It uses the committed lockfile and has read-only
 repository permissions.
 

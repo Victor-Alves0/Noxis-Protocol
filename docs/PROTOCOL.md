@@ -23,8 +23,9 @@ without disclosing the witness.
 - Genesis/state identities, durable replay and guarded local-node lifecycle.
 - A research-only local operational demo.
 - A Plonky3 STARK experiment that proves the frozen Poseidon2-P24 candidate
-  permutation and `Hash16(Leaf, commitment)` against external leaf vectors;
-  it is not a membership or private-transfer proof.
+  permutation, `Hash16(Leaf, commitment)` and ordered
+  `Hash16(Node, left || right)` against external vectors; it is not a
+  membership or private-transfer proof.
 
 ## What does not exist yet
 

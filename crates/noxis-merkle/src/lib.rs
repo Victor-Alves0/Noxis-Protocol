@@ -151,7 +151,7 @@ impl MerkleTree {
             if level.len() % 2 == 1 {
                 level.push(empty_hashes[height as usize]);
             }
-            let sibling_index = if current_index % 2 == 0 {
+            let sibling_index = if current_index.is_multiple_of(2) {
                 current_index + 1
             } else {
                 current_index - 1
@@ -241,7 +241,7 @@ fn empty_hashes(depth: u8) -> Vec<Hash> {
 }
 
 fn parent_level(children: &[Hash]) -> Vec<Hash> {
-    debug_assert!(!children.is_empty() && children.len() % 2 == 0);
+    debug_assert!(!children.is_empty() && children.len().is_multiple_of(2));
     children
         .chunks_exact(2)
         .map(|pair| hash_node(&pair[0], &pair[1]))

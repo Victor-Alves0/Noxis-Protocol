@@ -42,6 +42,12 @@ const P24_HASH16_LEAF_STEPS: usize = P24_HASH16_LEAF_PERMUTATIONS * P24_ROUNDS;
 const P24_HASH16_LEAF_TRACE_ROWS: usize = 128;
 const P24_HASH16_LEAF_TRACE_WIDTH: usize = P24_WIDTH + P24_HASH16_LEAF_STEPS;
 const P24_HASH16_LEAF_PUBLIC_VALUES: usize = 32;
+const P24_HASH16_NODE_PERMUTATIONS: usize = 4;
+const P24_HASH16_NODE_STEPS: usize = P24_HASH16_NODE_PERMUTATIONS * P24_ROUNDS;
+const P24_HASH16_NODE_TRACE_ROWS: usize = 128;
+const P24_HASH16_NODE_TRACE_WIDTH: usize = P24_WIDTH + P24_HASH16_NODE_STEPS;
+const P24_HASH16_NODE_PUBLIC_VALUES: usize = 48;
+const P24_HASH16_DIGEST_ELEMENTS: usize = 16;
 
 type Val = BabyBear;
 type Challenge = BinomialExtensionField<Val, 4>;
@@ -93,6 +99,17 @@ pub struct Poseidon2P24LeafExperimentResult {
     pub trace_rows: usize,
 }
 
+/// Public result of a STARK for the candidate ordered
+/// `Hash16(Node, left || right)` construction. The child and parent digests
+/// are public; all sponge states remain in the hidden trace.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Poseidon2P24NodeExperimentResult {
+    pub left: BabyBearDigestV2,
+    pub right: BabyBearDigestV2,
+    pub parent: BabyBearDigestV2,
+    pub trace_rows: usize,
+}
+
 /// The fixed AIR used only to establish the P3 integration boundary.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PrivateAccumulatorAir;
@@ -111,17 +128,73 @@ pub struct Poseidon2P24Air {
     round_constants: [[u32; P24_WIDTH]; P24_ROUNDS],
 }
 
-/// AIR for the exact `Hash16(Leaf, commitment)` candidate construction.
+/// The fixed candidate shapes currently supported by the Hash16 AIR.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Poseidon2P24Hash16Shape {
+    Leaf,
+    Node,
+}
+
+impl Poseidon2P24Hash16Shape {
+    const fn domain(self) -> Poseidon2P24TreeDomainV1 {
+        match self {
+            Self::Leaf => Poseidon2P24TreeDomainV1::Leaf,
+            Self::Node => Poseidon2P24TreeDomainV1::Node,
+        }
+    }
+
+    const fn input_elements(self) -> usize {
+        match self {
+            Self::Leaf => P24_HASH16_DIGEST_ELEMENTS,
+            Self::Node => P24_HASH16_DIGEST_ELEMENTS * 2,
+        }
+    }
+
+    const fn permutations(self) -> usize {
+        match self {
+            Self::Leaf => P24_HASH16_LEAF_PERMUTATIONS,
+            Self::Node => P24_HASH16_NODE_PERMUTATIONS,
+        }
+    }
+
+    const fn steps(self) -> usize {
+        self.permutations() * P24_ROUNDS
+    }
+
+    const fn trace_rows(self) -> usize {
+        match self {
+            Self::Leaf => P24_HASH16_LEAF_TRACE_ROWS,
+            Self::Node => P24_HASH16_NODE_TRACE_ROWS,
+        }
+    }
+
+    const fn trace_width(self) -> usize {
+        match self {
+            Self::Leaf => P24_HASH16_LEAF_TRACE_WIDTH,
+            Self::Node => P24_HASH16_NODE_TRACE_WIDTH,
+        }
+    }
+
+    const fn public_values(self) -> usize {
+        match self {
+            Self::Leaf => P24_HASH16_LEAF_PUBLIC_VALUES,
+            Self::Node => P24_HASH16_NODE_PUBLIC_VALUES,
+        }
+    }
+}
+
+/// AIR for exact fixed-arity candidate `Hash16` constructions.
 ///
-/// It composes three constrained P24 permutations with the frozen leaf IV,
-/// the two absorption phases required for sixteen input elements and the
-/// prescribed squeeze. This is the first STARK binding between a candidate
-/// note commitment and a candidate Merkle leaf; it is not yet a Merkle path
-/// or a private-transfer proof.
+/// It composes constrained P24 permutations with a frozen domain IV, its fixed
+/// absorption phases and the prescribed squeeze. The supported `Leaf` and
+/// ordered `Node` shapes share the same logic but have distinct arities and
+/// public-value layouts. This is not yet a Merkle path or private-transfer
+/// proof.
 #[derive(Clone, Debug)]
-pub struct Poseidon2P24Hash16LeafAir {
+pub struct Poseidon2P24Hash16Air {
     permutation: Poseidon2P24Air,
-    leaf_iv: [u32; 9],
+    shape: Poseidon2P24Hash16Shape,
+    iv: [u32; 9],
 }
 
 impl Poseidon2P24Air {
@@ -134,11 +207,15 @@ impl Poseidon2P24Air {
     }
 }
 
-impl Poseidon2P24Hash16LeafAir {
-    fn from_reference(reference: &Poseidon2P24Reference) -> Result<Self, StarkExperimentError> {
+impl Poseidon2P24Hash16Air {
+    fn from_reference(
+        reference: &Poseidon2P24Reference,
+        shape: Poseidon2P24Hash16Shape,
+    ) -> Result<Self, StarkExperimentError> {
         Ok(Self {
             permutation: Poseidon2P24Air::from_reference(reference),
-            leaf_iv: CandidatePoseidon2P24ManifestV2::new().iv(Poseidon2P24TreeDomainV1::Leaf)?,
+            shape,
+            iv: CandidatePoseidon2P24ManifestV2::new().iv(shape.domain())?,
         })
     }
 }
@@ -171,13 +248,13 @@ impl<F> BaseAir<F> for Poseidon2P24Air {
     }
 }
 
-impl<F> BaseAir<F> for Poseidon2P24Hash16LeafAir {
+impl<F> BaseAir<F> for Poseidon2P24Hash16Air {
     fn width(&self) -> usize {
-        P24_HASH16_LEAF_TRACE_WIDTH
+        self.shape.trace_width()
     }
 
     fn num_public_values(&self) -> usize {
-        P24_HASH16_LEAF_PUBLIC_VALUES
+        self.shape.public_values()
     }
 
     fn max_constraint_degree(&self) -> Option<usize> {
@@ -259,7 +336,7 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Air {
     }
 }
 
-impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16LeafAir {
+impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16Air {
     fn eval(&self, builder: &mut AB) {
         let public_values = builder.public_values().to_vec();
         let main = builder.main();
@@ -267,8 +344,8 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16LeafAir {
         let next = main.next_slice();
         let local_state = &local[..P24_WIDTH];
         let next_state = &next[..P24_WIDTH];
-        let selectors = &local[P24_SELECTOR_OFFSET..P24_HASH16_LEAF_TRACE_WIDTH];
-        let next_selectors = &next[P24_SELECTOR_OFFSET..P24_HASH16_LEAF_TRACE_WIDTH];
+        let selectors = &local[P24_SELECTOR_OFFSET..self.shape.trace_width()];
+        let next_selectors = &next[P24_SELECTOR_OFFSET..self.shape.trace_width()];
 
         let initial_state = self.initial_state_expression::<AB>(&public_values);
         for lane in 0..P24_WIDTH {
@@ -277,7 +354,7 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16LeafAir {
                 .assert_eq(local_state[lane], initial_state[lane].clone());
         }
 
-        for selector in 0..P24_HASH16_LEAF_STEPS {
+        for selector in 0..self.shape.steps() {
             builder.when_first_row().assert_eq(
                 selectors[selector],
                 AB::F::from_u8(if selector == 0 { 1 } else { 0 }),
@@ -295,7 +372,7 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16LeafAir {
         let round_states: Vec<Vec<AB::Expr>> = (0..P24_ROUNDS)
             .map(|round| self.permutation.round_expression::<AB>(local_state, round))
             .collect();
-        let phase_completions: Vec<Vec<AB::Expr>> = (0..P24_HASH16_LEAF_PERMUTATIONS)
+        let phase_completions: Vec<Vec<AB::Expr>> = (0..self.shape.permutations())
             .map(|phase| {
                 self.phase_completion_expression::<AB>(
                     &round_states[P24_ROUNDS - 1],
@@ -304,16 +381,18 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16LeafAir {
                 )
             })
             .collect();
+        let output_offset = self.shape.input_elements();
+        let final_absorption_phase = (self.shape.input_elements() - 1) / 15;
         for lane in 0..15 {
-            let output: AB::Expr = public_values[16 + lane].into();
+            let output: AB::Expr = public_values[output_offset + lane].into();
             builder.assert_zero(
-                selectors[(P24_ROUNDS * 2) - 1]
+                selectors[(P24_ROUNDS * (final_absorption_phase + 1)) - 1]
                     * (round_states[P24_ROUNDS - 1][lane].clone() - output),
             );
         }
-        let final_output: AB::Expr = public_values[31].into();
+        let final_output: AB::Expr = public_values[output_offset + 15].into();
         builder.assert_zero(
-            selectors[P24_HASH16_LEAF_STEPS - 1]
+            selectors[self.shape.steps() - 1]
                 * (round_states[P24_ROUNDS - 1][0].clone() - final_output),
         );
 
@@ -354,17 +433,17 @@ impl Poseidon2P24Air {
     }
 }
 
-impl Poseidon2P24Hash16LeafAir {
+impl Poseidon2P24Hash16Air {
     fn initial_state_expression<AB: AirBuilder>(
         &self,
         public_values: &[AB::PublicVar],
     ) -> Vec<AB::Expr> {
         let raw = (0..P24_WIDTH)
             .map(|lane| {
-                if lane < 15 {
+                if lane < 15 && lane < self.shape.input_elements() {
                     public_values[lane].into()
                 } else {
-                    AB::Expr::from_u32(self.leaf_iv[lane - 15])
+                    AB::Expr::from_u32(self.iv[lane - 15])
                 }
             })
             .collect::<Vec<AB::Expr>>();
@@ -379,14 +458,17 @@ impl Poseidon2P24Hash16LeafAir {
     ) -> Vec<AB::Expr> {
         let mut absorbed = final_round_state.to_vec();
         match phase {
-            0 => {
-                let last_input: AB::Expr = public_values[15].into();
-                absorbed[0] = absorbed[0].clone() + last_input;
+            phase if phase + 1 < self.shape.permutations() => {
+                let input_start = (phase + 1) * 15;
+                for lane in 0..15 {
+                    if input_start + lane < self.shape.input_elements() {
+                        let input: AB::Expr = public_values[input_start + lane].into();
+                        absorbed[lane] = absorbed[lane].clone() + input;
+                    }
+                }
                 matrix_expression::<AB>(&self.permutation.external_matrix, &absorbed)
             }
-            1 => matrix_expression::<AB>(&self.permutation.external_matrix, &absorbed),
-            2 => absorbed,
-            _ => unreachable!("fixed leaf hash has exactly three permutations"),
+            _ => absorbed,
         }
     }
 }
@@ -458,19 +540,7 @@ pub fn run_p24_research_smoke() -> Result<Poseidon2P24ExperimentResult, StarkExp
 pub fn prove_and_verify_p24_leaf(
     commitment: BabyBearDigestV2,
 ) -> Result<Poseidon2P24LeafExperimentResult, StarkExperimentError> {
-    let reference = Poseidon2P24Reference::load_candidate()?;
-    let leaf = reference.leaf(commitment)?;
-    let air = Poseidon2P24Hash16LeafAir::from_reference(&reference)?;
-    let trace = build_p24_hash16_leaf_trace(&air, commitment);
-    let public_values = commitment
-        .into_iter()
-        .chain(leaf)
-        .map(Val::from_u32)
-        .collect::<Vec<_>>();
-    let config = make_hiding_config();
-    let proof = prove(&config, &air, trace, &public_values);
-    verify(&config, &air, &proof, &public_values)
-        .map_err(|_| StarkExperimentError::VerificationFailed)?;
+    let leaf = prove_and_verify_p24_hash16(Poseidon2P24Hash16Shape::Leaf, &commitment)?;
     Ok(Poseidon2P24LeafExperimentResult {
         commitment,
         leaf,
@@ -478,11 +548,62 @@ pub fn prove_and_verify_p24_leaf(
     })
 }
 
+/// Produces and verifies a STARK for the exact frozen ordered
+/// `Hash16(Node, left || right)` construction. This binds both public child
+/// digests, in their prescribed order, to the public parent digest without
+/// exposing intermediate sponge states.
+pub fn prove_and_verify_p24_node(
+    left: BabyBearDigestV2,
+    right: BabyBearDigestV2,
+) -> Result<Poseidon2P24NodeExperimentResult, StarkExperimentError> {
+    let mut input = [0_u32; P24_HASH16_DIGEST_ELEMENTS * 2];
+    input[..P24_HASH16_DIGEST_ELEMENTS].copy_from_slice(&left);
+    input[P24_HASH16_DIGEST_ELEMENTS..].copy_from_slice(&right);
+    let parent = prove_and_verify_p24_hash16(Poseidon2P24Hash16Shape::Node, &input)?;
+    Ok(Poseidon2P24NodeExperimentResult {
+        left,
+        right,
+        parent,
+        trace_rows: P24_HASH16_NODE_TRACE_ROWS,
+    })
+}
+
+fn prove_and_verify_p24_hash16(
+    shape: Poseidon2P24Hash16Shape,
+    input: &[u32],
+) -> Result<BabyBearDigestV2, StarkExperimentError> {
+    let reference = Poseidon2P24Reference::load_candidate()?;
+    let output = reference.hash16(shape.domain(), input)?;
+    let air = Poseidon2P24Hash16Air::from_reference(&reference, shape)?;
+    let trace = build_p24_hash16_trace(&air, input);
+    let public_values = input
+        .iter()
+        .copied()
+        .chain(output)
+        .map(Val::from_u32)
+        .collect::<Vec<_>>();
+    let config = make_hiding_config();
+    let proof = prove(&config, &air, trace, &public_values);
+    verify(&config, &air, &proof, &public_values)
+        .map_err(|_| StarkExperimentError::VerificationFailed)?;
+    Ok(output)
+}
+
 /// A command-friendly proof of the first candidate tree operation: hashing a
 /// sixteen-element commitment into its `Leaf` digest.
 pub fn run_p24_leaf_research_smoke()
 -> Result<Poseidon2P24LeafExperimentResult, StarkExperimentError> {
     prove_and_verify_p24_leaf(core::array::from_fn(|index| index as u32 + 1))
+}
+
+/// A command-friendly proof that the candidate ordered parent transformation
+/// binds distinct left and right child digests.
+pub fn run_p24_node_research_smoke()
+-> Result<Poseidon2P24NodeExperimentResult, StarkExperimentError> {
+    prove_and_verify_p24_node(
+        core::array::from_fn(|index| index as u32 + 1),
+        core::array::from_fn(|index| index as u32 + 17),
+    )
 }
 
 #[derive(Debug)]
@@ -559,37 +680,38 @@ fn build_p24_trace(air: &Poseidon2P24Air, input: BabyBearStateP24) -> RowMajorMa
     RowMajorMatrix::new(values, P24_TRACE_WIDTH)
 }
 
-fn build_p24_hash16_leaf_trace(
-    air: &Poseidon2P24Hash16LeafAir,
-    commitment: BabyBearDigestV2,
-) -> RowMajorMatrix<Val> {
-    let mut values = Val::zero_vec(P24_HASH16_LEAF_TRACE_ROWS * P24_HASH16_LEAF_TRACE_WIDTH);
+fn build_p24_hash16_trace(air: &Poseidon2P24Hash16Air, input: &[u32]) -> RowMajorMatrix<Val> {
+    debug_assert_eq!(input.len(), air.shape.input_elements());
+    let mut values = Val::zero_vec(air.shape.trace_rows() * air.shape.trace_width());
     let mut raw_state = [Val::ZERO; P24_WIDTH];
-    for (lane, value) in commitment.into_iter().take(15).enumerate() {
+    for (lane, value) in input.iter().copied().take(15).enumerate() {
         raw_state[lane] = Val::from_u32(value);
     }
-    for (lane, value) in air.leaf_iv.into_iter().enumerate() {
+    for (lane, value) in air.iv.into_iter().enumerate() {
         raw_state[15 + lane] = Val::from_u32(value);
     }
     let mut state = matrix_values(&air.permutation.external_matrix, &raw_state);
 
-    for row in 0..P24_HASH16_LEAF_TRACE_ROWS {
-        let offset = row * P24_HASH16_LEAF_TRACE_WIDTH;
+    for row in 0..air.shape.trace_rows() {
+        let offset = row * air.shape.trace_width();
         values[offset..offset + P24_WIDTH].copy_from_slice(&state);
-        if row < P24_HASH16_LEAF_STEPS {
+        if row < air.shape.steps() {
             values[offset + P24_SELECTOR_OFFSET + row] = Val::ONE;
             let phase = row / P24_ROUNDS;
             let round = row % P24_ROUNDS;
             state = round_values(&air.permutation, state, round);
-            if round + 1 == P24_ROUNDS && phase < P24_HASH16_LEAF_PERMUTATIONS - 1 {
-                if phase == 0 {
-                    state[0] += Val::from_u32(commitment[15]);
+            if round + 1 == P24_ROUNDS && phase + 1 < air.shape.permutations() {
+                let input_start = (phase + 1) * 15;
+                for lane in 0..15 {
+                    if input_start + lane < input.len() {
+                        state[lane] += Val::from_u32(input[input_start + lane]);
+                    }
                 }
                 state = matrix_values(&air.permutation.external_matrix, &state);
             }
         }
     }
-    RowMajorMatrix::new(values, P24_HASH16_LEAF_TRACE_WIDTH)
+    RowMajorMatrix::new(values, air.shape.trace_width())
 }
 
 fn round_values(
@@ -771,8 +893,9 @@ mod tests {
         let commitment = core::array::from_fn(|index| index as u32 + 1);
         let reference = Poseidon2P24Reference::load_candidate().unwrap();
         let leaf = reference.leaf(commitment).unwrap();
-        let air = Poseidon2P24Hash16LeafAir::from_reference(&reference).unwrap();
-        let trace = build_p24_hash16_leaf_trace(&air, commitment);
+        let air = Poseidon2P24Hash16Air::from_reference(&reference, Poseidon2P24Hash16Shape::Leaf)
+            .unwrap();
+        let trace = build_p24_hash16_trace(&air, &commitment);
         let public_values = commitment
             .into_iter()
             .chain(leaf)
@@ -797,6 +920,92 @@ mod tests {
             assert_eq!(
                 prove_and_verify_p24_leaf(elements(*note)).unwrap().leaf,
                 elements(*leaf)
+            );
+        }
+    }
+
+    #[test]
+    fn node_hash_stark_matches_the_frozen_candidate_reference() {
+        let left = core::array::from_fn(|index| index as u32 + 1);
+        let right = core::array::from_fn(|index| index as u32 + 17);
+        let result = prove_and_verify_p24_node(left, right).unwrap();
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+
+        assert_eq!(result.parent, reference.node(left, right).unwrap());
+        assert_eq!(result.trace_rows, P24_HASH16_NODE_TRACE_ROWS);
+    }
+
+    #[test]
+    fn node_hash_proof_rejects_a_changed_public_parent_or_child_order() {
+        let left = core::array::from_fn(|index| index as u32 + 1);
+        let right = core::array::from_fn(|index| index as u32 + 17);
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let parent = reference.node(left, right).unwrap();
+        let air = Poseidon2P24Hash16Air::from_reference(&reference, Poseidon2P24Hash16Shape::Node)
+            .unwrap();
+        let input = left.into_iter().chain(right).collect::<Vec<_>>();
+        let trace = build_p24_hash16_trace(&air, &input);
+        let public_values = input
+            .iter()
+            .copied()
+            .chain(parent)
+            .map(Val::from_u32)
+            .collect::<Vec<_>>();
+        p3_air::check_constraints(&air, &trace, &public_values);
+
+        let mut changed_parent = public_values.clone();
+        changed_parent[32] += Val::ONE;
+
+        let mut reversed_children = public_values.clone();
+        let original_right = reversed_children[16..32].to_vec();
+        reversed_children[..16].copy_from_slice(&original_right);
+        reversed_children[16..32].copy_from_slice(&left.map(Val::from_u32));
+
+        // These direct checks exercise the AIR boundary constraints rather than
+        // merely relying on Fiat-Shamir binding during proof verification.
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                p3_air::check_constraints(&air, &trace, &changed_parent);
+            }))
+            .is_err()
+        );
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                p3_air::check_constraints(&air, &trace, &reversed_children);
+            }))
+            .is_err()
+        );
+
+        let config = make_hiding_config();
+        let proof = prove(&config, &air, trace, &public_values);
+        assert!(verify(&config, &air, &proof, &changed_parent).is_err());
+        assert!(verify(&config, &air, &proof, &reversed_children).is_err());
+    }
+
+    #[test]
+    fn node_hash_stark_matches_ordered_external_node_vectors() {
+        let corpus = P24TreeVectorCorpusV2::frozen_complete_candidate_corpus();
+        let nodes = corpus
+            .records()
+            .iter()
+            .filter_map(|record| match record {
+                P24TreeVectorRecordV2::Node {
+                    left,
+                    right,
+                    parent,
+                } => Some((elements(*left), elements(*right), elements(*parent))),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes.len(), 2, "complete corpus fixes both node orders");
+        assert_eq!(nodes[0].0, nodes[1].1);
+        assert_eq!(nodes[0].1, nodes[1].0);
+        assert_ne!(nodes[0].2, nodes[1].2);
+        for (left, right, parent) in nodes {
+            assert_eq!(
+                prove_and_verify_p24_node(left, right).unwrap().parent,
+                parent
             );
         }
     }

@@ -39,7 +39,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ```
 
 Use a focused test while iterating, then run the full suite before opening a
-pull request. The repository's CI uses Rust 1.85.
+pull request. The repository's CI uses Rust 1.93.
 
 ## Pull requests
 

@@ -386,14 +386,13 @@ impl PersistentLedger {
                 });
             }
             terminal_record_hash = Some(record.record_hash());
-            if let Some(checkpoint) = checkpoint_candidates.remove(&record.sequence()) {
-                if let Some(restored) =
+            if let Some(checkpoint) = checkpoint_candidates.remove(&record.sequence())
+                && let Some(restored) =
                     restore_verified_checkpoint_at_record(&checkpoint, record, &next_state, anchor)
-                {
-                    state = restored;
-                    recovered_checkpoint_sequence = Some(record.sequence());
-                    continue;
-                }
+            {
+                state = restored;
+                recovered_checkpoint_sequence = Some(record.sequence());
+                continue;
             }
             state = next_state;
         }

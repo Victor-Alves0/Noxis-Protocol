@@ -291,7 +291,7 @@ impl Poseidon2P24Reference {
 }
 
 fn decode_elements(payload: &[u8]) -> Result<Vec<u32>, Poseidon2P24ReferenceError> {
-    if payload.len() % 4 != 0 {
+    if !payload.len().is_multiple_of(4) {
         return Err(Poseidon2P24ReferenceError::InvalidPayloadLength(
             payload.len(),
         ));

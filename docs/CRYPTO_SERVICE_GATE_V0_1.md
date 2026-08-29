@@ -41,7 +41,7 @@ alegação de privacidade.
 O comando de integração é:
 
 ```text
-cargo +1.85.0 test -p noxis-node --test cometbft_e2e --features research-testing --locked -- --ignored --exact real_cometbft_handshake_empty_block_and_process_restart
+cargo +1.93.0 test -p noxis-node --test cometbft_e2e --features research-testing --locked -- --ignored --exact real_cometbft_handshake_empty_block_and_process_restart
 ```
 
 ## Condições para remover o bloqueio
