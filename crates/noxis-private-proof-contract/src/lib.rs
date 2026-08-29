@@ -14,11 +14,15 @@ use noxis_tree_params::{
 use sha2::{Digest, Sha256};
 
 mod nxsm_transition;
+mod nxsm_witness;
 
 pub use nxsm_transition::{
     CANDIDATE_NXSM_NULLIFIER_TRANSITION_ENCODED_LENGTH,
     CANDIDATE_NXSM_NULLIFIER_TRANSITION_ID_DOMAIN, CandidateNxsmNullifierTransitionError,
     CandidateNxsmNullifierTransitionIdV1, CandidateNxsmNullifierTransitionV1,
+};
+pub use nxsm_witness::{
+    CandidateNxsmNullifierTransitionWitnessError, CandidateNxsmNullifierTransitionWitnessV1,
 };
 
 /// SHA-256 domain for the full candidate-deployment checksum.

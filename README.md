@@ -50,6 +50,7 @@ crates/
   noxis-tree-params  Frozen unselected tree-parameter candidates and vector framing.
   noxis-poseidon2-reference  Isolated dense reference evaluator for the unselected P24 candidate.
   noxis-nullifier-tree-state  Isolated mutable state and proof paths for the unselected NXSM candidate.
+  noxis-private-proof-contract  Candidate public proof framing and local NXSM transition witness; no proof backend.
   noxis-crypto   CryptoSuite metadata and proof-verifier boundary.
   noxis-ledger   Transactions, validation and deterministic state transitions.
   noxis-codec    Canonical binary transaction encoding and decoding.
@@ -86,6 +87,7 @@ docs/
   NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md  Independently generated NXSV v1 evidence for the NXSM candidate.
   PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md  Candidate typed binding between a private snapshot and NXSM root.
   PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md  Candidate transparent before/after NXSM nullifier relation.
+  PRIVATE_TRANSFER_WITNESS_CONSTRAINT_INTERFACE_CANDIDATE_V0_1.md  Candidate local witness contract for sequential NXSM constraints.
   ARCHITECTURE.md                Module boundaries and implementation roadmap.
 ```
 

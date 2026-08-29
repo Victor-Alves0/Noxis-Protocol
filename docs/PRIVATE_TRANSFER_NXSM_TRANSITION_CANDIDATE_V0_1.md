@@ -20,8 +20,10 @@ prévia, `CandidateNxsmNullifierTransitionV1` exige:
 
 A API também reexecuta a relação e compara todos os campos públicos antes de
 entregá-los a um futuro provador. A ausência é conferida hoje sobre estado
-transparente em memória; numa AIR, os 512 irmãos de cada caminho serão
-testemunha privada e as raízes antes/depois serão entradas públicas.
+transparente em memória. A interface local
+[`CandidateNxsmNullifierTransitionWitnessV1`](PRIVATE_TRANSFER_WITNESS_CONSTRAINT_INTERFACE_CANDIDATE_V0_1.md)
+agora mantém os dois caminhos de 512 irmãos em sequência: o segundo começa na
+raiz intermediária após a primeira inserção.
 
 ## Frame público canônico
 
@@ -50,7 +52,8 @@ ao contexto de notas; ele não deve ser interpretado como estado do ledger v1.
   proofs.
 - Não é compatível com liquidação do ledger v1, consenso ou produção.
 
-O próximo trabalho de prova deve transformar esta relação em restrições AIR:
-os caminhos de ausência, a derivação de nullifier e a atualização da raiz
-devem ser avaliados dentro do circuito, junto das restrições de notas, valores
-e saídas já especificadas.
+O próximo trabalho de prova deve transformar a
+[interface de witness e restrições](PRIVATE_TRANSFER_WITNESS_CONSTRAINT_INTERFACE_CANDIDATE_V0_1.md)
+em uma AIR: caminhos de ausência, derivação de nullifier e atualização de raiz
+devem ser avaliados dentro do circuito junto das restrições de notas, valores
+e saídas.

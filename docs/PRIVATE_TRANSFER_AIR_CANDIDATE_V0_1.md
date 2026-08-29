@@ -21,7 +21,7 @@ Os bytes recompostos carregam, na ordem já congelada: circuito, gênese, contex
 
 ## Testemunha privada e restrições
 
-Para cada entrada, a testemunha contém abertura da nota, chave de nullifier, posição e 32 irmãos Merkle. Para cada saída, contém abertura da nota. A AIR deverá impor:
+Para cada entrada, a testemunha contém abertura da nota, chave de nullifier, posição e 32 irmãos Merkle. Para cada saída, contém abertura da nota. A declaração `NXNT` exige ainda dois caminhos `NXSM` de 512 irmãos na sequência prévia → intermediária → posterior, conforme a [interface de witness](PRIVATE_TRANSFER_WITNESS_CONSTRAINT_INTERFACE_CANDIDATE_V0_1.md). A AIR deverá impor:
 
 1. `circuit_id` e `tree_parameters_id` públicos são as constantes exatas do deployment candidato.
 2. Para cada entrada: `recipient = H_ADDR(key)`, `cm = H_NOTE(...)`, `nf = H_NULLIFIER(key || rho || cm || position)`, caminho Merkle de 32 níveis e `root == pre_state_root`.
