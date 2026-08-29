@@ -10,6 +10,7 @@ noxis-nullifier-tree-reference = { path = "../noxis-nullifier-tree-reference" }
 noxis-nullifier-tree-state = { path = "../noxis-nullifier-tree-state" }
 noxis-poseidon2-reference = { path = "../noxis-poseidon2-reference" }
 noxis-poseidon2-privacy-reference = { path = "../noxis-poseidon2-privacy-reference" }
+noxis-stark-experiment = { path = "../noxis-stark-experiment" }
 noxis-private-state = { path = "../noxis-private-state" }
 noxis-privacy-types = { path = "../noxis-privacy-types" }
 noxis-types = { path = "../noxis-types" }

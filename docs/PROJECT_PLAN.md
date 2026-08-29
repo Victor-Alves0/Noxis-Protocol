@@ -100,6 +100,13 @@ uma demonstração de pesquisa pesada, não um fluxo de carteira ou validador.
 Ainda faltam uma âncora de estado aceita, ausência de nullifier e a
 transferência privada.
 
+**Preflight de posse ancorada:** `noxis-private-proof-contract` agora conecta
+uma prova P24 de posse de uma nota à raiz de notas do `NXPS v2`, ao nullifier
+da intenção `NXPU` e ao witness local de ausência/transição `NXSM`. Isso impede
+combinar uma prova válida com uma âncora ou nullifier de outra intenção. Os 512
+irmãos `NXSM` ainda são testemunha transparente local; portanto, isto não é
+prova privada de ausência, autorização de ledger nem transferência privada.
+
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem
 codec/`Debug`/`Clone`, caminho P24 de 32 níveis e uma declaração executável

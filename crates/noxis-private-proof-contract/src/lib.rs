@@ -14,6 +14,7 @@ use noxis_tree_params::{
 use sha2::{Digest, Sha256};
 
 mod air_profile;
+mod anchored_ownership;
 mod nxsm_transition;
 mod nxsm_witness;
 mod public_inputs;
@@ -27,6 +28,11 @@ pub use air_profile::{
     AIR_CONSTRAINT_VALUE_CONSERVATION, CANDIDATE_PRIVATE_TRANSFER_AIR_PROFILE_ENCODED_LENGTH,
     CANDIDATE_PRIVATE_TRANSFER_AIR_PROFILE_ID_DOMAIN, CandidatePrivateTransferAirProfileError,
     CandidatePrivateTransferAirProfileIdV1, CandidatePrivateTransferAirProfileV1,
+};
+pub use anchored_ownership::{
+    CandidateAnchoredOwnershipError, CandidateAnchoredOwnershipProofV1,
+    CandidateAnchoredOwnershipWitnessV1, prove_candidate_anchored_ownership,
+    verify_candidate_anchored_ownership,
 };
 pub use nxsm_transition::{
     CANDIDATE_NXSM_NULLIFIER_TRANSITION_ENCODED_LENGTH,
