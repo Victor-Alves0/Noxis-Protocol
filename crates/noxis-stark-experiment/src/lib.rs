@@ -65,6 +65,34 @@ const P24_MERKLE_PATH2_SECOND_SIBLING_OFFSET: usize = P24_HASH16_DIGEST_ELEMENTS
 const P24_MERKLE_PATH2_FIRST_DIRECTION_OFFSET: usize = P24_HASH16_DIGEST_ELEMENTS * 3;
 const P24_MERKLE_PATH2_SECOND_DIRECTION_OFFSET: usize = P24_MERKLE_PATH2_FIRST_DIRECTION_OFFSET + 1;
 const P24_MERKLE_PATH2_INTERMEDIATE_OFFSET: usize = P24_MERKLE_PATH2_SECOND_DIRECTION_OFFSET + 1;
+const P24_MERKLE_PATH_DEPTH: usize = 32;
+const P24_MERKLE_PATH32_PERMUTATIONS: usize = P24_HASH16_NODE_PERMUTATIONS * P24_MERKLE_PATH_DEPTH;
+const P24_MERKLE_PATH32_STEPS: usize = P24_MERKLE_PATH32_PERMUTATIONS * P24_ROUNDS;
+const P24_MERKLE_PATH32_TRACE_ROWS: usize = 4096;
+const P24_MERKLE_PATH32_ROUND_SELECTORS: usize = P24_ROUNDS;
+const P24_MERKLE_PATH32_PHASE_SELECTORS: usize = P24_MERKLE_PATH32_PERMUTATIONS;
+const P24_MERKLE_PATH32_PHASE_OFFSET: usize =
+    P24_SELECTOR_OFFSET + P24_MERKLE_PATH32_ROUND_SELECTORS;
+const P24_MERKLE_PATH32_DONE_OFFSET: usize =
+    P24_MERKLE_PATH32_PHASE_OFFSET + P24_MERKLE_PATH32_PHASE_SELECTORS;
+const P24_MERKLE_PATH32_WITNESS_OFFSET: usize = P24_MERKLE_PATH32_DONE_OFFSET + 1;
+const P24_MERKLE_PATH32_PRIVATE_WITNESS_ELEMENTS: usize = P24_HASH16_DIGEST_ELEMENTS
+    + (P24_HASH16_DIGEST_ELEMENTS * P24_MERKLE_PATH_DEPTH)
+    + P24_MERKLE_PATH_DEPTH
+    + (P24_HASH16_DIGEST_ELEMENTS * (P24_MERKLE_PATH_DEPTH - 1));
+const P24_MERKLE_PATH32_TRACE_WIDTH: usize = P24_WIDTH
+    + P24_MERKLE_PATH32_ROUND_SELECTORS
+    + P24_MERKLE_PATH32_PHASE_SELECTORS
+    + 1
+    + P24_MERKLE_PATH32_PRIVATE_WITNESS_ELEMENTS;
+const P24_MERKLE_PATH32_PUBLIC_VALUES: usize = P24_HASH16_DIGEST_ELEMENTS;
+const P24_MERKLE_PATH32_LEAF_OFFSET: usize = 0;
+const P24_MERKLE_PATH32_SIBLINGS_OFFSET: usize = P24_HASH16_DIGEST_ELEMENTS;
+const P24_MERKLE_PATH32_DIRECTIONS_OFFSET: usize =
+    P24_MERKLE_PATH32_SIBLINGS_OFFSET + (P24_HASH16_DIGEST_ELEMENTS * P24_MERKLE_PATH_DEPTH);
+const P24_MERKLE_PATH32_INTERMEDIATES_OFFSET: usize =
+    P24_MERKLE_PATH32_DIRECTIONS_OFFSET + P24_MERKLE_PATH_DEPTH;
+const P24_MERKLE_PATH32_PROVER_STACK_BYTES: usize = 64 * 1024 * 1024;
 
 type Val = BabyBear;
 type Challenge = BinomialExtensionField<Val, 4>;
@@ -145,6 +173,15 @@ pub struct Poseidon2P24MerklePath2ExperimentResult {
     pub trace_rows: usize,
 }
 
+/// Public result of a full depth-32 candidate Merkle-path proof. The leaf,
+/// siblings, directions and intermediate nodes remain private; only the root
+/// is public.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Poseidon2P24MerklePath32ExperimentResult {
+    pub root: BabyBearDigestV2,
+    pub trace_rows: usize,
+}
+
 /// The fixed AIR used only to establish the P3 integration boundary.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PrivateAccumulatorAir;
@@ -170,20 +207,25 @@ enum Poseidon2P24Hash16Shape {
     Node,
     MerkleStep,
     MerklePath2,
+    MerklePath32,
 }
 
 impl Poseidon2P24Hash16Shape {
     const fn domain(self) -> Poseidon2P24TreeDomainV1 {
         match self {
             Self::Leaf => Poseidon2P24TreeDomainV1::Leaf,
-            Self::Node | Self::MerkleStep | Self::MerklePath2 => Poseidon2P24TreeDomainV1::Node,
+            Self::Node | Self::MerkleStep | Self::MerklePath2 | Self::MerklePath32 => {
+                Poseidon2P24TreeDomainV1::Node
+            }
         }
     }
 
     const fn input_elements(self) -> usize {
         match self {
             Self::Leaf => P24_HASH16_DIGEST_ELEMENTS,
-            Self::Node | Self::MerkleStep | Self::MerklePath2 => P24_HASH16_DIGEST_ELEMENTS * 2,
+            Self::Node | Self::MerkleStep | Self::MerklePath2 | Self::MerklePath32 => {
+                P24_HASH16_DIGEST_ELEMENTS * 2
+            }
         }
     }
 
@@ -192,6 +234,7 @@ impl Poseidon2P24Hash16Shape {
             Self::Leaf => P24_HASH16_LEAF_PERMUTATIONS,
             Self::Node | Self::MerkleStep => P24_HASH16_NODE_PERMUTATIONS,
             Self::MerklePath2 => P24_MERKLE_PATH2_PERMUTATIONS,
+            Self::MerklePath32 => P24_MERKLE_PATH32_PERMUTATIONS,
         }
     }
 
@@ -204,6 +247,7 @@ impl Poseidon2P24Hash16Shape {
             Self::Leaf => P24_HASH16_LEAF_TRACE_ROWS,
             Self::Node | Self::MerkleStep => P24_HASH16_NODE_TRACE_ROWS,
             Self::MerklePath2 => P24_MERKLE_PATH2_TRACE_ROWS,
+            Self::MerklePath32 => P24_MERKLE_PATH32_TRACE_ROWS,
         }
     }
 
@@ -213,6 +257,7 @@ impl Poseidon2P24Hash16Shape {
             Self::Node => P24_HASH16_NODE_TRACE_WIDTH,
             Self::MerkleStep => P24_MERKLE_STEP_TRACE_WIDTH,
             Self::MerklePath2 => P24_MERKLE_PATH2_TRACE_WIDTH,
+            Self::MerklePath32 => P24_MERKLE_PATH32_TRACE_WIDTH,
         }
     }
 
@@ -222,19 +267,21 @@ impl Poseidon2P24Hash16Shape {
             Self::Node => P24_HASH16_NODE_PUBLIC_VALUES,
             Self::MerkleStep => P24_MERKLE_STEP_PUBLIC_VALUES,
             Self::MerklePath2 => P24_MERKLE_PATH2_PUBLIC_VALUES,
+            Self::MerklePath32 => P24_MERKLE_PATH32_PUBLIC_VALUES,
         }
     }
 
     const fn output_offset(self) -> usize {
         match self {
             Self::Leaf | Self::Node => self.input_elements(),
-            Self::MerkleStep | Self::MerklePath2 => 0,
+            Self::MerkleStep | Self::MerklePath2 | Self::MerklePath32 => 0,
         }
     }
 
     const fn private_witness_offset(self) -> Option<usize> {
         match self {
             Self::MerkleStep | Self::MerklePath2 => Some(P24_SELECTOR_OFFSET + self.steps()),
+            Self::MerklePath32 => Some(P24_MERKLE_PATH32_WITNESS_OFFSET),
             Self::Leaf | Self::Node => None,
         }
     }
@@ -243,6 +290,7 @@ impl Poseidon2P24Hash16Shape {
         match self {
             Self::MerkleStep => P24_MERKLE_STEP_PRIVATE_WITNESS_ELEMENTS,
             Self::MerklePath2 => P24_MERKLE_PATH2_PRIVATE_WITNESS_ELEMENTS,
+            Self::MerklePath32 => P24_MERKLE_PATH32_PRIVATE_WITNESS_ELEMENTS,
             Self::Leaf | Self::Node => 0,
         }
     }
@@ -250,6 +298,7 @@ impl Poseidon2P24Hash16Shape {
     const fn hash_count(self) -> usize {
         match self {
             Self::MerklePath2 => 2,
+            Self::MerklePath32 => P24_MERKLE_PATH_DEPTH,
             Self::Leaf | Self::Node | Self::MerkleStep => 1,
         }
     }
@@ -257,7 +306,9 @@ impl Poseidon2P24Hash16Shape {
     const fn permutations_per_hash(self) -> usize {
         match self {
             Self::Leaf => P24_HASH16_LEAF_PERMUTATIONS,
-            Self::Node | Self::MerkleStep | Self::MerklePath2 => P24_HASH16_NODE_PERMUTATIONS,
+            Self::Node | Self::MerkleStep | Self::MerklePath2 | Self::MerklePath32 => {
+                P24_HASH16_NODE_PERMUTATIONS
+            }
         }
     }
 }
@@ -338,7 +389,13 @@ impl<F> BaseAir<F> for Poseidon2P24Hash16Air {
     }
 
     fn max_constraint_degree(&self) -> Option<usize> {
-        Some(8)
+        Some(match self.shape {
+            Poseidon2P24Hash16Shape::MerklePath32 => 10,
+            Poseidon2P24Hash16Shape::Leaf
+            | Poseidon2P24Hash16Shape::Node
+            | Poseidon2P24Hash16Shape::MerkleStep
+            | Poseidon2P24Hash16Shape::MerklePath2 => 8,
+        })
     }
 }
 
@@ -418,6 +475,11 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Air {
 
 impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16Air {
     fn eval(&self, builder: &mut AB) {
+        if self.shape == Poseidon2P24Hash16Shape::MerklePath32 {
+            self.eval_merkle_path32::<AB>(builder);
+            return;
+        }
+
         let public_values = builder.public_values().to_vec();
         let main = builder.main();
         let local = main.current_slice();
@@ -438,8 +500,9 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16Air {
         if let Some(witness_offset) = self.shape.private_witness_offset() {
             let witness = &local[witness_offset..];
             let next_witness = &next[witness_offset..];
-            for direction_index in self.private_direction_indexes() {
-                let direction: AB::Expr = witness[*direction_index].into();
+            for direction_index in 0..self.private_direction_count() {
+                let direction: AB::Expr =
+                    witness[self.private_direction_offset() + direction_index].into();
                 builder.assert_zero(direction.clone() * (direction - AB::Expr::ONE));
             }
             for lane in 0..self.shape.private_witness_elements() {
@@ -511,6 +574,30 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16Air {
                 0,
                 &intermediate_output,
             );
+        } else if self.shape == Poseidon2P24Hash16Shape::MerklePath32 {
+            let witness_offset = self
+                .shape
+                .private_witness_offset()
+                .expect("MerklePath32 always has private witness columns");
+            for hash_index in 0..P24_MERKLE_PATH_DEPTH - 1 {
+                let intermediate_output = local[witness_offset
+                    + P24_MERKLE_PATH32_INTERMEDIATES_OFFSET
+                    + (hash_index * P24_HASH16_DIGEST_ELEMENTS)
+                    ..witness_offset
+                        + P24_MERKLE_PATH32_INTERMEDIATES_OFFSET
+                        + ((hash_index + 1) * P24_HASH16_DIGEST_ELEMENTS)]
+                    .iter()
+                    .copied()
+                    .map(Into::into)
+                    .collect::<Vec<AB::Expr>>();
+                self.assert_hash_output::<AB>(
+                    builder,
+                    selectors,
+                    &round_states[P24_ROUNDS - 1],
+                    hash_index,
+                    &intermediate_output,
+                );
+            }
         }
 
         for lane in 0..P24_WIDTH {
@@ -551,14 +638,212 @@ impl Poseidon2P24Air {
 }
 
 impl Poseidon2P24Hash16Air {
-    fn private_direction_indexes(&self) -> &'static [usize] {
+    fn eval_merkle_path32<AB: AirBuilder>(&self, builder: &mut AB) {
+        let public_values = builder.public_values().to_vec();
+        let main = builder.main();
+        let local = main.current_slice();
+        let next = main.next_slice();
+        let local_state = &local[..P24_WIDTH];
+        let next_state = &next[..P24_WIDTH];
+        let round_selectors =
+            &local[P24_SELECTOR_OFFSET..P24_SELECTOR_OFFSET + P24_MERKLE_PATH32_ROUND_SELECTORS];
+        let next_round_selectors =
+            &next[P24_SELECTOR_OFFSET..P24_SELECTOR_OFFSET + P24_MERKLE_PATH32_ROUND_SELECTORS];
+        let phase_selectors = &local[P24_MERKLE_PATH32_PHASE_OFFSET
+            ..P24_MERKLE_PATH32_PHASE_OFFSET + P24_MERKLE_PATH32_PHASE_SELECTORS];
+        let next_phase_selectors = &next[P24_MERKLE_PATH32_PHASE_OFFSET
+            ..P24_MERKLE_PATH32_PHASE_OFFSET + P24_MERKLE_PATH32_PHASE_SELECTORS];
+        let done = local[P24_MERKLE_PATH32_DONE_OFFSET];
+        let next_done = next[P24_MERKLE_PATH32_DONE_OFFSET];
+        let initial_state = self.initial_state_expression::<AB>(0, local, &public_values);
+
+        for lane in 0..P24_WIDTH {
+            builder
+                .when_first_row()
+                .assert_eq(local_state[lane], initial_state[lane].clone());
+        }
+        for (selector, round_selector) in round_selectors.iter().enumerate() {
+            builder.when_first_row().assert_eq(
+                *round_selector,
+                AB::F::from_u8(if selector == 0 { 1 } else { 0 }),
+            );
+        }
+        for (phase, phase_selector) in phase_selectors.iter().enumerate() {
+            builder.when_first_row().assert_eq(
+                *phase_selector,
+                AB::F::from_u8(if phase == 0 { 1 } else { 0 }),
+            );
+        }
+        builder.when_first_row().assert_eq(done, AB::F::ZERO);
+        let done_expr: AB::Expr = done.into();
+        builder.assert_zero(done_expr.clone() * (done_expr.clone() - AB::Expr::ONE));
+
+        let terminal: AB::Expr = round_selectors[P24_ROUNDS - 1]
+            * phase_selectors[P24_MERKLE_PATH32_PHASE_SELECTORS - 1];
+        builder.when_transition().assert_eq(
+            next_done,
+            done_expr.clone() + terminal.clone() * (AB::Expr::ONE - done_expr.clone()),
+        );
+        builder.when_transition().assert_eq(
+            next_round_selectors[0],
+            round_selectors[P24_ROUNDS - 1]
+                * (AB::Expr::ONE
+                    - AB::Expr::from(phase_selectors[P24_MERKLE_PATH32_PHASE_SELECTORS - 1])),
+        );
+        for selector in 1..P24_ROUNDS - 1 {
+            builder.when_transition().assert_eq(
+                next_round_selectors[selector],
+                round_selectors[selector - 1],
+            );
+        }
+        builder.when_transition().assert_eq(
+            next_round_selectors[P24_ROUNDS - 1],
+            round_selectors[P24_ROUNDS - 2]
+                + (round_selectors[P24_ROUNDS - 1]
+                    * phase_selectors[P24_MERKLE_PATH32_PHASE_SELECTORS - 1]),
+        );
+        for phase in 0..P24_MERKLE_PATH32_PHASE_SELECTORS - 1 {
+            let previous: AB::Expr = if phase == 0 {
+                AB::Expr::ZERO
+            } else {
+                phase_selectors[phase - 1].into()
+            };
+            builder.when_transition().assert_eq(
+                next_phase_selectors[phase],
+                phase_selectors[phase]
+                    + round_selectors[P24_ROUNDS - 1]
+                        * (previous - AB::Expr::from(phase_selectors[phase])),
+            );
+        }
+        builder.when_transition().assert_eq(
+            next_phase_selectors[P24_MERKLE_PATH32_PHASE_SELECTORS - 1],
+            phase_selectors[P24_MERKLE_PATH32_PHASE_SELECTORS - 1]
+                + (round_selectors[P24_ROUNDS - 1]
+                    * phase_selectors[P24_MERKLE_PATH32_PHASE_SELECTORS - 2]),
+        );
+
+        let witness_offset = self
+            .shape
+            .private_witness_offset()
+            .expect("MerklePath32 always has private witness columns");
+        for direction_index in 0..P24_MERKLE_PATH_DEPTH {
+            let direction: AB::Expr = local
+                [witness_offset + P24_MERKLE_PATH32_DIRECTIONS_OFFSET + direction_index]
+                .into();
+            builder.assert_zero(direction.clone() * (direction - AB::Expr::ONE));
+        }
+        for lane in 0..P24_MERKLE_PATH32_PRIVATE_WITNESS_ELEMENTS {
+            builder
+                .when_transition()
+                .assert_eq(next[witness_offset + lane], local[witness_offset + lane]);
+        }
+
+        let round_states: Vec<Vec<AB::Expr>> = (0..P24_ROUNDS)
+            .map(|round| self.permutation.round_expression::<AB>(local_state, round))
+            .collect();
+        let phase_completions: Vec<Vec<AB::Expr>> = (0..P24_MERKLE_PATH32_PHASE_SELECTORS)
+            .map(|phase| {
+                self.phase_completion_expression::<AB>(
+                    &round_states[P24_ROUNDS - 1],
+                    phase,
+                    local,
+                    &public_values,
+                )
+            })
+            .collect();
+        for lane in 0..P24_WIDTH {
+            let mut final_round_target: AB::Expr = local_state[lane].into();
+            for phase in 0..P24_MERKLE_PATH32_PHASE_SELECTORS {
+                final_round_target += phase_selectors[phase]
+                    * (phase_completions[phase][lane].clone() - local_state[lane]);
+            }
+            let mut expected_next: AB::Expr = local_state[lane].into();
+            for round in 0..P24_ROUNDS {
+                let target = if round + 1 == P24_ROUNDS {
+                    final_round_target.clone()
+                } else {
+                    round_states[round][lane].clone()
+                };
+                expected_next += (AB::Expr::ONE - done_expr.clone())
+                    * round_selectors[round]
+                    * (target - local_state[lane]);
+            }
+            builder
+                .when_transition()
+                .assert_eq(next_state[lane], expected_next);
+        }
+
+        self.assert_merkle_path32_outputs::<AB>(
+            builder,
+            &round_states[P24_ROUNDS - 1],
+            round_selectors[P24_ROUNDS - 1],
+            phase_selectors,
+            done,
+            local,
+            &public_values,
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)] // AIR evaluation context is intentionally explicit.
+    fn assert_merkle_path32_outputs<AB: AirBuilder>(
+        &self,
+        builder: &mut AB,
+        final_round_state: &[AB::Expr],
+        final_round_selector: AB::Var,
+        phase_selectors: &[AB::Var],
+        done: AB::Var,
+        local: &[AB::Var],
+        public_values: &[AB::PublicVar],
+    ) {
+        let active: AB::Expr = AB::Expr::ONE - AB::Expr::from(done);
+        let witness_offset = P24_MERKLE_PATH32_WITNESS_OFFSET;
+        for hash_index in 0..P24_MERKLE_PATH_DEPTH {
+            let output = if hash_index + 1 == P24_MERKLE_PATH_DEPTH {
+                public_values
+                    .iter()
+                    .copied()
+                    .map(Into::into)
+                    .collect::<Vec<AB::Expr>>()
+            } else {
+                let start = witness_offset
+                    + P24_MERKLE_PATH32_INTERMEDIATES_OFFSET
+                    + (hash_index * P24_HASH16_DIGEST_ELEMENTS);
+                local[start..start + P24_HASH16_DIGEST_ELEMENTS]
+                    .iter()
+                    .copied()
+                    .map(Into::into)
+                    .collect::<Vec<AB::Expr>>()
+            };
+            let first_squeeze_phase = (hash_index * P24_HASH16_NODE_PERMUTATIONS) + 2;
+            let final_squeeze_phase = first_squeeze_phase + 1;
+            let first_gate: AB::Expr =
+                active.clone() * final_round_selector * phase_selectors[first_squeeze_phase];
+            for lane in 0..15 {
+                builder.assert_zero(
+                    first_gate.clone() * (final_round_state[lane].clone() - output[lane].clone()),
+                );
+            }
+            let final_gate: AB::Expr =
+                active.clone() * final_round_selector * phase_selectors[final_squeeze_phase];
+            builder.assert_zero(final_gate * (final_round_state[0].clone() - output[15].clone()));
+        }
+    }
+
+    const fn private_direction_offset(&self) -> usize {
         match self.shape {
-            Poseidon2P24Hash16Shape::MerkleStep => &[P24_MERKLE_STEP_PRIVATE_WITNESS_ELEMENTS - 1],
-            Poseidon2P24Hash16Shape::MerklePath2 => &[
-                P24_MERKLE_PATH2_FIRST_DIRECTION_OFFSET,
-                P24_MERKLE_PATH2_SECOND_DIRECTION_OFFSET,
-            ],
-            Poseidon2P24Hash16Shape::Leaf | Poseidon2P24Hash16Shape::Node => &[],
+            Poseidon2P24Hash16Shape::MerkleStep => P24_MERKLE_STEP_PRIVATE_WITNESS_ELEMENTS - 1,
+            Poseidon2P24Hash16Shape::MerklePath2 => P24_MERKLE_PATH2_FIRST_DIRECTION_OFFSET,
+            Poseidon2P24Hash16Shape::MerklePath32 => P24_MERKLE_PATH32_DIRECTIONS_OFFSET,
+            Poseidon2P24Hash16Shape::Leaf | Poseidon2P24Hash16Shape::Node => 0,
+        }
+    }
+
+    const fn private_direction_count(&self) -> usize {
+        match self.shape {
+            Poseidon2P24Hash16Shape::MerkleStep => 1,
+            Poseidon2P24Hash16Shape::MerklePath2 => 2,
+            Poseidon2P24Hash16Shape::MerklePath32 => P24_MERKLE_PATH_DEPTH,
+            Poseidon2P24Hash16Shape::Leaf | Poseidon2P24Hash16Shape::Node => 0,
         }
     }
 
@@ -662,6 +947,31 @@ impl Poseidon2P24Hash16Air {
                     ),
                     _ => unreachable!("MerklePath2 has exactly two hashes"),
                 };
+                let current: AB::Expr = local[witness_offset + current_offset + lane].into();
+                let sibling: AB::Expr = local[witness_offset + sibling_offset + lane].into();
+                let direction: AB::Expr = local[witness_offset + direction_offset].into();
+
+                if input_index < P24_HASH16_DIGEST_ELEMENTS {
+                    current.clone() + direction.clone() * (sibling.clone() - current)
+                } else {
+                    sibling.clone() + direction * (current - sibling)
+                }
+            }
+            Poseidon2P24Hash16Shape::MerklePath32 => {
+                let witness_offset = self
+                    .shape
+                    .private_witness_offset()
+                    .expect("MerklePath32 always has private witness columns");
+                let lane = input_index % P24_HASH16_DIGEST_ELEMENTS;
+                let current_offset = if hash_index == 0 {
+                    P24_MERKLE_PATH32_LEAF_OFFSET
+                } else {
+                    P24_MERKLE_PATH32_INTERMEDIATES_OFFSET
+                        + ((hash_index - 1) * P24_HASH16_DIGEST_ELEMENTS)
+                };
+                let sibling_offset =
+                    P24_MERKLE_PATH32_SIBLINGS_OFFSET + (hash_index * P24_HASH16_DIGEST_ELEMENTS);
+                let direction_offset = P24_MERKLE_PATH32_DIRECTIONS_OFFSET + hash_index;
                 let current: AB::Expr = local[witness_offset + current_offset + lane].into();
                 let sibling: AB::Expr = local[witness_offset + sibling_offset + lane].into();
                 let direction: AB::Expr = local[witness_offset + direction_offset].into();
@@ -856,6 +1166,40 @@ pub fn prove_and_verify_p24_merkle_path2(
     })
 }
 
+/// Produces and verifies a hiding-FRI STARK for the full fixed depth-32 P24
+/// candidate Merkle path. The `leaf_index` supplies private direction bits in
+/// least-significant-bit-first order; the verifier receives only `root`.
+///
+/// This proves candidate tree membership relative to the supplied public root.
+/// It still does not prove ownership, bind the leaf to a note opening, or bind
+/// the root to a Noxis state anchor.
+pub fn prove_and_verify_p24_merkle_path32(
+    leaf: BabyBearDigestV2,
+    leaf_index: u32,
+    siblings: [BabyBearDigestV2; P24_MERKLE_PATH_DEPTH],
+) -> Result<Poseidon2P24MerklePath32ExperimentResult, StarkExperimentError> {
+    let reference = Poseidon2P24Reference::load_candidate()?;
+    let directions = core::array::from_fn(|level| ((leaf_index >> level) & 1) == 1);
+    let mut current = leaf;
+    let mut intermediates = [[0_u32; P24_HASH16_DIGEST_ELEMENTS]; P24_MERKLE_PATH_DEPTH - 1];
+    for level in 0..P24_MERKLE_PATH_DEPTH {
+        current = candidate_node(&reference, current, siblings[level], directions[level])?;
+        if level + 1 < P24_MERKLE_PATH_DEPTH {
+            intermediates[level] = current;
+        }
+    }
+    let root = current;
+    let air =
+        Poseidon2P24Hash16Air::from_reference(&reference, Poseidon2P24Hash16Shape::MerklePath32)?;
+    let trace = build_p24_merkle_path32_trace(&air, leaf, siblings, directions, intermediates);
+    let public_values = root.map(Val::from_u32);
+    prove_and_verify_with_large_stack(air, trace, public_values)?;
+    Ok(Poseidon2P24MerklePath32ExperimentResult {
+        root,
+        trace_rows: P24_MERKLE_PATH32_TRACE_ROWS,
+    })
+}
+
 fn prove_and_verify_p24_hash16(
     shape: Poseidon2P24Hash16Shape,
     input: &[u32],
@@ -932,11 +1276,27 @@ pub fn run_p24_merkle_path2_research_smoke()
     )
 }
 
+/// A command-friendly proof of one full fixed-depth candidate Merkle path.
+pub fn run_p24_merkle_path32_research_smoke()
+-> Result<Poseidon2P24MerklePath32ExperimentResult, StarkExperimentError> {
+    let reference = Poseidon2P24Reference::load_candidate()?;
+    let commitments = [
+        core::array::from_fn(|index| index as u32 + 1),
+        core::array::from_fn(|index| index as u32 + 17),
+        core::array::from_fn(|index| index as u32 + 33),
+    ];
+    let (leaf, siblings, expected_root) = reference.small_tree_path(&commitments, 2)?;
+    let result = prove_and_verify_p24_merkle_path32(leaf, 2, siblings)?;
+    debug_assert_eq!(result.root, expected_root);
+    Ok(result)
+}
+
 #[derive(Debug)]
 pub enum StarkExperimentError {
     CandidateParameters(Poseidon2P24ReferenceError),
     CandidateTreeParameters(Poseidon2P24CandidateError),
     VerificationFailed,
+    ProverThreadFailed,
 }
 
 impl From<Poseidon2P24ReferenceError> for StarkExperimentError {
@@ -969,11 +1329,34 @@ impl std::fmt::Display for StarkExperimentError {
             Self::VerificationFailed => {
                 formatter.write_str("Plonky3 rejected the research STARK proof")
             }
+            Self::ProverThreadFailed => {
+                formatter.write_str("the dedicated depth-32 STARK prover thread could not complete")
+            }
         }
     }
 }
 
 impl std::error::Error for StarkExperimentError {}
+
+fn prove_and_verify_with_large_stack(
+    air: Poseidon2P24Hash16Air,
+    trace: RowMajorMatrix<Val>,
+    public_values: [Val; P24_HASH16_DIGEST_ELEMENTS],
+) -> Result<(), StarkExperimentError> {
+    let prover = std::thread::Builder::new()
+        .name("noxis-p24-path32-prover".to_owned())
+        .stack_size(P24_MERKLE_PATH32_PROVER_STACK_BYTES)
+        .spawn(move || {
+            let config = make_hiding_config_with_log_blowup(4);
+            let proof = prove(&config, &air, trace, &public_values);
+            verify(&config, &air, &proof, &public_values)
+                .map_err(|_| StarkExperimentError::VerificationFailed)
+        })
+        .map_err(|_| StarkExperimentError::ProverThreadFailed)?;
+    prover
+        .join()
+        .map_err(|_| StarkExperimentError::ProverThreadFailed)?
+}
 
 fn build_trace(initial_state: u32, increments: [u32; TRACE_ROWS - 1]) -> RowMajorMatrix<Val> {
     let mut values = Val::zero_vec(TRACE_ROWS * TRACE_WIDTH);
@@ -1166,6 +1549,103 @@ fn build_p24_merkle_path2_trace(
     RowMajorMatrix::new(values, air.shape.trace_width())
 }
 
+fn build_p24_merkle_path32_trace(
+    air: &Poseidon2P24Hash16Air,
+    leaf: BabyBearDigestV2,
+    siblings: [BabyBearDigestV2; P24_MERKLE_PATH_DEPTH],
+    directions: [bool; P24_MERKLE_PATH_DEPTH],
+    intermediates: [BabyBearDigestV2; P24_MERKLE_PATH_DEPTH - 1],
+) -> RowMajorMatrix<Val> {
+    debug_assert_eq!(air.shape, Poseidon2P24Hash16Shape::MerklePath32);
+
+    let mut inputs = Vec::with_capacity(P24_MERKLE_PATH_DEPTH);
+    let mut current = leaf;
+    for level in 0..P24_MERKLE_PATH_DEPTH {
+        inputs.push(p24_node_input(current, siblings[level], directions[level]));
+        if level + 1 < P24_MERKLE_PATH_DEPTH {
+            current = intermediates[level];
+        }
+    }
+
+    let mut values = Val::zero_vec(air.shape.trace_rows() * air.shape.trace_width());
+    let mut raw_state = [Val::ZERO; P24_WIDTH];
+    for (lane, value) in inputs[0].iter().copied().take(15).enumerate() {
+        raw_state[lane] = Val::from_u32(value);
+    }
+    for (lane, value) in air.iv.into_iter().enumerate() {
+        raw_state[15 + lane] = Val::from_u32(value);
+    }
+    let mut state = matrix_values(&air.permutation.external_matrix, &raw_state);
+    let witness_offset = air
+        .shape
+        .private_witness_offset()
+        .expect("MerklePath32 always has private witness columns");
+
+    for row in 0..air.shape.trace_rows() {
+        let offset = row * air.shape.trace_width();
+        values[offset..offset + P24_WIDTH].copy_from_slice(&state);
+        let witness = &mut values[offset + witness_offset
+            ..offset + witness_offset + P24_MERKLE_PATH32_PRIVATE_WITNESS_ELEMENTS];
+        witness[P24_MERKLE_PATH32_LEAF_OFFSET
+            ..P24_MERKLE_PATH32_LEAF_OFFSET + P24_HASH16_DIGEST_ELEMENTS]
+            .copy_from_slice(&leaf.map(Val::from_u32));
+        for (level, sibling) in siblings.iter().enumerate() {
+            let start = P24_MERKLE_PATH32_SIBLINGS_OFFSET + (level * P24_HASH16_DIGEST_ELEMENTS);
+            witness[start..start + P24_HASH16_DIGEST_ELEMENTS]
+                .copy_from_slice(&sibling.map(Val::from_u32));
+            witness[P24_MERKLE_PATH32_DIRECTIONS_OFFSET + level] = if directions[level] {
+                Val::ONE
+            } else {
+                Val::ZERO
+            };
+        }
+        for (level, intermediate) in intermediates.iter().enumerate() {
+            let start =
+                P24_MERKLE_PATH32_INTERMEDIATES_OFFSET + (level * P24_HASH16_DIGEST_ELEMENTS);
+            witness[start..start + P24_HASH16_DIGEST_ELEMENTS]
+                .copy_from_slice(&intermediate.map(Val::from_u32));
+        }
+
+        if row < P24_MERKLE_PATH32_STEPS {
+            let phase = row / P24_ROUNDS;
+            let round = row % P24_ROUNDS;
+            values[offset + P24_SELECTOR_OFFSET + round] = Val::ONE;
+            values[offset + P24_MERKLE_PATH32_PHASE_OFFSET + phase] = Val::ONE;
+            let hash_index = phase / P24_HASH16_NODE_PERMUTATIONS;
+            let phase_in_hash = phase % P24_HASH16_NODE_PERMUTATIONS;
+            state = round_values(&air.permutation, state, round);
+            if round + 1 == P24_ROUNDS {
+                if phase_in_hash + 1 < P24_HASH16_NODE_PERMUTATIONS {
+                    let input_start = (phase_in_hash + 1) * 15;
+                    for lane in 0..15 {
+                        if input_start + lane < inputs[hash_index].len() {
+                            state[lane] += Val::from_u32(inputs[hash_index][input_start + lane]);
+                        }
+                    }
+                    state = matrix_values(&air.permutation.external_matrix, &state);
+                } else if hash_index + 1 < P24_MERKLE_PATH_DEPTH {
+                    let mut next_raw = [Val::ZERO; P24_WIDTH];
+                    for (lane, value) in inputs[hash_index + 1].iter().copied().take(15).enumerate()
+                    {
+                        next_raw[lane] = Val::from_u32(value);
+                    }
+                    for (lane, value) in air.iv.into_iter().enumerate() {
+                        next_raw[15 + lane] = Val::from_u32(value);
+                    }
+                    state = matrix_values(&air.permutation.external_matrix, &next_raw);
+                }
+            }
+        } else {
+            values[offset + P24_SELECTOR_OFFSET + P24_ROUNDS - 1] = Val::ONE;
+            values
+                [offset + P24_MERKLE_PATH32_PHASE_OFFSET + P24_MERKLE_PATH32_PHASE_SELECTORS - 1] =
+                Val::ONE;
+            values[offset + P24_MERKLE_PATH32_DONE_OFFSET] = Val::ONE;
+        }
+    }
+    RowMajorMatrix::new(values, air.shape.trace_width())
+}
+
 fn p24_node_input(
     current: BabyBearDigestV2,
     sibling: BabyBearDigestV2,
@@ -1235,6 +1715,10 @@ fn matrix_expression<AB: AirBuilder>(
 }
 
 fn make_hiding_config() -> Config {
+    make_hiding_config_with_log_blowup(3)
+}
+
+fn make_hiding_config_with_log_blowup(log_blowup: usize) -> Config {
     let byte_hash = ByteHash {};
     let u64_hash = U64Hash::new(KeccakF {});
     let field_hash = FieldHash::new(u64_hash);
@@ -1242,7 +1726,7 @@ fn make_hiding_config() -> Config {
     let val_mmcs = ValHidingMmcs::new(field_hash, compress, 0, secure_rng());
     let challenge_mmcs = ChallengeHidingMmcs::new(val_mmcs.clone());
     let fri_params = FriParameters {
-        log_blowup: 3,
+        log_blowup,
         log_final_poly_len: 0,
         max_log_arity: 1,
         num_queries: 32,
@@ -1686,6 +2170,36 @@ mod tests {
             }))
             .is_err()
         );
+    }
+
+    #[test]
+    fn private_merkle_path32_air_accepts_a_complete_external_path_trace() {
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let commitments = [
+            core::array::from_fn(|index| index as u32 + 1),
+            core::array::from_fn(|index| index as u32 + 17),
+            core::array::from_fn(|index| index as u32 + 33),
+        ];
+        let (leaf, siblings, root) = reference.small_tree_path(&commitments, 2).unwrap();
+        let directions = core::array::from_fn(|level| ((2_u32 >> level) & 1) == 1);
+        let mut current = leaf;
+        let mut intermediates = [[0_u32; P24_HASH16_DIGEST_ELEMENTS]; P24_MERKLE_PATH_DEPTH - 1];
+        for level in 0..P24_MERKLE_PATH_DEPTH {
+            current =
+                candidate_node(&reference, current, siblings[level], directions[level]).unwrap();
+            if level + 1 < P24_MERKLE_PATH_DEPTH {
+                intermediates[level] = current;
+            }
+        }
+        assert_eq!(current, root);
+        let air = Poseidon2P24Hash16Air::from_reference(
+            &reference,
+            Poseidon2P24Hash16Shape::MerklePath32,
+        )
+        .unwrap();
+        let trace = build_p24_merkle_path32_trace(&air, leaf, siblings, directions, intermediates);
+
+        p3_air::check_constraints(&air, &trace, &root.map(Val::from_u32));
     }
 
     #[test]

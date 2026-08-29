@@ -86,8 +86,13 @@ nó, com filhos invertidos, são verificados para manter explícita a orientaç�
 O experimento agora também encadeia dois desses passos na mesma prova: folha,
 dois irmãos, dois bits e o pai intermediário ficam privados; apenas a raiz de
 dois níveis é pública. As quatro orientações iniciais do corpus externo de
-caminhos são verificadas. Ainda não há caminho de 32 níveis, membership ou
-transferência privada.
+caminhos são verificadas. O mesmo AIR agora também prova um caminho candidato
+inteiro de 32 níveis: folha, irmãos, direções e 31 nós intermediários ficam
+privados e apenas a raiz é pública. A prova completa exige build `--release`,
+pilha dedicada de 64 MiB e perfil FRI com `log_blowup = 4`, pois o AIR compacto
+tem grau 10. É uma demonstração de pesquisa pesada, não um fluxo de carteira
+ou validador. Ainda faltam vínculo à abertura/posse da nota, âncora de estado,
+nullifier e transferência privada.
 
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem

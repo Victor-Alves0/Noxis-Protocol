@@ -1,6 +1,7 @@
 use noxis_stark_experiment::{
     run_p24_leaf_research_smoke, run_p24_merkle_path2_research_smoke,
-    run_p24_merkle_step_research_smoke, run_p24_node_research_smoke,
+    run_p24_merkle_path32_research_smoke, run_p24_merkle_step_research_smoke,
+    run_p24_node_research_smoke,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -8,6 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let node = run_p24_node_research_smoke()?;
     let merkle_step = run_p24_merkle_step_research_smoke()?;
     let merkle_path2 = run_p24_merkle_path2_research_smoke()?;
+    let merkle_path32 = run_p24_merkle_path32_research_smoke()?;
     println!("Noxis Poseidon2-P24 leaf STARK proof accepted");
     println!("Public commitment lane 0: {}", leaf.commitment[0]);
     println!("Public leaf lane 0: {}", leaf.leaf[0]);
@@ -24,9 +26,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!("Noxis Poseidon2-P24 private two-level Merkle-path STARK proof accepted");
     println!("Public Merkle-path root lane 0: {}", merkle_path2.root[0]);
+    println!("Noxis Poseidon2-P24 private depth-32 Merkle-path STARK proof accepted");
+    println!("Public depth-32 root lane 0: {}", merkle_path32.root[0]);
     println!(
-        "Private sponge trace rows (leaf/node/step/path): {}/{}/{}/{}",
-        leaf.trace_rows, node.trace_rows, merkle_step.trace_rows, merkle_path2.trace_rows
+        "Private sponge trace rows (leaf/node/step/path2/path32): {}/{}/{}/{}/{}",
+        leaf.trace_rows,
+        node.trace_rows,
+        merkle_step.trace_rows,
+        merkle_path2.trace_rows,
+        merkle_path32.trace_rows
     );
     Ok(())
 }
