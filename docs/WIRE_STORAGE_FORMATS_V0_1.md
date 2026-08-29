@@ -138,8 +138,8 @@ assertion.
 The assertions are intentionally explicit rather than a naming heuristic:
 format-version constants use several legitimate Rust names. This cannot prove
 that a row's semantic limits are correct; owner-codec tests and review remain
-the authority for that. It does prevent a new binary identity or an unreviewed
-version change from silently losing its audit-home.
+the authority for that. It prevents a new magic, a stale registry row, or a
+changed registered-version assertion from silently losing its audit-home.
 
 Read [`DURABILITY_SPEC_V0_1.md`](DURABILITY_SPEC_V0_1.md) next for durable
 authority. For candidates, use the [private-transfer research trail](README.md#private-transfer-research-trail): their registry presence is an audit index, not activation.
