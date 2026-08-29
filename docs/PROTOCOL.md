@@ -24,10 +24,10 @@ without disclosing the witness.
 - A research-only local operational demo.
 - A Plonky3 STARK experiment that proves the frozen Poseidon2-P24 candidate
   permutation, byte-exact private `H_ADDR` and `H_NOTE` preimages, a composed
-  private key-to-note-to-nullifier-to-leaf two-level membership binding and
-  ordered `Hash16(Node, left || right)` against external vectors, plus a
-  separate full depth-32 private path. Full-depth ownership and membership
-  remain unjoined: it is not a private-transfer proof.
+  private key-to-note-to-nullifier-to-leaf full depth-32 membership binding
+  and ordered `Hash16(Node, left || right)` against external vectors. It does
+  not yet prove state-anchor acceptance, nullifier absence or a private
+  transfer.
 
 ## What does not exist yet
 

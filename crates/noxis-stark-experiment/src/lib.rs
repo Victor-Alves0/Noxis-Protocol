@@ -44,7 +44,8 @@ pub use note::{
 };
 pub use ownership::{
     Poseidon2P24OwnershipExperimentResult, prove_and_verify_p24_note_ownership,
-    prove_and_verify_p24_note_ownership_path2, run_p24_note_ownership_research_smoke,
+    prove_and_verify_p24_note_ownership_path2, prove_and_verify_p24_note_ownership_path32,
+    run_p24_note_ownership_research_smoke,
 };
 
 const TRACE_WIDTH: usize = 2;
