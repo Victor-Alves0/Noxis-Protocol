@@ -63,6 +63,25 @@ impl Poseidon2P24Reference {
         })
     }
 
+    /// Returns the frozen public parameters consumed by an AIR implementation.
+    ///
+    /// The matrices and round constants are deployment parameters, not secret
+    /// witness material. Exposing read-only references lets an independent
+    /// prover implementation use this crate as its canonical parameter source.
+    pub const fn external_matrix(&self) -> &[[u32; P24_WIDTH]; P24_WIDTH] {
+        &self.external_matrix
+    }
+
+    /// Returns the frozen internal linear layer of the candidate permutation.
+    pub const fn internal_matrix(&self) -> &[[u32; P24_WIDTH]; P24_WIDTH] {
+        &self.internal_matrix
+    }
+
+    /// Returns the frozen round constants of the candidate permutation.
+    pub const fn round_constants(&self) -> &[[u32; P24_WIDTH]; P24_TOTAL_ROUNDS] {
+        &self.round_constants
+    }
+
     /// Applies the candidate permutation to one complete canonical state.
     pub fn permutation(
         &self,
