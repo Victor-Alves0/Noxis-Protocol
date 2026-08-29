@@ -11,6 +11,7 @@ members = [
     "crates/noxis-private-state",
     "crates/noxis-note-opening",
     "crates/noxis-crypto",
+    "crates/noxis-wallet-crypto",
     "crates/noxis-ledger",
     "crates/noxis-codec",
     "crates/noxis-merkle",

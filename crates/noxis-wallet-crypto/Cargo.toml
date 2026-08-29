@@ -1,0 +1,17 @@
+[package]
+name = "noxis-wallet-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
+ml-dsa = { version = "0.1.1", features = ["getrandom"] }
+ml-kem = { version = "0.3.2", features = ["getrandom", "zeroize"] }
+rand_core = { version = "0.6.4", features = ["getrandom"] }
+x25519-dalek = { version = "2.0.1", features = ["getrandom", "static_secrets"] }
+zeroize = "1.8.1"
+
+[lints]
+workspace = true
