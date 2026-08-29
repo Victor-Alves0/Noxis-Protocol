@@ -10,8 +10,9 @@ tests and independent review.
 - The legacy ledger state uses its current research implementation boundaries;
   it is not a private-transfer construction.
 - Poseidon2-P24 is a frozen **candidate** for private-note and tree work. A
-  dense reference evaluator, external vectors and a STARK permutation
-  experiment exist; the candidate is not selected for production.
+  dense reference evaluator, external vectors and a STARK experiment for its
+  permutation and candidate leaf hash exist; the candidate is not selected
+  for production.
 - The proof direction is transparent STARK/AIR. A complete private-transfer
   statement and production verifier do not yet exist.
 - The hybrid wallet profile is experimental. It does not enable active

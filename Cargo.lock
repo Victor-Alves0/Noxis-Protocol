@@ -676,6 +676,7 @@ name = "noxis-stark-experiment"
 version = "0.1.0"
 dependencies = [
  "noxis-poseidon2-reference",
+ "noxis-tree-params",
  "p3-air",
  "p3-baby-bear",
  "p3-challenger",

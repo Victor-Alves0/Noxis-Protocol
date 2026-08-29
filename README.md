@@ -46,6 +46,10 @@ review and testing expectations.
 - Non-self-referential transaction intent IDs, bound with genesis, validation-context and pre-transition state IDs in every transfer proof and mint-authorization statement.
 - Canonical `NXCP` checkpoints, atomically published under the protected data directory and verified against strict replay.
 - Versioned cryptographic-suite metadata to prevent permanent coupling to one primitive.
+- A research-only Plonky3 STARK experiment that proves the frozen
+  Poseidon2-P24 candidate permutation and its `Hash16(Leaf, commitment)`
+  construction against external leaf vectors. It is not a note-membership,
+  nullifier, value-conservation or private-transfer proof.
 - Canonical consensus data: weighted validator sets, block headers, record commitments and finality-certificate verification boundaries. This is not yet a running validator network or a finality claim.
 - Genesis and the protected local manifest commit to the validator set, public verification keys, declared fault budget and consensus limits. A node cannot reopen the same data directory with a different consensus configuration.
 - Tests for unauthorized issuance, duplicate nullifiers, duplicate commitments, and unknown assets.

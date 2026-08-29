@@ -8,7 +8,11 @@
 //! privacy property.
 
 use noxis_poseidon2_reference::{
-    BabyBearStateP24, P24_WIDTH, Poseidon2P24Reference, Poseidon2P24ReferenceError,
+    BabyBearDigestV2, BabyBearStateP24, P24_WIDTH, Poseidon2P24Reference,
+    Poseidon2P24ReferenceError,
+};
+use noxis_tree_params::{
+    CandidatePoseidon2P24ManifestV2, Poseidon2P24CandidateError, Poseidon2P24TreeDomainV1,
 };
 use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_baby_bear::BabyBear;
@@ -33,6 +37,11 @@ const P24_TRACE_ROWS: usize = 32;
 const P24_SELECTOR_OFFSET: usize = P24_WIDTH;
 const P24_TRACE_WIDTH: usize = P24_WIDTH + P24_ROUNDS;
 const P24_PUBLIC_VALUES: usize = P24_WIDTH * 2;
+const P24_HASH16_LEAF_PERMUTATIONS: usize = 3;
+const P24_HASH16_LEAF_STEPS: usize = P24_HASH16_LEAF_PERMUTATIONS * P24_ROUNDS;
+const P24_HASH16_LEAF_TRACE_ROWS: usize = 128;
+const P24_HASH16_LEAF_TRACE_WIDTH: usize = P24_WIDTH + P24_HASH16_LEAF_STEPS;
+const P24_HASH16_LEAF_PUBLIC_VALUES: usize = 32;
 
 type Val = BabyBear;
 type Challenge = BinomialExtensionField<Val, 4>;
@@ -74,6 +83,16 @@ pub struct Poseidon2P24ExperimentResult {
     pub trace_rows: usize,
 }
 
+/// Public result of a STARK for the candidate `Hash16(Leaf, commitment)`
+/// construction. The commitment and its leaf digest are public; the sponge
+/// states across all three permutations remain in the hidden trace.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Poseidon2P24LeafExperimentResult {
+    pub commitment: BabyBearDigestV2,
+    pub leaf: BabyBearDigestV2,
+    pub trace_rows: usize,
+}
+
 /// The fixed AIR used only to establish the P3 integration boundary.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PrivateAccumulatorAir;
@@ -92,6 +111,19 @@ pub struct Poseidon2P24Air {
     round_constants: [[u32; P24_WIDTH]; P24_ROUNDS],
 }
 
+/// AIR for the exact `Hash16(Leaf, commitment)` candidate construction.
+///
+/// It composes three constrained P24 permutations with the frozen leaf IV,
+/// the two absorption phases required for sixteen input elements and the
+/// prescribed squeeze. This is the first STARK binding between a candidate
+/// note commitment and a candidate Merkle leaf; it is not yet a Merkle path
+/// or a private-transfer proof.
+#[derive(Clone, Debug)]
+pub struct Poseidon2P24Hash16LeafAir {
+    permutation: Poseidon2P24Air,
+    leaf_iv: [u32; 9],
+}
+
 impl Poseidon2P24Air {
     fn from_reference(reference: &Poseidon2P24Reference) -> Self {
         Self {
@@ -99,6 +131,15 @@ impl Poseidon2P24Air {
             internal_matrix: *reference.internal_matrix(),
             round_constants: *reference.round_constants(),
         }
+    }
+}
+
+impl Poseidon2P24Hash16LeafAir {
+    fn from_reference(reference: &Poseidon2P24Reference) -> Result<Self, StarkExperimentError> {
+        Ok(Self {
+            permutation: Poseidon2P24Air::from_reference(reference),
+            leaf_iv: CandidatePoseidon2P24ManifestV2::new().iv(Poseidon2P24TreeDomainV1::Leaf)?,
+        })
     }
 }
 
@@ -123,6 +164,20 @@ impl<F> BaseAir<F> for Poseidon2P24Air {
 
     fn num_public_values(&self) -> usize {
         P24_PUBLIC_VALUES
+    }
+
+    fn max_constraint_degree(&self) -> Option<usize> {
+        Some(8)
+    }
+}
+
+impl<F> BaseAir<F> for Poseidon2P24Hash16LeafAir {
+    fn width(&self) -> usize {
+        P24_HASH16_LEAF_TRACE_WIDTH
+    }
+
+    fn num_public_values(&self) -> usize {
+        P24_HASH16_LEAF_PUBLIC_VALUES
     }
 
     fn max_constraint_degree(&self) -> Option<usize> {
@@ -204,6 +259,84 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Air {
     }
 }
 
+impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16LeafAir {
+    fn eval(&self, builder: &mut AB) {
+        let public_values = builder.public_values().to_vec();
+        let main = builder.main();
+        let local = main.current_slice();
+        let next = main.next_slice();
+        let local_state = &local[..P24_WIDTH];
+        let next_state = &next[..P24_WIDTH];
+        let selectors = &local[P24_SELECTOR_OFFSET..P24_HASH16_LEAF_TRACE_WIDTH];
+        let next_selectors = &next[P24_SELECTOR_OFFSET..P24_HASH16_LEAF_TRACE_WIDTH];
+
+        let initial_state = self.initial_state_expression::<AB>(&public_values);
+        for lane in 0..P24_WIDTH {
+            builder
+                .when_first_row()
+                .assert_eq(local_state[lane], initial_state[lane].clone());
+        }
+
+        for selector in 0..P24_HASH16_LEAF_STEPS {
+            builder.when_first_row().assert_eq(
+                selectors[selector],
+                AB::F::from_u8(if selector == 0 { 1 } else { 0 }),
+            );
+            let expected_next_selector = if selector == 0 {
+                AB::Expr::ZERO
+            } else {
+                selectors[selector - 1].into()
+            };
+            builder
+                .when_transition()
+                .assert_eq(next_selectors[selector], expected_next_selector);
+        }
+
+        let round_states: Vec<Vec<AB::Expr>> = (0..P24_ROUNDS)
+            .map(|round| self.permutation.round_expression::<AB>(local_state, round))
+            .collect();
+        let phase_completions: Vec<Vec<AB::Expr>> = (0..P24_HASH16_LEAF_PERMUTATIONS)
+            .map(|phase| {
+                self.phase_completion_expression::<AB>(
+                    &round_states[P24_ROUNDS - 1],
+                    phase,
+                    &public_values,
+                )
+            })
+            .collect();
+        for lane in 0..15 {
+            let output: AB::Expr = public_values[16 + lane].into();
+            builder.assert_zero(
+                selectors[(P24_ROUNDS * 2) - 1]
+                    * (round_states[P24_ROUNDS - 1][lane].clone() - output),
+            );
+        }
+        let final_output: AB::Expr = public_values[31].into();
+        builder.assert_zero(
+            selectors[P24_HASH16_LEAF_STEPS - 1]
+                * (round_states[P24_ROUNDS - 1][0].clone() - final_output),
+        );
+
+        for lane in 0..P24_WIDTH {
+            let mut expected_next: AB::Expr = local_state[lane].into();
+            for (phase, phase_completion) in phase_completions.iter().enumerate() {
+                for (round, round_state) in round_states.iter().enumerate() {
+                    let step = (phase * P24_ROUNDS) + round;
+                    let target = if round + 1 == P24_ROUNDS {
+                        phase_completion[lane].clone()
+                    } else {
+                        round_state[lane].clone()
+                    };
+                    expected_next += selectors[step] * (target - local_state[lane]);
+                }
+            }
+            builder
+                .when_transition()
+                .assert_eq(next_state[lane], expected_next);
+        }
+    }
+}
+
 impl Poseidon2P24Air {
     fn round_expression<AB: AirBuilder>(&self, state: &[AB::Var], round: usize) -> Vec<AB::Expr> {
         let mut added: Vec<AB::Expr> = state.iter().copied().map(|value| value.into()).collect();
@@ -217,6 +350,43 @@ impl Poseidon2P24Air {
             added[0] = added[0].clone() + AB::F::from_u32(self.round_constants[round][0]);
             added[0] = seventh_power::<AB>(added[0].clone());
             matrix_expression::<AB>(&self.internal_matrix, &added)
+        }
+    }
+}
+
+impl Poseidon2P24Hash16LeafAir {
+    fn initial_state_expression<AB: AirBuilder>(
+        &self,
+        public_values: &[AB::PublicVar],
+    ) -> Vec<AB::Expr> {
+        let raw = (0..P24_WIDTH)
+            .map(|lane| {
+                if lane < 15 {
+                    public_values[lane].into()
+                } else {
+                    AB::Expr::from_u32(self.leaf_iv[lane - 15])
+                }
+            })
+            .collect::<Vec<AB::Expr>>();
+        matrix_expression::<AB>(&self.permutation.external_matrix, &raw)
+    }
+
+    fn phase_completion_expression<AB: AirBuilder>(
+        &self,
+        final_round_state: &[AB::Expr],
+        phase: usize,
+        public_values: &[AB::PublicVar],
+    ) -> Vec<AB::Expr> {
+        let mut absorbed = final_round_state.to_vec();
+        match phase {
+            0 => {
+                let last_input: AB::Expr = public_values[15].into();
+                absorbed[0] = absorbed[0].clone() + last_input;
+                matrix_expression::<AB>(&self.permutation.external_matrix, &absorbed)
+            }
+            1 => matrix_expression::<AB>(&self.permutation.external_matrix, &absorbed),
+            2 => absorbed,
+            _ => unreachable!("fixed leaf hash has exactly three permutations"),
         }
     }
 }
@@ -282,15 +452,55 @@ pub fn run_p24_research_smoke() -> Result<Poseidon2P24ExperimentResult, StarkExp
     prove_and_verify_p24_permutation(core::array::from_fn(|index| index as u32 + 1))
 }
 
+/// Produces and verifies a STARK for the exact frozen `Hash16(Leaf, input)`
+/// construction. This binds a candidate note commitment to its candidate
+/// Merkle-leaf digest without exposing intermediate sponge states.
+pub fn prove_and_verify_p24_leaf(
+    commitment: BabyBearDigestV2,
+) -> Result<Poseidon2P24LeafExperimentResult, StarkExperimentError> {
+    let reference = Poseidon2P24Reference::load_candidate()?;
+    let leaf = reference.leaf(commitment)?;
+    let air = Poseidon2P24Hash16LeafAir::from_reference(&reference)?;
+    let trace = build_p24_hash16_leaf_trace(&air, commitment);
+    let public_values = commitment
+        .into_iter()
+        .chain(leaf)
+        .map(Val::from_u32)
+        .collect::<Vec<_>>();
+    let config = make_hiding_config();
+    let proof = prove(&config, &air, trace, &public_values);
+    verify(&config, &air, &proof, &public_values)
+        .map_err(|_| StarkExperimentError::VerificationFailed)?;
+    Ok(Poseidon2P24LeafExperimentResult {
+        commitment,
+        leaf,
+        trace_rows: P24_HASH16_LEAF_TRACE_ROWS,
+    })
+}
+
+/// A command-friendly proof of the first candidate tree operation: hashing a
+/// sixteen-element commitment into its `Leaf` digest.
+pub fn run_p24_leaf_research_smoke()
+-> Result<Poseidon2P24LeafExperimentResult, StarkExperimentError> {
+    prove_and_verify_p24_leaf(core::array::from_fn(|index| index as u32 + 1))
+}
+
 #[derive(Debug)]
 pub enum StarkExperimentError {
     CandidateParameters(Poseidon2P24ReferenceError),
+    CandidateTreeParameters(Poseidon2P24CandidateError),
     VerificationFailed,
 }
 
 impl From<Poseidon2P24ReferenceError> for StarkExperimentError {
     fn from(value: Poseidon2P24ReferenceError) -> Self {
         Self::CandidateParameters(value)
+    }
+}
+
+impl From<Poseidon2P24CandidateError> for StarkExperimentError {
+    fn from(value: Poseidon2P24CandidateError) -> Self {
+        Self::CandidateTreeParameters(value)
     }
 }
 
@@ -301,6 +511,12 @@ impl std::fmt::Display for StarkExperimentError {
                 write!(
                     formatter,
                     "could not load frozen P24 candidate parameters: {error}"
+                )
+            }
+            Self::CandidateTreeParameters(error) => {
+                write!(
+                    formatter,
+                    "could not load frozen P24 tree parameters: {error}"
                 )
             }
             Self::VerificationFailed => {
@@ -341,6 +557,39 @@ fn build_p24_trace(air: &Poseidon2P24Air, input: BabyBearStateP24) -> RowMajorMa
         }
     }
     RowMajorMatrix::new(values, P24_TRACE_WIDTH)
+}
+
+fn build_p24_hash16_leaf_trace(
+    air: &Poseidon2P24Hash16LeafAir,
+    commitment: BabyBearDigestV2,
+) -> RowMajorMatrix<Val> {
+    let mut values = Val::zero_vec(P24_HASH16_LEAF_TRACE_ROWS * P24_HASH16_LEAF_TRACE_WIDTH);
+    let mut raw_state = [Val::ZERO; P24_WIDTH];
+    for (lane, value) in commitment.into_iter().take(15).enumerate() {
+        raw_state[lane] = Val::from_u32(value);
+    }
+    for (lane, value) in air.leaf_iv.into_iter().enumerate() {
+        raw_state[15 + lane] = Val::from_u32(value);
+    }
+    let mut state = matrix_values(&air.permutation.external_matrix, &raw_state);
+
+    for row in 0..P24_HASH16_LEAF_TRACE_ROWS {
+        let offset = row * P24_HASH16_LEAF_TRACE_WIDTH;
+        values[offset..offset + P24_WIDTH].copy_from_slice(&state);
+        if row < P24_HASH16_LEAF_STEPS {
+            values[offset + P24_SELECTOR_OFFSET + row] = Val::ONE;
+            let phase = row / P24_ROUNDS;
+            let round = row % P24_ROUNDS;
+            state = round_values(&air.permutation, state, round);
+            if round + 1 == P24_ROUNDS && phase < P24_HASH16_LEAF_PERMUTATIONS - 1 {
+                if phase == 0 {
+                    state[0] += Val::from_u32(commitment[15]);
+                }
+                state = matrix_values(&air.permutation.external_matrix, &state);
+            }
+        }
+    }
+    RowMajorMatrix::new(values, P24_HASH16_LEAF_TRACE_WIDTH)
 }
 
 fn round_values(
@@ -429,7 +678,19 @@ fn secure_rng() -> ChaCha12Rng {
 
 #[cfg(test)]
 mod tests {
+    use noxis_tree_params::{P24TreeValueV2, P24TreeVectorCorpusV2, P24TreeVectorRecordV2};
+
     use super::*;
+
+    fn elements(value: P24TreeValueV2) -> BabyBearDigestV2 {
+        core::array::from_fn(|index| {
+            u32::from_le_bytes(
+                value.as_bytes()[index * 4..(index + 1) * 4]
+                    .try_into()
+                    .expect("fixed P24 tree value bounds"),
+            )
+        })
+    }
 
     #[test]
     fn hiding_fri_stark_proves_and_verifies_a_private_accumulator_trace() {
@@ -493,5 +754,50 @@ mod tests {
         altered_public_values[P24_WIDTH] += Val::ONE;
 
         assert!(verify(&config, &air, &proof, &altered_public_values).is_err());
+    }
+
+    #[test]
+    fn leaf_hash_stark_matches_the_frozen_candidate_reference() {
+        let commitment = core::array::from_fn(|index| index as u32 + 1);
+        let result = prove_and_verify_p24_leaf(commitment).unwrap();
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+
+        assert_eq!(result.leaf, reference.leaf(commitment).unwrap());
+        assert_eq!(result.trace_rows, P24_HASH16_LEAF_TRACE_ROWS);
+    }
+
+    #[test]
+    fn leaf_hash_proof_rejects_a_changed_public_leaf() {
+        let commitment = core::array::from_fn(|index| index as u32 + 1);
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let leaf = reference.leaf(commitment).unwrap();
+        let air = Poseidon2P24Hash16LeafAir::from_reference(&reference).unwrap();
+        let trace = build_p24_hash16_leaf_trace(&air, commitment);
+        let public_values = commitment
+            .into_iter()
+            .chain(leaf)
+            .map(Val::from_u32)
+            .collect::<Vec<_>>();
+        p3_air::check_constraints(&air, &trace, &public_values);
+        let config = make_hiding_config();
+        let proof = prove(&config, &air, trace, &public_values);
+        let mut altered_public_values = public_values;
+        altered_public_values[16] += Val::ONE;
+
+        assert!(verify(&config, &air, &proof, &altered_public_values).is_err());
+    }
+
+    #[test]
+    fn leaf_hash_stark_matches_every_external_leaf_vector() {
+        let corpus = P24TreeVectorCorpusV2::frozen_complete_candidate_corpus();
+        for record in corpus.records() {
+            let P24TreeVectorRecordV2::Leaf { note, leaf } = record else {
+                continue;
+            };
+            assert_eq!(
+                prove_and_verify_p24_leaf(elements(*note)).unwrap().leaf,
+                elements(*leaf)
+            );
+        }
     }
 }
