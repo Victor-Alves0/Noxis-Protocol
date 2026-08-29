@@ -41,7 +41,7 @@ O deployment AIR precisa comprometer os IDs e bytes completos de P24, NXPH e NXI
 - Não há especificação de cifra/envelope que prove que cada digest de ciphertext corresponde à nota, slot, AAD e chave do destinatário.
 - A chave ligada por `H_ADDR` ainda não está ligada a uma chave de recebimento X25519/ML-KEM.
 - Não existe estado privado persistente v2, política de raízes, conjunto global de nullifiers ou inserção atômica das saídas.
-- `StateId` e raiz privada são apenas vinculados pela intenção; ainda não há regra v2 que demonstre que descrevem o mesmo estado.
+- A relação transparente [`NXNT v1`](PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md) já vincula `NXPS v2`, ausência dos dois nullifiers e raiz `NXSM` posterior, mas ainda não há AIR que demonstre essa relação em zero conhecimento nem que atualize a raiz de notas.
 - `CircuitId`, `ProofVerifierId`, digest do programa AIR e backend STARK permanecem não selecionados.
 
 Essas lacunas são bloqueios de segurança, não detalhes de implementação. O próximo artefato deve ser um manifesto de deployment de prova que as represente e continue falhando fechado até existir backend auditado.

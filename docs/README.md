@@ -29,7 +29,7 @@ reading the directory alphabetically.
 | **How is data persisted and recovered?** | [Durability specification](DURABILITY_SPEC_V0_1.md) | [State-chain rules](STATE_CHAIN_SPEC_V0_1.md), [checkpoint format](CHECKPOINT_SPEC_V0_1.md), [checkpoint attestation decision](CHECKPOINT_ATTESTATION_DECISION_V0_1.md) and [data-directory lifecycle](DATA_DIRECTORY_SPEC_V0_1.md). |
 | **Can I run something now?** | [Local operational demo](LOCAL_OPERATIONAL_DEMO_V0_1.md) | [Node service boundary](NODE_SERVICE_SPEC_V0_1.md). The demo is local and research-only; it does not start a validator network or provide private transfers. |
 | **Where is the privacy and post-quantum roadmap?** | [Crypto service gate](CRYPTO_SERVICE_GATE_V0_1.md) — the current fail-closed boundary | Then read the [private-transfer architecture draft](PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md), [hybrid cryptography profile draft](HYBRID_CRYPTO_PROFILE_DRAFT_V0_1.md), [private-transfer AIR candidate](PRIVATE_TRANSFER_AIR_CANDIDATE_V0_1.md) and [proof deployment candidate](PRIVATE_TRANSFER_PROOF_DEPLOYMENT_CANDIDATE_V0_1.md). |
-| **What is already checked for the private-transfer research path?** | [Local preflight](PRIVATE_TRANSFER_LOCAL_PREFLIGHT_V0_1.md) | [Intent commitment candidate](PRIVATE_TRANSFER_INTENT_COMMITMENT_CANDIDATE_V0_1.md), [private state snapshot](PRIVATE_STATE_SNAPSHOT_CANDIDATE_V0_1.md), [private state anchor v1](PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md) and [typed NXSM anchor v2](PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md). These are candidates, not privacy activation. |
+| **What is already checked for the private-transfer research path?** | [Local preflight](PRIVATE_TRANSFER_LOCAL_PREFLIGHT_V0_1.md) | [Intent commitment candidate](PRIVATE_TRANSFER_INTENT_COMMITMENT_CANDIDATE_V0_1.md), [private state snapshot](PRIVATE_STATE_SNAPSHOT_CANDIDATE_V0_1.md), [private state anchor v1](PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md), [typed NXSM anchor v2](PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md) and [NXSM transition](PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md). These are candidates, not privacy activation. |
 
 ## Suggested reading paths
 
@@ -79,7 +79,7 @@ stack exists.
 3. [AIR candidate](PRIVATE_TRANSFER_AIR_CANDIDATE_V0_1.md)
 4. [Intent commitment candidate](PRIVATE_TRANSFER_INTENT_COMMITMENT_CANDIDATE_V0_1.md)
 5. [Local semantic preflight](PRIVATE_TRANSFER_LOCAL_PREFLIGHT_V0_1.md)
-6. [State snapshot and anchor](PRIVATE_STATE_SNAPSHOT_CANDIDATE_V0_1.md) / [v1 anchor details](PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md) / [typed NXSM v2 candidate](PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md)
+6. [State snapshot and anchor](PRIVATE_STATE_SNAPSHOT_CANDIDATE_V0_1.md) / [v1 anchor details](PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md) / [typed NXSM v2 candidate](PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md) / [NXSM transition](PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md)
 7. [Hybrid identity and transport profile](HYBRID_CRYPTO_PROFILE_DRAFT_V0_1.md)
 8. [Deployment prerequisites](PRIVATE_TRANSFER_PROOF_DEPLOYMENT_CANDIDATE_V0_1.md)
 

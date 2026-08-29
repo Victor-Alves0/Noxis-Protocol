@@ -13,6 +13,14 @@ use noxis_tree_params::{
 };
 use sha2::{Digest, Sha256};
 
+mod nxsm_transition;
+
+pub use nxsm_transition::{
+    CANDIDATE_NXSM_NULLIFIER_TRANSITION_ENCODED_LENGTH,
+    CANDIDATE_NXSM_NULLIFIER_TRANSITION_ID_DOMAIN, CandidateNxsmNullifierTransitionError,
+    CandidateNxsmNullifierTransitionIdV1, CandidateNxsmNullifierTransitionV1,
+};
+
 /// SHA-256 domain for the full candidate-deployment checksum.
 pub const PRIVATE_TRANSFER_PROOF_DEPLOYMENT_CHECKSUM_DOMAIN: &[u8] =
     b"NOXIS/PRIVATE-TRANSFER-PROOF-DEPLOYMENT-CHECKSUM/V1\0";
