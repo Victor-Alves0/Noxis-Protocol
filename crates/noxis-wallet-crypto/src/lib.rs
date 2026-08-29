@@ -31,6 +31,12 @@ use sha2::{Digest as _, Sha256};
 use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
 use zeroize::Zeroize;
 
+mod address;
+
+pub use address::{
+    HybridPaymentAddress, HybridPaymentAddressEntry, PaymentAddressError, PaymentDiversifier,
+};
+
 /// Stable label prepended to every identity message signed by this crate.
 pub const IDENTITY_SIGNING_DOMAIN: &[u8] = b"NOXIS/IDENTITY-SIGN/V1\0";
 
@@ -341,6 +347,12 @@ impl HybridRecipientPublicKey {
     /// complete hybrid public key set.
     pub fn x25519_public_key(&self) -> [u8; 32] {
         self.x25519_public.to_bytes()
+    }
+
+    /// Identifies this complete public recipient key set at one wallet key
+    /// epoch. It is safe to publish, unlike a private receiving key.
+    pub fn keyset_id(&self, key_epoch: u64) -> [u8; 32] {
+        recipient_keyset_id(&self.x25519_public, &self.ml_kem_768_public, key_epoch)
     }
 
     /// Encrypts a payload using only the recipient's public X25519 and
