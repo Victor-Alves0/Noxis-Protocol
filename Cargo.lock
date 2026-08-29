@@ -260,6 +260,8 @@ dependencies = [
 name = "noxis-private-state"
 version = "0.1.0"
 dependencies = [
+ "noxis-nullifier-tree-reference",
+ "noxis-nullifier-tree-state",
  "noxis-poseidon2-reference",
  "noxis-privacy-types",
  "noxis-tree-params",

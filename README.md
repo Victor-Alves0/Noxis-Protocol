@@ -84,6 +84,7 @@ docs/
   POSEIDON2_BABYBEAR16_REFERENCE_EVALUATION_V0_1.md  Cross-validated permutation reference vectors.
   NULLIFIER_SPARSE_MUTABLE_REFERENCE_CANDIDATE_V0_1.md  Isolated mutable NXSM candidate state and limits.
   NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md  Independently generated NXSV v1 evidence for the NXSM candidate.
+  PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md  Candidate typed binding between a private snapshot and NXSM root.
   ARCHITECTURE.md                Module boundaries and implementation roadmap.
 ```
 

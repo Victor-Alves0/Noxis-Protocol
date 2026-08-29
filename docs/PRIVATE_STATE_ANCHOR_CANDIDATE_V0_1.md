@@ -43,8 +43,10 @@ tem allowlist nem escolhe uma implantação criptográfica.
 ## O que ainda falta
 
 Há uma árvore esparsa autenticada em memória, ainda candidata e isolada, mas
-`NXPS v1` não a usa: ele continua comprometendo `H_NFSET`. Não há corpus externo
-de vetores, backend de prova, persistência nem transição atômica. O próximo
-marco deve produzir evidência externa para `NXSM` e especificar uma nova âncora
-que comprometa sua raiz tipada; só depois será possível fazer a verificação
-dentro de uma AIR/STARK.
+`NXPS v1` não a usa: ele continua comprometendo `H_NFSET`. A candidata separada
+`NXPS v2` já registra uma raiz `NXSM` tipada e verifica que ela corresponde ao
+snapshot; veja
+[`PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md`](PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md).
+Não há backend de prova, persistência nem transição atômica. O próximo marco é
+fazer uma AIR/STARK verificar a atualização dessa raiz, antes de qualquer uso
+fora do domínio de pesquisa.

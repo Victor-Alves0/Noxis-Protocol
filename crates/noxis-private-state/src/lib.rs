@@ -15,11 +15,16 @@ use noxis_tree_params::{CandidatePoseidon2P24ManifestV2, Poseidon2P24CandidateEr
 use sha2::{Digest, Sha256};
 
 mod state_anchor;
+mod state_anchor_v2;
 
 pub use state_anchor::{
     PRIVATE_NULLIFIER_SET_COMMITMENT_DOMAIN, PRIVATE_STATE_ANCHOR_ENCODED_LENGTH,
     PRIVATE_STATE_ANCHOR_ID_DOMAIN, PrivateNullifierSetCommitmentV1, PrivateStateAnchorError,
     PrivateStateAnchorV1,
+};
+pub use state_anchor_v2::{
+    PRIVATE_STATE_NXSM_ANCHOR_ENCODED_LENGTH, PRIVATE_STATE_NXSM_ANCHOR_ID_DOMAIN,
+    PrivateStateAnchorV2, PrivateStateAnchorV2Error,
 };
 
 /// Deliberate local-only bound; a persistent v2 accumulator will replace it.
