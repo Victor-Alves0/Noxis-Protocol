@@ -12,10 +12,10 @@ tests and independent review.
 - Poseidon2-P24 is a frozen **candidate** for private-note and tree work. A
   dense reference evaluator, external vectors and a STARK experiment for its
   permutation, byte-exact private `H_ADDR` and `H_NOTE` preimages, a private
-  key-to-note-to-nullifier-to-leaf ownership binding, candidate leaf hash, ordered
-  candidate node hash and one private ordered Merkle step, two-level private
-  path and full private depth-32 path exist; the candidate is not selected for
-  production. Ownership remains unjoined from Merkle membership and state.
+  key-to-note-to-nullifier-to-leaf two-level private-membership binding,
+  candidate leaf hash, ordered candidate node hash and a full private depth-32
+  path exist; the candidate is not selected for production. Full-depth
+  ownership remains unjoined from membership and state.
 - The proof direction is transparent STARK/AIR. A complete private-transfer
   statement and production verifier do not yet exist.
 - The hybrid wallet profile is experimental. It does not enable active

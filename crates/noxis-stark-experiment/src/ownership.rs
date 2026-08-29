@@ -38,9 +38,13 @@ const ADDR_PHASES: usize = 2;
 const NOTE_PHASES: usize = 5;
 const NULLIFIER_PHASES: usize = 4;
 const LEAF_PHASES: usize = 3;
-const TOTAL_PHASES: usize = ADDR_PHASES + NOTE_PHASES + NULLIFIER_PHASES + LEAF_PHASES;
+const NODE_PHASES_PER_HASH: usize = 4;
+const MEMBERSHIP_DEPTH: usize = 2;
+const NODE_PHASES: usize = NODE_PHASES_PER_HASH * MEMBERSHIP_DEPTH;
+const TOTAL_PHASES: usize =
+    ADDR_PHASES + NOTE_PHASES + NULLIFIER_PHASES + LEAF_PHASES + NODE_PHASES;
 const TOTAL_STEPS: usize = TOTAL_PHASES * P24_ROUNDS;
-const TRACE_ROWS: usize = 512;
+const TRACE_ROWS: usize = 1024;
 const SELECTOR_OFFSET: usize = P24_WIDTH;
 const WITNESS_OFFSET: usize = SELECTOR_OFFSET + TOTAL_STEPS;
 
@@ -55,7 +59,10 @@ const NOTE_COMMITMENT_BYTES_OFFSET: usize = RECIPIENT_DIGEST_OFFSET + DIGEST_LAN
 const NOTE_COMMITMENT_BITS_OFFSET: usize = NOTE_COMMITMENT_BYTES_OFFSET + DIGEST_BYTES;
 const NOTE_DIGEST_OFFSET: usize = NOTE_COMMITMENT_BITS_OFFSET + (DIGEST_BYTES * BITS_PER_BYTE);
 const TREE_LEAF_DIGEST_OFFSET: usize = NOTE_DIGEST_OFFSET + DIGEST_LANES;
-const WITNESS_ELEMENTS: usize = TREE_LEAF_DIGEST_OFFSET + DIGEST_LANES;
+const MERKLE_SIBLINGS_OFFSET: usize = TREE_LEAF_DIGEST_OFFSET + DIGEST_LANES;
+const MERKLE_INTERMEDIATE_OFFSET: usize =
+    MERKLE_SIBLINGS_OFFSET + (MEMBERSHIP_DEPTH * DIGEST_LANES);
+const WITNESS_ELEMENTS: usize = MERKLE_INTERMEDIATE_OFFSET + DIGEST_LANES;
 const TRACE_WIDTH: usize = WITNESS_OFFSET + WITNESS_ELEMENTS;
 
 const ADDR_BLOCK_PHASE: usize = 0;
@@ -69,6 +76,14 @@ const NULLIFIER_SQUEEZE_PHASE: usize = NULLIFIER_FIRST_PHASE + 3;
 const LEAF_FIRST_PHASE: usize = NULLIFIER_SQUEEZE_PHASE + 1;
 const LEAF_SECOND_PHASE: usize = LEAF_FIRST_PHASE + 1;
 const LEAF_SQUEEZE_PHASE: usize = LEAF_SECOND_PHASE + 1;
+const NODE0_BLOCK0_PHASE: usize = LEAF_SQUEEZE_PHASE + 1;
+const NODE0_BLOCK1_PHASE: usize = NODE0_BLOCK0_PHASE + 1;
+const NODE0_BLOCK2_PHASE: usize = NODE0_BLOCK1_PHASE + 1;
+const NODE0_SQUEEZE_PHASE: usize = NODE0_BLOCK2_PHASE + 1;
+const NODE1_BLOCK0_PHASE: usize = NODE0_SQUEEZE_PHASE + 1;
+const NODE1_BLOCK1_PHASE: usize = NODE1_BLOCK0_PHASE + 1;
+const NODE1_BLOCK2_PHASE: usize = NODE1_BLOCK1_PHASE + 1;
+const NODE1_SQUEEZE_PHASE: usize = NODE1_BLOCK2_PHASE + 1;
 
 const NOTE_VERSION_OFFSET: usize = 0;
 const NOTE_RECIPIENT_OFFSET: usize = 50;
@@ -79,8 +94,22 @@ const NOTE_RHO_OFFSET: usize = 114;
 pub struct Poseidon2P24OwnershipExperimentResult {
     /// The sole public 16-element value: the deterministic nullifier.
     pub nullifier: BabyBearDigestV2,
+    /// Public root after the two private ordered candidate node hashes.
+    pub root: BabyBearDigestV2,
     /// Number of rows in the fixed private trace.
     pub trace_rows: usize,
+}
+
+#[derive(Clone, Copy)]
+struct OwnershipTraceWitness {
+    nullifier_key: [u8; KEY_BYTES],
+    note_preimage: [u8; NOTE_BYTES],
+    leaf_position: u32,
+    recipient_commitment: BabyBearDigestV2,
+    note_commitment: BabyBearDigestV2,
+    tree_leaf: BabyBearDigestV2,
+    siblings: [BabyBearDigestV2; MEMBERSHIP_DEPTH],
+    intermediate: BabyBearDigestV2,
 }
 
 /// AIR for one key-to-note-to-nullifier-to-leaf ownership binding.
@@ -91,6 +120,7 @@ struct Poseidon2P24OwnershipAir {
     note_iv: [u32; 9],
     nullifier_iv: [u32; 9],
     leaf_iv: [u32; 9],
+    node_iv: [u32; 9],
 }
 
 impl Poseidon2P24OwnershipAir {
@@ -103,6 +133,7 @@ impl Poseidon2P24OwnershipAir {
             note_iv: manifest.iv(Poseidon2P24NoteDomainV1::Note)?,
             nullifier_iv: manifest.iv(Poseidon2P24NoteDomainV1::Nullifier)?,
             leaf_iv: tree_manifest.iv(Poseidon2P24TreeDomainV1::Leaf)?,
+            node_iv: tree_manifest.iv(Poseidon2P24TreeDomainV1::Node)?,
         })
     }
 
@@ -150,6 +181,55 @@ impl Poseidon2P24OwnershipAir {
             })
             .collect::<Vec<AB::Expr>>();
         matrix_expression::<AB>(&self.permutation.external_matrix, &raw)
+    }
+
+    fn initial_node_state_expression<AB: AirBuilder>(
+        &self,
+        witness: &[AB::Var],
+        node_index: usize,
+    ) -> Vec<AB::Expr> {
+        let raw = (0..P24_WIDTH)
+            .map(|lane| {
+                if lane < RATE {
+                    self.node_input_expression::<AB>(witness, node_index, lane)
+                } else {
+                    AB::Expr::from_u32(self.node_iv[lane - RATE])
+                }
+            })
+            .collect::<Vec<AB::Expr>>();
+        matrix_expression::<AB>(&self.permutation.external_matrix, &raw)
+    }
+
+    fn node_input_expression<AB: AirBuilder>(
+        &self,
+        witness: &[AB::Var],
+        node_index: usize,
+        input_index: usize,
+    ) -> AB::Expr {
+        let lane = input_index % DIGEST_LANES;
+        let current: AB::Expr = if node_index == 0 {
+            witness[TREE_LEAF_DIGEST_OFFSET + lane].into()
+        } else {
+            witness[MERKLE_INTERMEDIATE_OFFSET + lane].into()
+        };
+        let sibling: AB::Expr =
+            witness[MERKLE_SIBLINGS_OFFSET + (node_index * DIGEST_LANES) + lane].into();
+        let direction = self.position_direction_expression::<AB>(witness, node_index);
+        if input_index < DIGEST_LANES {
+            current.clone() + direction.clone() * (sibling.clone() - current)
+        } else {
+            sibling.clone() + direction * (current - sibling)
+        }
+    }
+
+    fn position_direction_expression<AB: AirBuilder>(
+        &self,
+        witness: &[AB::Var],
+        level: usize,
+    ) -> AB::Expr {
+        let byte_index = POSITION_BYTES - 1 - (level / BITS_PER_BYTE);
+        witness[POSITION_BITS_OFFSET + (byte_index * BITS_PER_BYTE) + (level % BITS_PER_BYTE)]
+            .into()
     }
 
     fn key_packed_expression<AB: AirBuilder>(
@@ -314,7 +394,7 @@ impl<F> BaseAir<F> for Poseidon2P24OwnershipAir {
     }
 
     fn num_public_values(&self) -> usize {
-        DIGEST_LANES
+        DIGEST_LANES * 2
     }
 
     fn max_constraint_degree(&self) -> Option<usize> {
@@ -413,7 +493,7 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24OwnershipAir {
             NOTE_SQUEEZE_PHASE,
             &note_output,
         );
-        let public_output = public_values
+        let public_nullifier = public_values[..DIGEST_LANES]
             .iter()
             .copied()
             .map(Into::into)
@@ -424,7 +504,7 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24OwnershipAir {
             &round_states,
             NULLIFIER_LAST_BLOCK_PHASE,
             NULLIFIER_SQUEEZE_PHASE,
-            &public_output,
+            &public_nullifier,
         );
         let tree_leaf_output = witness
             [TREE_LEAF_DIGEST_OFFSET..TREE_LEAF_DIGEST_OFFSET + DIGEST_LANES]
@@ -439,6 +519,19 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24OwnershipAir {
             LEAF_SECOND_PHASE,
             LEAF_SQUEEZE_PHASE,
             &tree_leaf_output,
+        );
+        let public_root = public_values[DIGEST_LANES..]
+            .iter()
+            .copied()
+            .map(Into::into)
+            .collect::<Vec<AB::Expr>>();
+        self.assert_digest_at_phase::<AB>(
+            builder,
+            selectors,
+            &round_states,
+            NODE1_BLOCK2_PHASE,
+            NODE1_SQUEEZE_PHASE,
+            &public_root,
         );
     }
 }
@@ -455,7 +548,9 @@ impl Poseidon2P24OwnershipAir {
             ADDR_BLOCK_PHASE
             | NOTE_LAST_BLOCK_PHASE
             | NULLIFIER_LAST_BLOCK_PHASE
-            | LEAF_SECOND_PHASE => {
+            | LEAF_SECOND_PHASE
+            | NODE0_BLOCK2_PHASE
+            | NODE1_BLOCK2_PHASE => {
                 matrix_expression::<AB>(&self.permutation.external_matrix, round_state)[lane]
                     .clone()
             }
@@ -487,7 +582,25 @@ impl Poseidon2P24OwnershipAir {
                 self.initial_leaf_state_expression::<AB>(witness)[lane].clone()
             }
             LEAF_FIRST_PHASE => self.leaf_second_block_expression::<AB>(round_state, witness, lane),
-            LEAF_SQUEEZE_PHASE => round_state[lane].clone(),
+            LEAF_SQUEEZE_PHASE => {
+                self.initial_node_state_expression::<AB>(witness, 0)[lane].clone()
+            }
+            NODE0_BLOCK0_PHASE => {
+                self.node_absorb_expression::<AB>(round_state, witness, 0, 15, lane)
+            }
+            NODE0_BLOCK1_PHASE => {
+                self.node_absorb_expression::<AB>(round_state, witness, 0, 30, lane)
+            }
+            NODE0_SQUEEZE_PHASE => {
+                self.initial_node_state_expression::<AB>(witness, 1)[lane].clone()
+            }
+            NODE1_BLOCK0_PHASE => {
+                self.node_absorb_expression::<AB>(round_state, witness, 1, 15, lane)
+            }
+            NODE1_BLOCK1_PHASE => {
+                self.node_absorb_expression::<AB>(round_state, witness, 1, 30, lane)
+            }
+            NODE1_SQUEEZE_PHASE => round_state[lane].clone(),
             _ => unreachable!("every P24 ownership phase is fixed"),
         }
     }
@@ -519,6 +632,31 @@ impl Poseidon2P24OwnershipAir {
     ) -> AB::Expr {
         let mut absorbed = round_state.to_vec();
         absorbed[0] = absorbed[0].clone() + witness[NOTE_DIGEST_OFFSET + 15];
+        matrix_expression::<AB>(&self.permutation.external_matrix, &absorbed)[lane].clone()
+    }
+
+    fn node_absorb_expression<AB: AirBuilder>(
+        &self,
+        round_state: &[AB::Expr],
+        witness: &[AB::Var],
+        node_index: usize,
+        input_start: usize,
+        lane: usize,
+    ) -> AB::Expr {
+        let absorbed = (0..P24_WIDTH)
+            .map(|state_lane| {
+                if state_lane < RATE && input_start + state_lane < DIGEST_LANES * 2 {
+                    round_state[state_lane].clone()
+                        + self.node_input_expression::<AB>(
+                            witness,
+                            node_index,
+                            input_start + state_lane,
+                        )
+                } else {
+                    round_state[state_lane].clone()
+                }
+            })
+            .collect::<Vec<AB::Expr>>();
         matrix_expression::<AB>(&self.permutation.external_matrix, &absorbed)[lane].clone()
     }
 
@@ -556,31 +694,60 @@ pub fn prove_and_verify_p24_note_ownership(
     note_preimage: [u8; NOTE_BYTES],
     leaf_position: u32,
 ) -> Result<Poseidon2P24OwnershipExperimentResult, StarkExperimentError> {
+    prove_and_verify_p24_note_ownership_path2(
+        nullifier_key,
+        note_preimage,
+        leaf_position,
+        synthetic_merkle_siblings(),
+    )
+}
+
+/// Produces and verifies one ownership proof with two private ordered Merkle
+/// steps. The two direction bits are the least-significant bits of the same
+/// private position used in `H_NULLIFIER`; only the nullifier and root are
+/// public.
+pub fn prove_and_verify_p24_note_ownership_path2(
+    nullifier_key: [u8; KEY_BYTES],
+    note_preimage: [u8; NOTE_BYTES],
+    leaf_position: u32,
+    siblings: [BabyBearDigestV2; MEMBERSHIP_DEPTH],
+) -> Result<Poseidon2P24OwnershipExperimentResult, StarkExperimentError> {
     let reference = Poseidon2P24Reference::load_candidate()?;
     let private_reference = Poseidon2P24PrivacyReference::load_candidate()?;
     let recipient_commitment = private_reference.hash_addr(&nullifier_key)?;
     let note_commitment = private_reference.hash_note(&note_preimage)?;
     let tree_leaf = reference.leaf(note_commitment)?;
+    let directions: [bool; MEMBERSHIP_DEPTH] =
+        core::array::from_fn(|level| ((leaf_position >> level) & 1) == 1);
+    let intermediate = candidate_node(&reference, tree_leaf, siblings[0], directions[0])?;
+    let root = candidate_node(&reference, intermediate, siblings[1], directions[1])?;
     let nullifier_preimage =
         make_nullifier_preimage(nullifier_key, note_preimage, note_commitment, leaf_position);
     let nullifier = private_reference.hash_nullifier_preimage(&nullifier_preimage)?;
     let air = Poseidon2P24OwnershipAir::from_reference(&reference)?;
-    let trace = build_ownership_trace(
-        &air,
+    let witness = OwnershipTraceWitness {
         nullifier_key,
         note_preimage,
         leaf_position,
         recipient_commitment,
         note_commitment,
         tree_leaf,
-    );
-    let public_values = nullifier.map(Val::from_u32);
+        siblings,
+        intermediate,
+    };
+    let trace = build_ownership_trace(&air, &witness);
+    let public_values = nullifier
+        .into_iter()
+        .chain(root)
+        .map(Val::from_u32)
+        .collect::<Vec<_>>();
     let config = make_hiding_config();
     let proof = prove(&config, &air, trace, &public_values);
     verify(&config, &air, &proof, &public_values)
         .map_err(|_| StarkExperimentError::VerificationFailed)?;
     Ok(Poseidon2P24OwnershipExperimentResult {
         nullifier,
+        root,
         trace_rows: TRACE_ROWS,
     })
 }
@@ -597,33 +764,26 @@ pub fn run_p24_note_ownership_research_smoke()
 
 fn build_ownership_trace(
     air: &Poseidon2P24OwnershipAir,
-    nullifier_key: [u8; KEY_BYTES],
-    note_preimage: [u8; NOTE_BYTES],
-    leaf_position: u32,
-    recipient_commitment: BabyBearDigestV2,
-    note_commitment: BabyBearDigestV2,
-    tree_leaf: BabyBearDigestV2,
+    witness: &OwnershipTraceWitness,
 ) -> RowMajorMatrix<Val> {
-    let key_packed = byte_pack3le(&nullifier_key, ADDR_ELEMENTS);
-    let note_packed = byte_pack3le(&note_preimage, NOTE_ELEMENTS);
-    let nullifier_preimage =
-        make_nullifier_preimage(nullifier_key, note_preimage, note_commitment, leaf_position);
+    let key_packed = byte_pack3le(&witness.nullifier_key, ADDR_ELEMENTS);
+    let note_packed = byte_pack3le(&witness.note_preimage, NOTE_ELEMENTS);
+    let nullifier_preimage = make_nullifier_preimage(
+        witness.nullifier_key,
+        witness.note_preimage,
+        witness.note_commitment,
+        witness.leaf_position,
+    );
     let nullifier_packed = byte_pack3le(&nullifier_preimage, NULLIFIER_ELEMENTS);
     let mut values = Val::zero_vec(TRACE_ROWS * TRACE_WIDTH);
     let mut state = initial_state_values(&air.permutation, air.addr_iv, &key_packed);
+    let direction0 = (witness.leaf_position & 1) == 1;
+    let direction1 = ((witness.leaf_position >> 1) & 1) == 1;
 
     for row in 0..TRACE_ROWS {
         let offset = row * TRACE_WIDTH;
         values[offset..offset + P24_WIDTH].copy_from_slice(&state);
-        write_witness(
-            &mut values[offset + WITNESS_OFFSET..],
-            nullifier_key,
-            note_preimage,
-            leaf_position,
-            recipient_commitment,
-            note_commitment,
-            tree_leaf,
-        );
+        write_witness(&mut values[offset + WITNESS_OFFSET..], witness);
         if row < TOTAL_STEPS {
             values[offset + SELECTOR_OFFSET + row] = Val::ONE;
             let round = row % P24_ROUNDS;
@@ -659,14 +819,62 @@ fn build_ownership_trace(
                     NULLIFIER_SQUEEZE_PHASE => initial_state_values(
                         &air.permutation,
                         air.leaf_iv,
-                        &note_commitment[..RATE],
+                        &witness.note_commitment[..RATE],
                     ),
                     LEAF_FIRST_PHASE => {
-                        state[0] += Val::from_u32(note_commitment[15]);
+                        state[0] += Val::from_u32(witness.note_commitment[15]);
                         matrix_values(&air.permutation.external_matrix, &state)
                     }
                     LEAF_SECOND_PHASE => matrix_values(&air.permutation.external_matrix, &state),
-                    LEAF_SQUEEZE_PHASE => state,
+                    LEAF_SQUEEZE_PHASE => initial_node_state_values(
+                        &air.permutation,
+                        air.node_iv,
+                        witness.tree_leaf,
+                        witness.siblings[0],
+                        direction0,
+                    ),
+                    NODE0_BLOCK0_PHASE => node_absorb_then_permute(
+                        &air.permutation,
+                        state,
+                        witness.tree_leaf,
+                        witness.siblings[0],
+                        direction0,
+                        15,
+                    ),
+                    NODE0_BLOCK1_PHASE => node_absorb_then_permute(
+                        &air.permutation,
+                        state,
+                        witness.tree_leaf,
+                        witness.siblings[0],
+                        direction0,
+                        30,
+                    ),
+                    NODE0_BLOCK2_PHASE => matrix_values(&air.permutation.external_matrix, &state),
+                    NODE0_SQUEEZE_PHASE => initial_node_state_values(
+                        &air.permutation,
+                        air.node_iv,
+                        witness.intermediate,
+                        witness.siblings[1],
+                        direction1,
+                    ),
+                    NODE1_BLOCK0_PHASE => node_absorb_then_permute(
+                        &air.permutation,
+                        state,
+                        witness.intermediate,
+                        witness.siblings[1],
+                        direction1,
+                        15,
+                    ),
+                    NODE1_BLOCK1_PHASE => node_absorb_then_permute(
+                        &air.permutation,
+                        state,
+                        witness.intermediate,
+                        witness.siblings[1],
+                        direction1,
+                        30,
+                    ),
+                    NODE1_BLOCK2_PHASE => matrix_values(&air.permutation.external_matrix, &state),
+                    NODE1_SQUEEZE_PHASE => state,
                     _ => unreachable!("every P24 ownership phase is fixed"),
                 };
             }
@@ -690,6 +898,34 @@ fn initial_state_values(
     matrix_values(&permutation.external_matrix, &raw)
 }
 
+fn initial_node_state_values(
+    permutation: &Poseidon2P24Air,
+    iv: [u32; 9],
+    current: BabyBearDigestV2,
+    sibling: BabyBearDigestV2,
+    current_is_right: bool,
+) -> [Val; P24_WIDTH] {
+    let input = ordered_node_input(current, sibling, current_is_right);
+    initial_state_values(permutation, iv, &input)
+}
+
+fn node_absorb_then_permute(
+    permutation: &Poseidon2P24Air,
+    mut state: [Val; P24_WIDTH],
+    current: BabyBearDigestV2,
+    sibling: BabyBearDigestV2,
+    current_is_right: bool,
+    input_start: usize,
+) -> [Val; P24_WIDTH] {
+    let input = ordered_node_input(current, sibling, current_is_right);
+    for (lane, state_lane) in state.iter_mut().enumerate().take(RATE) {
+        if let Some(value) = input.get(input_start + lane) {
+            *state_lane += Val::from_u32(*value);
+        }
+    }
+    matrix_values(&permutation.external_matrix, &state)
+}
+
 fn absorb_then_initial_permute(
     permutation: &Poseidon2P24Air,
     mut state: [Val; P24_WIDTH],
@@ -704,39 +940,83 @@ fn absorb_then_initial_permute(
     matrix_values(&permutation.external_matrix, &state)
 }
 
-fn write_witness(
-    witness: &mut [Val],
-    key: [u8; KEY_BYTES],
-    note: [u8; NOTE_BYTES],
-    leaf_position: u32,
-    recipient: BabyBearDigestV2,
-    note_commitment: BabyBearDigestV2,
-    tree_leaf: BabyBearDigestV2,
-) {
-    write_bytes_and_bits(witness, KEY_BYTES_OFFSET, KEY_BITS_OFFSET, &key);
-    write_bytes_and_bits(witness, NOTE_BYTES_OFFSET, NOTE_BITS_OFFSET, &note);
+fn write_witness(witness: &mut [Val], input: &OwnershipTraceWitness) {
+    write_bytes_and_bits(
+        witness,
+        KEY_BYTES_OFFSET,
+        KEY_BITS_OFFSET,
+        &input.nullifier_key,
+    );
+    write_bytes_and_bits(
+        witness,
+        NOTE_BYTES_OFFSET,
+        NOTE_BITS_OFFSET,
+        &input.note_preimage,
+    );
     write_bytes_and_bits(
         witness,
         POSITION_BYTES_OFFSET,
         POSITION_BITS_OFFSET,
-        &leaf_position.to_be_bytes(),
+        &input.leaf_position.to_be_bytes(),
     );
-    for (lane, value) in recipient.into_iter().enumerate() {
+    for (lane, value) in input.recipient_commitment.into_iter().enumerate() {
         witness[RECIPIENT_DIGEST_OFFSET + lane] = Val::from_u32(value);
     }
-    let note_commitment_bytes = digest_bytes(note_commitment);
+    let note_commitment_bytes = digest_bytes(input.note_commitment);
     write_bytes_and_bits(
         witness,
         NOTE_COMMITMENT_BYTES_OFFSET,
         NOTE_COMMITMENT_BITS_OFFSET,
         &note_commitment_bytes,
     );
-    for (lane, value) in note_commitment.into_iter().enumerate() {
+    for (lane, value) in input.note_commitment.into_iter().enumerate() {
         witness[NOTE_DIGEST_OFFSET + lane] = Val::from_u32(value);
     }
-    for (lane, value) in tree_leaf.into_iter().enumerate() {
+    for (lane, value) in input.tree_leaf.into_iter().enumerate() {
         witness[TREE_LEAF_DIGEST_OFFSET + lane] = Val::from_u32(value);
     }
+    for (level, sibling) in input.siblings.into_iter().enumerate() {
+        for (lane, value) in sibling.into_iter().enumerate() {
+            witness[MERKLE_SIBLINGS_OFFSET + (level * DIGEST_LANES) + lane] = Val::from_u32(value);
+        }
+    }
+    for (lane, value) in input.intermediate.into_iter().enumerate() {
+        witness[MERKLE_INTERMEDIATE_OFFSET + lane] = Val::from_u32(value);
+    }
+}
+
+fn ordered_node_input(
+    current: BabyBearDigestV2,
+    sibling: BabyBearDigestV2,
+    current_is_right: bool,
+) -> [u32; DIGEST_LANES * 2] {
+    let (left, right) = if current_is_right {
+        (sibling, current)
+    } else {
+        (current, sibling)
+    };
+    let mut input = [0_u32; DIGEST_LANES * 2];
+    input[..DIGEST_LANES].copy_from_slice(&left);
+    input[DIGEST_LANES..].copy_from_slice(&right);
+    input
+}
+
+fn candidate_node(
+    reference: &Poseidon2P24Reference,
+    current: BabyBearDigestV2,
+    sibling: BabyBearDigestV2,
+    current_is_right: bool,
+) -> Result<BabyBearDigestV2, StarkExperimentError> {
+    Ok(reference.node(
+        if current_is_right { sibling } else { current },
+        if current_is_right { current } else { sibling },
+    )?)
+}
+
+fn synthetic_merkle_siblings() -> [BabyBearDigestV2; MEMBERSHIP_DEPTH] {
+    core::array::from_fn(|level| {
+        core::array::from_fn(|lane| ((level as u32 + 1) * 101) + lane as u32 + 1)
+    })
 }
 
 fn write_bytes_and_bits(
@@ -811,7 +1091,7 @@ mod tests {
     }
 
     #[test]
-    fn ownership_stark_binds_one_private_key_note_position_and_tree_leaf_to_the_nullifier() {
+    fn ownership_stark_binds_one_private_key_note_position_leaf_and_path_to_the_public_root() {
         let (key, note, position) = valid_witness();
         let result = prove_and_verify_p24_note_ownership(key, note, position).unwrap();
         let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
@@ -821,6 +1101,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.nullifier, expected);
+        let tree_reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let tree_leaf = tree_reference.leaf(commitment).unwrap();
+        let siblings = synthetic_merkle_siblings();
+        let first = candidate_node(&tree_reference, tree_leaf, siblings[0], true).unwrap();
+        let root = candidate_node(&tree_reference, first, siblings[1], true).unwrap();
+        assert_eq!(result.root, root);
         assert_eq!(result.trace_rows, TRACE_ROWS);
     }
 
@@ -832,25 +1118,45 @@ mod tests {
         let recipient = private_reference.hash_addr(&key).unwrap();
         let commitment = private_reference.hash_note(&note).unwrap();
         let tree_leaf = reference.leaf(commitment).unwrap();
+        let siblings = synthetic_merkle_siblings();
+        let first = candidate_node(&reference, tree_leaf, siblings[0], true).unwrap();
+        let root = candidate_node(&reference, first, siblings[1], true).unwrap();
         let nullifier = private_reference
             .hash_nullifier_preimage(&make_nullifier_preimage(key, note, commitment, position))
             .unwrap()
             .map(Val::from_u32);
+        let public_values = core::array::from_fn(|index| {
+            if index < DIGEST_LANES {
+                nullifier[index]
+            } else {
+                Val::from_u32(root[index - DIGEST_LANES])
+            }
+        });
         let air = Poseidon2P24OwnershipAir::from_reference(&reference).unwrap();
-        let trace =
-            build_ownership_trace(&air, key, note, position, recipient, commitment, tree_leaf);
-        p3_air::check_constraints(&air, &trace, &nullifier);
-
-        let assert_rejected = |trace: &RowMajorMatrix<Val>, public_values: &[Val; DIGEST_LANES]| {
-            assert!(
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    p3_air::check_constraints(&air, trace, public_values);
-                }))
-                .is_err()
-            );
+        let witness = OwnershipTraceWitness {
+            nullifier_key: key,
+            note_preimage: note,
+            leaf_position: position,
+            recipient_commitment: recipient,
+            note_commitment: commitment,
+            tree_leaf,
+            siblings,
+            intermediate: first,
         };
+        let trace = build_ownership_trace(&air, &witness);
+        p3_air::check_constraints(&air, &trace, &public_values);
 
-        let mut changed_nullifier = nullifier;
+        let assert_rejected =
+            |trace: &RowMajorMatrix<Val>, public_values: &[Val; DIGEST_LANES * 2]| {
+                assert!(
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        p3_air::check_constraints(&air, trace, public_values);
+                    }))
+                    .is_err()
+                );
+            };
+
+        let mut changed_nullifier = public_values;
         changed_nullifier[0] += Val::ONE;
         assert_rejected(&trace, &changed_nullifier);
 
@@ -860,20 +1166,27 @@ mod tests {
                 [row * TRACE_WIDTH + WITNESS_OFFSET + NOTE_BYTES_OFFSET + NOTE_RECIPIENT_OFFSET] +=
                 Val::ONE;
         }
-        assert_rejected(&broken_recipient, &nullifier);
+        assert_rejected(&broken_recipient, &public_values);
 
         let mut broken_note_commitment = trace.clone();
         for row in 0..TRACE_ROWS {
             broken_note_commitment.values
                 [row * TRACE_WIDTH + WITNESS_OFFSET + NOTE_COMMITMENT_BYTES_OFFSET] += Val::ONE;
         }
-        assert_rejected(&broken_note_commitment, &nullifier);
+        assert_rejected(&broken_note_commitment, &public_values);
 
-        let mut broken_tree_leaf = trace;
+        let mut broken_tree_leaf = trace.clone();
         for row in 0..TRACE_ROWS {
             broken_tree_leaf.values
                 [row * TRACE_WIDTH + WITNESS_OFFSET + TREE_LEAF_DIGEST_OFFSET] += Val::ONE;
         }
-        assert_rejected(&broken_tree_leaf, &nullifier);
+        assert_rejected(&broken_tree_leaf, &public_values);
+
+        let mut broken_sibling = trace;
+        for row in 0..TRACE_ROWS {
+            broken_sibling.values[row * TRACE_WIDTH + WITNESS_OFFSET + MERKLE_SIBLINGS_OFFSET] +=
+                Val::ONE;
+        }
+        assert_rejected(&broken_sibling, &public_values);
     }
 }

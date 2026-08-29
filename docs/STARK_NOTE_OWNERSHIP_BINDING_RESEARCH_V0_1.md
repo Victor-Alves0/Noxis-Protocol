@@ -5,7 +5,8 @@
 This document specifies one executable Plonky3 research relation. It composes
 the frozen, unselected `NXPH v1` candidate functions `H_ADDR`, `H_NOTE` and
 `H_NULLIFIER`, plus the frozen tree candidate `H_LEAF`, in one hiding-FRI
-STARK. It is not a selected cryptographic primitive, wallet API,
+STARK. It now also proves two private ordered Merkle nodes to one public root.
+It is not a selected cryptographic primitive, wallet API, full-depth
 Merkle-membership proof, transaction proof or settlement authorization.
 
 The implementation is
@@ -27,6 +28,8 @@ nullifier            = H_NULLIFIER(
     nullifier_key || rho || note_commitment-u32le || leaf_position-u32be
 )
 tree_leaf            = H_LEAF(note_commitment)
+root                 = H_NODE(H_NODE(tree_leaf, sibling_0, position.bit(0)),
+                              sibling_1, position.bit(1))
 ```
 
 It additionally enforces that:
@@ -40,22 +43,26 @@ It additionally enforces that:
 6. `rho` and the position used by `H_NULLIFIER` are taken from the same note
    witness and position witness, respectively; and
 7. the private tree leaf is exactly the candidate tree-domain hash of the same
-   private note commitment.
+   private note commitment; and
+8. two private sibling values are ordered with the two least-significant bits
+   of the same private position used by `H_NULLIFIER`, producing the public
+   root.
 
-The recipient and note commitments are retained only as private AIR witness
-values; they are not independent public inputs. That prevents a verifier from
-linking this narrow proof to a recipient or note commitment merely by observing
-it. The only public value is the deterministic nullifier.
+The recipient and note commitments, leaf, siblings, directions and intermediate
+node are retained only as private AIR witness values; they are not independent
+public inputs. The public values are the deterministic nullifier and the
+two-level root.
 
 ## What this proves — and what it does not
 
 This is the first executable binding that establishes knowledge of a key
-committed inside a note, uses that same key to derive its nullifier, and derives
-the exact leaf which must enter the candidate note tree. It is a necessary
-ownership subrelation for a private spend.
+committed inside a note, uses that same key to derive its nullifier, derives
+the exact candidate tree leaf and proves a private two-level path to a public
+root. It is a necessary ownership-and-membership subrelation for a private
+spend.
 
-It does **not** prove that this leaf is in the note tree, that the supplied
-position has a valid path, that the nullifier is absent from state, that the
+It does **not** prove a full depth-32 path to a deployed note-tree root, that
+the nullifier is absent from state, that the
 asset/value fields satisfy transfer rules, that the note is unspent, that an
 envelope can be decrypted by a hybrid recipient key, or that a ledger accepts
 anything. It also does not yet enforce every semantic `NoteOpeningV2` rule
@@ -73,12 +80,12 @@ cargo run --release -p noxis-stark-experiment --bin noxis-stark-smoke
 Focused tests prove a synthetic internally consistent note end-to-end against
 the frozen reference and directly reject a changed public nullifier, a
 recipient byte that no longer corresponds to the private key, an altered note
-commitment byte, or an altered private tree leaf.
+commitment byte, an altered private tree leaf or an altered private sibling.
 
 ## Next required composition
 
-The next ownership extension must use this private `tree_leaf` in its complete
-private depth-32 Merkle path to a public state root, then establish nullifier
-absence against a public nullifier-state anchor. Only after that can the
-relation be combined with asset/value conservation, outputs, encrypted
+The next ownership extension must replace this fixed two-level path with the
+complete private depth-32 Merkle path to a public state root, then establish
+nullifier absence against a public nullifier-state anchor. Only after that can
+the relation be combined with asset/value conservation, outputs, encrypted
 envelopes and a state transition.

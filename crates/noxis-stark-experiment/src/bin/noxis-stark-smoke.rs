@@ -23,6 +23,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Public note commitment lane 0: {}", note.note_commitment[0]);
     println!("Noxis Poseidon2-P24 private ownership-and-tree-leaf STARK proof accepted");
     println!("Public nullifier lane 0: {}", ownership.nullifier[0]);
+    println!(
+        "Public private-membership root lane 0: {}",
+        ownership.root[0]
+    );
     println!("Noxis Poseidon2-P24 leaf STARK proof accepted");
     println!("Public commitment lane 0: {}", leaf.commitment[0]);
     println!("Public leaf lane 0: {}", leaf.leaf[0]);
