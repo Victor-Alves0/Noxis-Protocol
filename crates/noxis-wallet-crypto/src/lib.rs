@@ -32,9 +32,15 @@ use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSec
 use zeroize::Zeroize;
 
 mod address;
+mod wire;
 
 pub use address::{
     HybridPaymentAddress, HybridPaymentAddressEntry, PaymentAddressError, PaymentDiversifier,
+};
+pub use wire::{
+    HYBRID_RECIPIENT_ENVELOPE_MAGIC, PAYMENT_ADDRESS_MAGIC, PaymentAddressCodecError,
+    decode_hybrid_recipient_envelope, decode_payment_address, encode_hybrid_recipient_envelope,
+    encode_payment_address,
 };
 
 /// Stable label prepended to every identity message signed by this crate.
@@ -45,9 +51,9 @@ pub const HYBRID_WALLET_PROFILE_ID: &[u8] = b"noxis-hybrid-v1";
 
 const RECIPIENT_ENVELOPE_DOMAIN: &[u8] = b"NOXIS/RECIPIENT-ENVELOPE/V1\0";
 const RECIPIENT_ENVELOPE_KDF_INFO: &[u8] = b"NOXIS/RECIPIENT-ENVELOPE/KEY/V1\0";
-const ML_KEM_768_PUBLIC_KEY_LENGTH: usize = 1184;
-const ML_KEM_768_CIPHERTEXT_LENGTH: usize = 1088;
-const XCHACHA20_NONCE_LENGTH: usize = 24;
+pub(crate) const ML_KEM_768_PUBLIC_KEY_LENGTH: usize = 1184;
+pub(crate) const ML_KEM_768_CIPHERTEXT_LENGTH: usize = 1088;
+pub(crate) const XCHACHA20_NONCE_LENGTH: usize = 24;
 
 /// The public half of a hybrid identity. Verification accepts only a complete
 /// Ed25519 and ML-DSA-65 signature pair over the same domain-bound message.
@@ -145,12 +151,12 @@ pub struct RecipientEnvelopeContext {
 /// A single experimental recipient envelope. It is an in-memory object only;
 /// canonical network serialization belongs to a later codec module.
 pub struct HybridRecipientEnvelope {
-    key_epoch: u64,
-    keyset_id: [u8; 32],
-    ephemeral_x25519_public_key: [u8; 32],
-    ml_kem_768_ciphertext: [u8; ML_KEM_768_CIPHERTEXT_LENGTH],
-    nonce: [u8; XCHACHA20_NONCE_LENGTH],
-    encrypted_payload: Vec<u8>,
+    pub(crate) key_epoch: u64,
+    pub(crate) keyset_id: [u8; 32],
+    pub(crate) ephemeral_x25519_public_key: [u8; 32],
+    pub(crate) ml_kem_768_ciphertext: [u8; ML_KEM_768_CIPHERTEXT_LENGTH],
+    pub(crate) nonce: [u8; XCHACHA20_NONCE_LENGTH],
+    pub(crate) encrypted_payload: Vec<u8>,
 }
 
 /// An envelope was malformed, addressed to another recipient context, or
@@ -353,6 +359,20 @@ impl HybridRecipientPublicKey {
     /// epoch. It is safe to publish, unlike a private receiving key.
     pub fn keyset_id(&self, key_epoch: u64) -> [u8; 32] {
         recipient_keyset_id(&self.x25519_public, &self.ml_kem_768_public, key_epoch)
+    }
+
+    pub(crate) fn from_wire_components(
+        x25519_public: [u8; 32],
+        ml_kem_768_public: [u8; ML_KEM_768_PUBLIC_KEY_LENGTH],
+    ) -> Result<Self, ()> {
+        let encoded_key =
+            ml_kem::Key::<EncapsulationKey768>::try_from(ml_kem_768_public.as_slice())
+                .map_err(|_| ())?;
+        let ml_kem_768_public = EncapsulationKey768::new(&encoded_key).map_err(|_| ())?;
+        Ok(Self {
+            x25519_public: X25519PublicKey::from(x25519_public),
+            ml_kem_768_public,
+        })
     }
 
     /// Encrypts a payload using only the recipient's public X25519 and

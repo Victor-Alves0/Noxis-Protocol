@@ -145,7 +145,7 @@ impl HybridPaymentAddressEntry {
 }
 
 impl HybridPaymentAddress {
-    fn new(
+    pub(crate) fn new(
         diversifier: PaymentDiversifier,
         key_epoch: u64,
         recipient: HybridRecipientPublicKey,
@@ -170,6 +170,10 @@ impl HybridPaymentAddress {
     /// Stable public identifier of this complete diversified address.
     pub const fn address_id(&self) -> [u8; 32] {
         self.address_id
+    }
+
+    pub(crate) const fn recipient(&self) -> &HybridRecipientPublicKey {
+        &self.recipient
     }
 
     /// Encrypts an incoming note payload using only the public address. The
