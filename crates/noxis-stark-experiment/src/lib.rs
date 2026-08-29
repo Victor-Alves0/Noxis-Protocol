@@ -2,8 +2,8 @@
 //!
 //! This crate contains executable Plonky3 STARK experiments with a hiding FRI
 //! PCS. Its active smoke proof constrains the exact frozen Poseidon2-P24
-//! permutation behind the Noxis candidate privacy primitives. It does **not**
-//! now also proves a standalone private `H_ADDR` preimage relation. It does
+//! permutation behind the Noxis candidate privacy primitives. It now also
+//! proves standalone private `H_ADDR` and `H_NOTE` preimage relations. It does
 //! **not** yet prove note membership, nullifier absence, note-to-key binding,
 //! asset conservation, a private transfer, or any production privacy property.
 
@@ -33,9 +33,13 @@ use rand::SeedableRng as _;
 use rand_chacha::ChaCha12Rng;
 
 mod addr;
+mod note;
 
 pub use addr::{
     Poseidon2P24AddrExperimentResult, prove_and_verify_p24_addr, run_p24_addr_research_smoke,
+};
+pub use note::{
+    Poseidon2P24NoteExperimentResult, prove_and_verify_p24_note, run_p24_note_research_smoke,
 };
 
 const TRACE_WIDTH: usize = 2;

@@ -48,8 +48,9 @@ review and testing expectations.
 - Canonical `NXCP` checkpoints, atomically published under the protected data directory and verified against strict replay.
 - Versioned cryptographic-suite metadata to prevent permanent coupling to one primitive.
 - A research-only Plonky3 STARK experiment that proves the frozen
-  Poseidon2-P24 candidate permutation, private `H_ADDR(key)` preimage with
-  byte-exact `BytePack3LE`, `Hash16(Leaf, commitment)` and ordered
+  Poseidon2-P24 candidate permutation, private `H_ADDR(key)` and
+  `H_NOTE(preimage)` relations with byte-exact `BytePack3LE`,
+  `Hash16(Leaf, commitment)` and ordered
   `Hash16(Node, left || right)` constructions against external vectors, plus
   one private ordered Merkle step, a two-level private path and a full private
   depth-32 path. These remain separate relations: this is not a note-ownership,
@@ -152,10 +153,10 @@ Run the separate full-depth P24 STARK research demo with an optimized build:
 cargo run --release -p noxis-stark-experiment --bin noxis-stark-smoke
 ```
 
-It proves a private candidate `H_ADDR` preimage and a depth-32 Merkle path with
-only their respective commitments/root public. The relations are still
-separate. This is an expensive research workload, not a wallet or validator
-operation.
+It proves private candidate `H_ADDR` and `H_NOTE` preimages and a depth-32
+Merkle path with only their respective commitments/root public. The relations
+are still separate. This is an expensive research workload, not a wallet or
+validator operation.
 
 On POSIX systems, use `./scripts/demo-local.sh`. The demo prints the initialized
 genesis and state identities, accepts a fixture-authorized mint and one research
