@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/Victor-Alves0/Noxis-Protocol/security/advisories/new
+    about: Do not disclose suspected vulnerabilities in a public issue.
+  - name: Research and design discussion
+    url: https://github.com/Victor-Alves0/Noxis-Protocol/discussions
+    about: Discuss protocol, cryptography and architecture questions before proposing a large change.

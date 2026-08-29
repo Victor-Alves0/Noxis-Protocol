@@ -1,0 +1,31 @@
+name: Research question
+description: Propose or investigate a protocol, cryptography, privacy or systems question.
+title: "research: "
+labels: ["type: research question", "status: needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for a reviewable question, not an unreported vulnerability.
+        See SECURITY.md for private reporting and docs/OPEN_QUESTIONS.md for current topics.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question and scope
+      description: What exact claim, construction, boundary or assumption are you evaluating?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence, model or references
+      description: Include a threat model, counterexample, experiment, paper or primary-source reference.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Expected impact
+      description: What design, specification, implementation or security claim could change?
+    validations:
+      required: true

@@ -9,6 +9,20 @@ Start with the [repository README](../README.md) for the current scope and the
 commands that verify the workspace. Then use the routes below instead of
 reading the directory alphabetically.
 
+## Research front doors
+
+These short guides are intended for new contributors and external reviewers;
+they point to the versioned specifications rather than replacing them.
+
+| If you are looking for | Start here |
+| --- | --- |
+| Current capabilities and non-claims | [Protocol overview](PROTOCOL.md) |
+| Security assumptions and reporting | [Threat-model guide](THREAT_MODEL.md) and [SECURITY.md](../SECURITY.md) |
+| Cryptographic direction | [Cryptography guide](CRYPTOGRAPHY.md) |
+| Private-note roadmap | [Private-notes guide](PRIVATE_NOTES.md) |
+| Hybrid post-quantum direction | [PQ hybrid design](PQ_HYBRID_DESIGN.md) |
+| Research questions worth answering | [Open questions](OPEN_QUESTIONS.md) |
+
 ## Status legend
 
 | Mark | Meaning |

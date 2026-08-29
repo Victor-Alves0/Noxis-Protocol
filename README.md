@@ -4,6 +4,19 @@ Noxis is a security-first implementation of a privacy-preserving, multi-asset se
 
 It is not a bank, exchange, wallet, custodian, stablecoin issuer, or production cryptographic implementation. It does not connect to real assets, fiat systems, blockchains, or payment rails.
 
+## Research and community
+
+Noxis is being built in public for careful technical discussion. Researchers,
+Rust engineers, protocol designers and reviewers can start with the
+[documentation map](docs/README.md), propose an answer to an
+[open research question](docs/OPEN_QUESTIONS.md), or browse issues labeled
+`help wanted`.
+
+For design discussion, use GitHub Discussions or a scoped issue. For a
+suspected vulnerability, follow [SECURITY.md](SECURITY.md) and do not disclose
+details in a public issue. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+review and testing expectations.
+
 ## What exists now
 
 - A modular Rust workspace with explicit ownership boundaries.

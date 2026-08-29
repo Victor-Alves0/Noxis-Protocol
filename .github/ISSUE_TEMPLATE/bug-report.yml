@@ -1,0 +1,30 @@
+name: Bug report
+description: Report a reproducible non-sensitive defect.
+title: "bug: "
+labels: ["bug", "status: needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include exploit details, secret material or a suspected vulnerability here. Read SECURITY.md first.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Commands, inputs and platform details needed to reproduce the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Scope and impact
+      description: State whether this affects tests, documentation, local research behavior, or a security boundary.
+    validations:
+      required: true
