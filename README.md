@@ -48,11 +48,12 @@ review and testing expectations.
 - Canonical `NXCP` checkpoints, atomically published under the protected data directory and verified against strict replay.
 - Versioned cryptographic-suite metadata to prevent permanent coupling to one primitive.
 - A research-only Plonky3 STARK experiment that proves the frozen
-  Poseidon2-P24 candidate permutation, `Hash16(Leaf, commitment)` and ordered
+  Poseidon2-P24 candidate permutation, private `H_ADDR(key)` preimage with
+  byte-exact `BytePack3LE`, `Hash16(Leaf, commitment)` and ordered
   `Hash16(Node, left || right)` constructions against external vectors, plus
   one private ordered Merkle step, a two-level private path and a full private
-  depth-32 path. It is not a note-ownership, nullifier, value-conservation or
-  private-transfer proof.
+  depth-32 path. These remain separate relations: this is not a note-ownership,
+  nullifier, value-conservation or private-transfer proof.
 - Canonical consensus data: weighted validator sets, block headers, record commitments and finality-certificate verification boundaries. This is not yet a running validator network or a finality claim.
 - Genesis and the protected local manifest commit to the validator set, public verification keys, declared fault budget and consensus limits. A node cannot reopen the same data directory with a different consensus configuration.
 - Tests for unauthorized issuance, duplicate nullifiers, duplicate commitments, and unknown assets.
@@ -151,8 +152,10 @@ Run the separate full-depth P24 STARK research demo with an optimized build:
 cargo run --release -p noxis-stark-experiment --bin noxis-stark-smoke
 ```
 
-It proves a candidate depth-32 Merkle path with only the root public. This is
-an expensive research workload, not a wallet or validator operation.
+It proves a private candidate `H_ADDR` preimage and a depth-32 Merkle path with
+only their respective commitments/root public. The relations are still
+separate. This is an expensive research workload, not a wallet or validator
+operation.
 
 On POSIX systems, use `./scripts/demo-local.sh`. The demo prints the initialized
 genesis and state identities, accepts a fixture-authorized mint and one research

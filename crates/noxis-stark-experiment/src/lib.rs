@@ -3,16 +3,18 @@
 //! This crate contains executable Plonky3 STARK experiments with a hiding FRI
 //! PCS. Its active smoke proof constrains the exact frozen Poseidon2-P24
 //! permutation behind the Noxis candidate privacy primitives. It does **not**
-//! yet prove note membership, nullifier absence, ownership, asset
-//! conservation, range constraints, recipient binding, or any production
-//! privacy property.
+//! now also proves a standalone private `H_ADDR` preimage relation. It does
+//! **not** yet prove note membership, nullifier absence, note-to-key binding,
+//! asset conservation, a private transfer, or any production privacy property.
 
+use noxis_poseidon2_privacy_reference::Poseidon2P24PrivacyReferenceError;
 use noxis_poseidon2_reference::{
     BabyBearDigestV2, BabyBearStateP24, P24_WIDTH, Poseidon2P24Reference,
     Poseidon2P24ReferenceError,
 };
 use noxis_tree_params::{
-    CandidatePoseidon2P24ManifestV2, Poseidon2P24CandidateError, Poseidon2P24TreeDomainV1,
+    CandidatePoseidon2P24ManifestV2, Poseidon2P24CandidateError,
+    Poseidon2P24NoteDomainsCandidateError, Poseidon2P24TreeDomainV1,
 };
 use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_baby_bear::BabyBear;
@@ -30,9 +32,15 @@ use p3_uni_stark::{StarkConfig, prove, verify};
 use rand::SeedableRng as _;
 use rand_chacha::ChaCha12Rng;
 
+mod addr;
+
+pub use addr::{
+    Poseidon2P24AddrExperimentResult, prove_and_verify_p24_addr, run_p24_addr_research_smoke,
+};
+
 const TRACE_WIDTH: usize = 2;
 const TRACE_ROWS: usize = 8;
-const P24_ROUNDS: usize = 29;
+pub(crate) const P24_ROUNDS: usize = 29;
 const P24_TRACE_ROWS: usize = 32;
 const P24_SELECTOR_OFFSET: usize = P24_WIDTH;
 const P24_TRACE_WIDTH: usize = P24_WIDTH + P24_ROUNDS;
@@ -94,7 +102,7 @@ const P24_MERKLE_PATH32_INTERMEDIATES_OFFSET: usize =
     P24_MERKLE_PATH32_DIRECTIONS_OFFSET + P24_MERKLE_PATH_DEPTH;
 const P24_MERKLE_PATH32_PROVER_STACK_BYTES: usize = 64 * 1024 * 1024;
 
-type Val = BabyBear;
+pub(crate) type Val = BabyBear;
 type Challenge = BinomialExtensionField<Val, 4>;
 type ByteHash = Keccak256Hash;
 type U64Hash = PaddingFreeSponge<KeccakF, 25, 17, 4>;
@@ -195,9 +203,9 @@ pub struct PrivateAccumulatorAir;
 /// composed in later AIR work.
 #[derive(Clone, Debug)]
 pub struct Poseidon2P24Air {
-    external_matrix: [[u32; P24_WIDTH]; P24_WIDTH],
-    internal_matrix: [[u32; P24_WIDTH]; P24_WIDTH],
-    round_constants: [[u32; P24_WIDTH]; P24_ROUNDS],
+    pub(crate) external_matrix: [[u32; P24_WIDTH]; P24_WIDTH],
+    pub(crate) internal_matrix: [[u32; P24_WIDTH]; P24_WIDTH],
+    pub(crate) round_constants: [[u32; P24_WIDTH]; P24_ROUNDS],
 }
 
 /// The fixed candidate shapes currently supported by the Hash16 AIR.
@@ -329,7 +337,7 @@ pub struct Poseidon2P24Hash16Air {
 }
 
 impl Poseidon2P24Air {
-    fn from_reference(reference: &Poseidon2P24Reference) -> Self {
+    pub(crate) fn from_reference(reference: &Poseidon2P24Reference) -> Self {
         Self {
             external_matrix: *reference.external_matrix(),
             internal_matrix: *reference.internal_matrix(),
@@ -621,7 +629,11 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24Hash16Air {
 }
 
 impl Poseidon2P24Air {
-    fn round_expression<AB: AirBuilder>(&self, state: &[AB::Var], round: usize) -> Vec<AB::Expr> {
+    pub(crate) fn round_expression<AB: AirBuilder>(
+        &self,
+        state: &[AB::Var],
+        round: usize,
+    ) -> Vec<AB::Expr> {
         let mut added: Vec<AB::Expr> = state.iter().copied().map(|value| value.into()).collect();
         if is_full_round(round) {
             for (lane, value) in added.iter_mut().enumerate() {
@@ -1295,6 +1307,8 @@ pub fn run_p24_merkle_path32_research_smoke()
 pub enum StarkExperimentError {
     CandidateParameters(Poseidon2P24ReferenceError),
     CandidateTreeParameters(Poseidon2P24CandidateError),
+    CandidatePrivateDomains(Poseidon2P24NoteDomainsCandidateError),
+    CandidatePrivateReference(Poseidon2P24PrivacyReferenceError),
     VerificationFailed,
     ProverThreadFailed,
 }
@@ -1311,6 +1325,18 @@ impl From<Poseidon2P24CandidateError> for StarkExperimentError {
     }
 }
 
+impl From<Poseidon2P24NoteDomainsCandidateError> for StarkExperimentError {
+    fn from(value: Poseidon2P24NoteDomainsCandidateError) -> Self {
+        Self::CandidatePrivateDomains(value)
+    }
+}
+
+impl From<Poseidon2P24PrivacyReferenceError> for StarkExperimentError {
+    fn from(value: Poseidon2P24PrivacyReferenceError) -> Self {
+        Self::CandidatePrivateReference(value)
+    }
+}
+
 impl std::fmt::Display for StarkExperimentError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -1324,6 +1350,18 @@ impl std::fmt::Display for StarkExperimentError {
                 write!(
                     formatter,
                     "could not load frozen P24 tree parameters: {error}"
+                )
+            }
+            Self::CandidatePrivateDomains(error) => {
+                write!(
+                    formatter,
+                    "could not load frozen P24 private-domain parameters: {error}"
+                )
+            }
+            Self::CandidatePrivateReference(error) => {
+                write!(
+                    formatter,
+                    "could not evaluate the frozen P24 private-domain reference: {error}"
                 )
             }
             Self::VerificationFailed => {
@@ -1662,7 +1700,7 @@ fn p24_node_input(
     input
 }
 
-fn round_values(
+pub(crate) fn round_values(
     air: &Poseidon2P24Air,
     mut state: [Val; P24_WIDTH],
     round: usize,
@@ -1680,7 +1718,7 @@ fn round_values(
     }
 }
 
-fn matrix_values(
+pub(crate) fn matrix_values(
     matrix: &[[u32; P24_WIDTH]; P24_WIDTH],
     values: &[Val; P24_WIDTH],
 ) -> [Val; P24_WIDTH] {
@@ -1691,7 +1729,7 @@ fn matrix_values(
     })
 }
 
-fn is_full_round(round: usize) -> bool {
+pub(crate) fn is_full_round(round: usize) -> bool {
     !(4..P24_ROUNDS - 4).contains(&round)
 }
 
@@ -1701,7 +1739,7 @@ fn seventh_power<AB: AirBuilder>(value: AB::Expr) -> AB::Expr {
     fourth * square * value
 }
 
-fn matrix_expression<AB: AirBuilder>(
+pub(crate) fn matrix_expression<AB: AirBuilder>(
     matrix: &[[u32; P24_WIDTH]; P24_WIDTH],
     values: &[AB::Expr],
 ) -> Vec<AB::Expr> {
@@ -1714,7 +1752,7 @@ fn matrix_expression<AB: AirBuilder>(
         .collect()
 }
 
-fn make_hiding_config() -> Config {
+pub(crate) fn make_hiding_config() -> Config {
     make_hiding_config_with_log_blowup(3)
 }
 

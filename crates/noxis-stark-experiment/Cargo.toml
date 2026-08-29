@@ -19,6 +19,7 @@ p3-merkle-tree = "0.6.3"
 p3-symmetric = "0.6.3"
 p3-uni-stark = "0.6.3"
 noxis-poseidon2-reference = { path = "../noxis-poseidon2-reference" }
+noxis-poseidon2-privacy-reference = { path = "../noxis-poseidon2-privacy-reference" }
 noxis-tree-params = { path = "../noxis-tree-params" }
 rand = "=0.10.1"
 rand_chacha = "0.10.0"
