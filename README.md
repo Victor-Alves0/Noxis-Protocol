@@ -209,6 +209,18 @@ address owner, rejects an unrelated recipient and verifies a hybrid identity
 signature. It is not a wallet, private transfer or production cryptography;
 see [`docs/WALLET_CRYPTO_LOCAL_DEMO_V0_1.md`](docs/WALLET_CRYPTO_LOCAL_DEMO_V0_1.md).
 
+To demonstrate the separate incoming view key scanning a bounded local batch
+of encrypted candidate notes, run:
+
+```powershell
+cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo -- private-note-scan
+```
+
+It accepts only notes authenticated for that recipient and ignores unrelated
+or unauthenticated envelopes. It has no block source, persistence, balance,
+nullifier or spend authority; see
+[`docs/INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md`](docs/INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md).
+
 To persist and reopen only public address material, use:
 
 ```powershell

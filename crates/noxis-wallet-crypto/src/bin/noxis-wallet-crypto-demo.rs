@@ -2,12 +2,13 @@
 //! recipient components.
 
 use noxis_wallet_crypto::{
-    CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH, CandidatePrivateNoteEnvelopeV1,
-    CandidatePrivateOutputSlotV1, CandidateWalletRootV1, HybridIdentityKeypair,
-    HybridPaymentAddressEntry, PaymentAddressError, PublicAddressBook, RecipientEnvelopeContext,
-    decode_hybrid_recipient_envelope, decode_payment_address,
+    CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH, CandidateIncomingNoteScanItemV1,
+    CandidatePrivateNoteEnvelopeV1, CandidatePrivateOutputSlotV1, CandidateWalletRootV1,
+    HybridIdentityKeypair, HybridPaymentAddressEntry, PaymentAddressError, PublicAddressBook,
+    RecipientEnvelopeContext, decode_hybrid_recipient_envelope, decode_payment_address,
     decrypt_candidate_private_note_for_incoming_view_key, encode_hybrid_recipient_envelope,
     encode_payment_address, encrypt_candidate_private_note_to_descriptor,
+    scan_candidate_incoming_notes,
 };
 
 const DEMO_CHAIN_ID: &[u8] = b"noxis-local-wallet-research";
@@ -19,6 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match parse_mode(std::env::args().skip(1))? {
         DemoMode::Run => run_demo(),
         DemoMode::PrivateNote => run_private_note_demo(),
+        DemoMode::PrivateNoteScan => run_private_note_scan_demo(),
         DemoMode::AddressBook { directory } => run_address_book_demo(directory),
         DemoMode::AddressBookList { directory } => run_address_book_list(directory),
     }
@@ -28,6 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 enum DemoMode {
     Run,
     PrivateNote,
+    PrivateNoteScan,
     AddressBook { directory: std::path::PathBuf },
     AddressBookList { directory: std::path::PathBuf },
 }
@@ -38,6 +41,7 @@ fn parse_mode(arguments: impl IntoIterator<Item = String>) -> Result<DemoMode, s
         [] => Ok(DemoMode::Run),
         [command] if command == "demo" => Ok(DemoMode::Run),
         [command] if command == "private-note" => Ok(DemoMode::PrivateNote),
+        [command] if command == "private-note-scan" => Ok(DemoMode::PrivateNoteScan),
         [command, flag, directory] if command == "address-book" && flag == "--data-dir" => {
             Ok(DemoMode::AddressBook {
                 directory: std::path::PathBuf::from(directory),
@@ -52,7 +56,7 @@ fn parse_mode(arguments: impl IntoIterator<Item = String>) -> Result<DemoMode, s
         }
         _ => Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "usage:\n  noxis-wallet-crypto-demo [demo]\n  noxis-wallet-crypto-demo private-note\n  noxis-wallet-crypto-demo address-book --data-dir PATH\n  noxis-wallet-crypto-demo address-book list --data-dir PATH",
+            "usage:\n  noxis-wallet-crypto-demo [demo]\n  noxis-wallet-crypto-demo private-note\n  noxis-wallet-crypto-demo private-note-scan\n  noxis-wallet-crypto-demo address-book --data-dir PATH\n  noxis-wallet-crypto-demo address-book list --data-dir PATH",
         )),
     }
 }
@@ -62,15 +66,12 @@ fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
     let wallet_root = CandidateWalletRootV1::generate();
     let recipient = wallet_root.derive_recipient_keyset(DEMO_KEY_EPOCH, 0)?;
     let descriptor = recipient.public_descriptor();
-    let mut note = [0_u8; CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH];
-    note[..2].copy_from_slice(&1_u16.to_be_bytes());
-    note[2..34].copy_from_slice(&[7; 32]);
-    note[34..50].copy_from_slice(&42_u128.to_be_bytes());
-    note[50..114].copy_from_slice(&descriptor.recipient_commitment().as_bytes());
-    // The remaining candidate witness fields are deliberately not displayed.
-    for (index, byte) in note[114..].iter_mut().enumerate() {
-        *byte = (index as u8).wrapping_mul(29).wrapping_add(11);
-    }
+    let note = candidate_note(
+        descriptor.recipient_commitment().as_bytes(),
+        [7; 32],
+        42,
+        11,
+    );
 
     let output = encrypt_candidate_private_note_to_descriptor(&descriptor, &context, note)?;
     let commitment = output.commitment();
@@ -105,6 +106,88 @@ fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("This is not a wallet, spend flow, ledger transaction or privacy activation.");
     println!("This candidate digest is only used by local research preflight, never the ledger.");
     Ok(())
+}
+
+fn run_private_note_scan_demo() -> Result<(), Box<dyn std::error::Error>> {
+    let context = RecipientEnvelopeContext::new(DEMO_CHAIN_ID, DEMO_KEY_EPOCH)?;
+    let wallet_root = CandidateWalletRootV1::generate();
+    let recipient = wallet_root.derive_recipient_keyset(DEMO_KEY_EPOCH, 0)?;
+    let descriptor = recipient.public_descriptor();
+    let unrelated_root = CandidateWalletRootV1::generate();
+    let unrelated = unrelated_root.derive_recipient_keyset(DEMO_KEY_EPOCH, 0)?;
+    let unrelated_descriptor = unrelated.public_descriptor();
+
+    let first = encrypt_candidate_private_note_to_descriptor(
+        &descriptor,
+        &context,
+        candidate_note(descriptor.recipient_commitment().as_bytes(), [3; 32], 17, 3),
+    )?;
+    let ignored = encrypt_candidate_private_note_to_descriptor(
+        &unrelated_descriptor,
+        &context,
+        candidate_note(
+            unrelated_descriptor.recipient_commitment().as_bytes(),
+            [4; 32],
+            19,
+            4,
+        ),
+    )?;
+    let second = encrypt_candidate_private_note_to_descriptor(
+        &descriptor,
+        &context,
+        candidate_note(descriptor.recipient_commitment().as_bytes(), [5; 32], 23, 5),
+    )?;
+    let view_key = recipient.into_incoming_view_key();
+    let result = scan_candidate_incoming_notes(
+        &view_key,
+        &[
+            CandidateIncomingNoteScanItemV1::new(&context, &first),
+            CandidateIncomingNoteScanItemV1::new(&context, &ignored),
+            CandidateIncomingNoteScanItemV1::new(&context, &second),
+        ],
+    )?;
+
+    if result.received().len() != 2 || result.ignored() != 1 {
+        return Err("the local incoming-view scanner returned an unexpected result".into());
+    }
+
+    println!("Noxis incoming-view batch scan — EXPERIMENTAL / LOCAL ONLY");
+    println!("scanned caller-provided encrypted outputs: 3");
+    println!(
+        "authenticated as this recipient: {}",
+        result.received().len()
+    );
+    println!(
+        "unrelated or unauthenticated outputs ignored: {}",
+        result.ignored()
+    );
+    println!(
+        "accepted local batch indexes: {}, {}",
+        result.received()[0].batch_index(),
+        result.received()[1].batch_index()
+    );
+    println!("No note bytes, asset, value, secret key, nullifier or balance is printed.");
+    println!("The incoming view key has no spend authority and cannot create a transaction.");
+    println!("This is not block scanning, wallet persistence, consensus or privacy activation.");
+    Ok(())
+}
+
+fn candidate_note(
+    recipient_commitment: [u8; 64],
+    asset: [u8; 32],
+    value: u128,
+    witness_seed: u8,
+) -> [u8; CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH] {
+    let mut note = [0_u8; CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH];
+    note[..2].copy_from_slice(&1_u16.to_be_bytes());
+    note[2..34].copy_from_slice(&asset);
+    note[34..50].copy_from_slice(&value.to_be_bytes());
+    note[50..114].copy_from_slice(&recipient_commitment);
+    // The remaining candidate witness fields are deliberately not displayed.
+    for (index, byte) in note[114..].iter_mut().enumerate() {
+        *byte = (index as u8).wrapping_mul(29).wrapping_add(witness_seed);
+    }
+    note
 }
 
 fn run_demo() -> Result<(), Box<dyn std::error::Error>> {
@@ -219,6 +302,10 @@ mod tests {
         assert_eq!(
             parse_mode([String::from("private-note")]).unwrap(),
             DemoMode::PrivateNote
+        );
+        assert_eq!(
+            parse_mode([String::from("private-note-scan")]).unwrap(),
+            DemoMode::PrivateNoteScan
         );
         assert_eq!(
             parse_mode([

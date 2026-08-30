@@ -36,6 +36,7 @@ mod address_book;
 mod ciphertext_digest;
 mod private_note;
 mod recipient_descriptor;
+mod scanner;
 mod wallet_root;
 mod wire;
 
@@ -61,6 +62,11 @@ pub use recipient_descriptor::{
     CANDIDATE_RECIPIENT_DESCRIPTOR_DOMAIN, CandidateIncomingViewKeyV1,
     CandidatePrivateRecipientDescriptorV1, CandidatePrivateRecipientError,
     CandidatePrivateRecipientKeysetV1,
+};
+pub use scanner::{
+    CandidateIncomingNoteScanError, CandidateIncomingNoteScanItemV1,
+    CandidateIncomingNoteScanResultV1, CandidateScannedIncomingNoteV1,
+    scan_candidate_incoming_notes,
 };
 pub use wallet_root::CandidateWalletRootV1;
 pub use wire::{
