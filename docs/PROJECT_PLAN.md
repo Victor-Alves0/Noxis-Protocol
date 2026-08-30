@@ -204,6 +204,12 @@ nota, saldo ou prova; ele serve somente à distribuição/reuso seguro de
 endereços públicos. Persistência de segredo e recuperação de carteira exigem
 outro projeto de keystore e não foram iniciadas aqui.
 
+**Gate de keystore:** a persistência de qualquer segredo de wallet permanece
+proibida até existir especificação de KDF/AEAD, formato limitado, inventário de
+chaves, política de backup/rollback e testes adversariais. A direção Argon2id
+é somente candidata; não há parâmetros nem formato selecionados. Ver
+[`WALLET_KEYSTORE_SECURITY_GATE_V0_1.md`](WALLET_KEYSTORE_SECURITY_GATE_V0_1.md).
+
 ### 6. Adaptadores de ativos e políticas de emissão
 
 Conecta ativos apenas onde o backing, a custódia, resgate, falhas e responsabilidades forem explicitamente especificados. Fiat externo nunca é aceito como prova automática de backing.

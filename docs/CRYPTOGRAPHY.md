@@ -23,6 +23,9 @@ tests and independent review.
   Ed25519 + ML-DSA-65 identity signatures are executable research components,
   but they do not enable active post-quantum protection or establish a sound
   combiner by themselves. See the [local wallet-crypto demo](WALLET_CRYPTO_LOCAL_DEMO_V0_1.md).
+- Secret wallet persistence is explicitly blocked pending its own threat
+  model, key inventory, selected KDF/AEAD profile, bounded format, recovery
+  policy and review. See the [wallet keystore security gate](WALLET_KEYSTORE_SECURITY_GATE_V0_1.md).
 
 Read [CRYPTOGRAPHY_DECISION_V0_1.md](CRYPTOGRAPHY_DECISION_V0_1.md) for the
 decision record and [CRYPTO_SERVICE_GATE_V0_1.md](CRYPTO_SERVICE_GATE_V0_1.md)
