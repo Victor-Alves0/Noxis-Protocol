@@ -248,8 +248,11 @@ aceitam. Vetores externos e integração ao preflight são os próximos gates. V
 **Validação local de pacote privado:** `noxis-private-packet-validation` agora
 redecodifica os dois `NXRE` de um `NXPT`, exige round-trip canônico e compara os
 digests candidatos ao intento antes de qualquer prova. Envelope trocado de slot
-ou bytes opacos não-`NXRE` são rejeitados. A fronteira não valida prova, estado,
-ledger ou rede; integrar seu recibo ao preflight é o próximo passo. Ver
+ou bytes opacos não-`NXRE` são rejeitados. Depois desse vínculo, uma incoming
+view key pode descobrir a própria nota no pacote sem receber nullifier ou poder
+de gasto. A fronteira não valida prova, admissão, estado, ledger, finalidade ou
+rede; integrar seu recibo ao preflight e depois a uma cadeia autenticada seguem
+como gates separados. Ver
 [`PRIVATE_PACKET_ENVELOPE_VALIDATION_CANDIDATE_V0_1.md`](PRIVATE_PACKET_ENVELOPE_VALIDATION_CANDIDATE_V0_1.md).
 
 **Preflight STARK ligado ao pacote:** o contrato de prova agora aceita o

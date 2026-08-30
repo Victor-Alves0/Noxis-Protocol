@@ -2,23 +2,29 @@
 
 use noxis_codec::{PrivateTransferPacketV2, encode_private_transfer};
 use noxis_privacy_types::{
-    CircuitId, MerkleRootV2, NoteCommitmentV2, NullifierV2, PrivateTransferIntentV2,
-    PrivateTransferOutputV2, TreeParametersId, TreeParametersV2,
+    CircuitId, MerkleRootV2, NullifierV2, PrivateTransferIntentV2, PrivateTransferOutputV2,
+    TreeParametersId, TreeParametersV2,
 };
 use noxis_private_packet_validation::{
     CandidatePrivatePacketEnvelopeValidationError,
     decode_and_validate_candidate_private_transfer_packet_envelopes,
+    decode_validate_and_scan_candidate_private_transfer_packet_for_incoming_view_key,
 };
 use noxis_types::{AssetId, GenesisId, StateId, ValidationContextId};
 use noxis_wallet_crypto::{
-    CandidatePrivateOutputSlotV1, HybridPaymentAddressEntry, RecipientEnvelopeContext,
-    candidate_ciphertext_digest_v1, encode_hybrid_recipient_envelope,
+    CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH, CandidateIncomingViewKeyV1,
+    CandidatePrivateOutputSlotV1, CandidatePrivateRecipientKeysetV1, RecipientEnvelopeContext,
+    candidate_ciphertext_digest_v1, decode_hybrid_recipient_envelope,
+    encode_hybrid_recipient_envelope, encrypt_candidate_private_note_to_descriptor,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let packet = sample_packet()?;
+    let (packet, context, view_key) = sample_packet()?;
     let encoded = encode_private_transfer(&packet)?;
     let validated = decode_and_validate_candidate_private_transfer_packet_envelopes(&encoded)?;
+    let scanned = decode_validate_and_scan_candidate_private_transfer_packet_for_incoming_view_key(
+        &encoded, &context, &view_key,
+    )?;
     let mut swapped_envelopes = packet.recipient_envelopes().clone();
     swapped_envelopes.swap(0, 1);
     let swapped = PrivateTransferPacketV2::new(
@@ -46,7 +52,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("both output digests recomputed and matched the intent ... accepted");
     println!("swapped output envelopes ... rejected: DigestMismatch(slot 0)");
     println!(
-        "This does not verify the opaque proof, decrypt notes, update state or authorize a ledger transaction."
+        "incoming view key scanned packet-bound outputs ... accepted ({} own, {} ignored)",
+        scanned.received().len(),
+        scanned.ignored()
+    );
+    println!(
+        "This does not verify the opaque proof, admit a packet, update state, expose a balance or authorize a ledger transaction."
     );
     println!(
         "Recomputed public digests: {}, {}",
@@ -56,32 +67,66 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn sample_packet() -> Result<PrivateTransferPacketV2, Box<dyn std::error::Error>> {
+fn sample_packet() -> Result<
+    (
+        PrivateTransferPacketV2,
+        RecipientEnvelopeContext,
+        CandidateIncomingViewKeyV1,
+    ),
+    Box<dyn std::error::Error>,
+> {
     let context = RecipientEnvelopeContext::new(b"noxis-private-packet-demo", 1)?;
-    let first_owner = HybridPaymentAddressEntry::generate(1);
-    let second_owner = HybridPaymentAddressEntry::generate(1);
-    let first = first_owner
-        .address()
-        .encrypt_incoming(&context, &[11; 178])?;
-    let second = second_owner
-        .address()
-        .encrypt_incoming(&context, &[12; 178])?;
-    let first_commitment = NoteCommitmentV2::from_elements([2; 16])?;
-    let second_commitment = NoteCommitmentV2::from_elements([3; 16])?;
+    let owner = CandidatePrivateRecipientKeysetV1::generate(1)?;
+    let owner_descriptor = owner.public_descriptor();
+    let unrelated = CandidatePrivateRecipientKeysetV1::generate(1)?;
+    let unrelated_descriptor = unrelated.public_descriptor();
+    let owned = encrypt_candidate_private_note_to_descriptor(
+        &owner_descriptor,
+        &context,
+        note(
+            owner_descriptor.recipient_commitment().as_bytes(),
+            [11; 32],
+            40,
+            1,
+        ),
+    )?;
+    let other = encrypt_candidate_private_note_to_descriptor(
+        &unrelated_descriptor,
+        &context,
+        note(
+            unrelated_descriptor.recipient_commitment().as_bytes(),
+            [12; 32],
+            41,
+            2,
+        ),
+    )?;
+    let mut output_data = [
+        (
+            owned.commitment(),
+            encode_hybrid_recipient_envelope(owned.envelope())?,
+        ),
+        (
+            other.commitment(),
+            encode_hybrid_recipient_envelope(other.envelope())?,
+        ),
+    ];
+    output_data.sort_unstable_by_key(|(commitment, _)| commitment.as_bytes());
+    let first = decode_hybrid_recipient_envelope(&output_data[0].1)?;
+    let second = decode_hybrid_recipient_envelope(&output_data[1].1)?;
     let outputs = [
         PrivateTransferOutputV2::new(
-            first_commitment,
+            output_data[0].0,
             candidate_ciphertext_digest_v1(
                 CandidatePrivateOutputSlotV1::First,
-                first_commitment,
+                output_data[0].0,
                 &first,
             )?,
         ),
         PrivateTransferOutputV2::new(
-            second_commitment,
+            output_data[1].0,
             candidate_ciphertext_digest_v1(
                 CandidatePrivateOutputSlotV1::Second,
-                second_commitment,
+                output_data[1].0,
                 &second,
             )?,
         ),
@@ -100,12 +145,30 @@ fn sample_packet() -> Result<PrivateTransferPacketV2, Box<dyn std::error::Error>
         ],
         outputs,
     )?;
-    Ok(PrivateTransferPacketV2::new(
-        intent,
-        [
-            encode_hybrid_recipient_envelope(&first)?,
-            encode_hybrid_recipient_envelope(&second)?,
-        ],
-        vec![13],
-    )?)
+    Ok((
+        PrivateTransferPacketV2::new(
+            intent,
+            [output_data[0].1.clone(), output_data[1].1.clone()],
+            vec![13],
+        )?,
+        context,
+        owner.into_incoming_view_key(),
+    ))
+}
+
+fn note(
+    recipient_commitment: [u8; 64],
+    asset: [u8; 32],
+    value: u128,
+    witness_seed: u8,
+) -> [u8; CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH] {
+    let mut note = [0_u8; CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH];
+    note[..2].copy_from_slice(&1_u16.to_be_bytes());
+    note[2..34].copy_from_slice(&asset);
+    note[34..50].copy_from_slice(&value.to_be_bytes());
+    note[50..114].copy_from_slice(&recipient_commitment);
+    for (index, byte) in note[114..].iter_mut().enumerate() {
+        *byte = (index as u8).wrapping_mul(23).wrapping_add(witness_seed);
+    }
+    note
 }

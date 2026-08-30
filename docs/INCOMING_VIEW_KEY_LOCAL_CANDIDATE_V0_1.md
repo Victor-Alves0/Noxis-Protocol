@@ -41,6 +41,11 @@ Ele devolve os índices locais das notas autenticadas para aquele destinatário,
 ignora envelopes de terceiros ou não autenticados sem distingui-los e falha
 fechado se uma nota autenticada não respeitar `H_NOTE` ou `H_ADDR`.
 
+O crate `noxis-private-packet-validation` também já aplica essa leitura a um
+`NXPT` canônico **depois** de conferir `H_ENVELOPE(slot, commitment, NXRE)`.
+Esse caminho devolve o slot público da intenção, não uma posição de bloco, e
+continua sem demonstrar que o pacote foi provado, aceito ou finalizado.
+
 ## O que isso resolve
 
 Uma carteira poderá, no futuro, entregar esta capacidade a um processo de
@@ -58,7 +63,8 @@ ele não define posição de bloco, saldo ou estado de consenso.
   key.
 - Não há fonte de blocos autenticada, descoberta sobre a cadeia,
   armazenamento de notas ou saldo. O scanner existente aceita somente um lote
-  em memória fornecido pelo chamador.
+  em memória fornecido pelo chamador, incluindo o lote de dois outputs de um
+  `NXPT` localmente validado.
 - Não há view key de saída; portanto pagamentos enviados não são auditáveis
   por esta capacidade.
 - Não há transação, prova ZK, nullifier, assinatura de gasto, stealth address

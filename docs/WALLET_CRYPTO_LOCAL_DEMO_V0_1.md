@@ -83,7 +83,9 @@ both signature algorithms.
 - It is not a wallet keystore, seed backup or key-rotation implementation.
 - It is not a stealth-address or anonymous-payment protocol.
 - It is not a persisted/exportable view key, block scanner, transaction
-  construction or private settlement.
+  construction or private settlement. A separate packet-bound local scanner
+  exists in `noxis-private-packet-validation`, but it has no admission or
+  chain-finality evidence.
 - It does not bind `NXRE` bytes to an `NXPU` `CiphertextDigestV2`; the local
   candidate-note receipt is intentionally below that protocol gate.
 - It does not make CometBFT transport, consensus, the node, or the protocol

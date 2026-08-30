@@ -221,6 +221,20 @@ or unauthenticated envelopes. It has no block source, persistence, balance,
 nullifier or spend authority; see
 [`docs/INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md`](docs/INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md).
 
+To exercise the stricter packet-bound path, in which a candidate `NXPT` first
+binds each `NXRE` envelope to its public output commitment before the incoming
+view key scans it, run:
+
+```powershell
+cargo run -p noxis-private-packet-validation --bin noxis-private-packet-validation-demo
+```
+
+It rejects swapped output envelopes before decryption and then finds one local
+recipient note out of two. This still does not verify a proof, admit the packet
+to the ledger, establish finality, persist a note or create spend authority;
+see
+[`docs/PRIVATE_PACKET_ENVELOPE_VALIDATION_CANDIDATE_V0_1.md`](docs/PRIVATE_PACKET_ENVELOPE_VALIDATION_CANDIDATE_V0_1.md).
+
 To persist and reopen only public address material, use:
 
 ```powershell
