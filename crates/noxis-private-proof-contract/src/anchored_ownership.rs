@@ -52,6 +52,13 @@ impl CandidateAnchoredOwnershipWitnessV1 {
             siblings,
         }
     }
+
+    /// Exact in-memory note opening used by local preflight-only relations.
+    /// This is crate-visible rather than public so a caller cannot turn a
+    /// witness accessor into a wallet/export API.
+    pub(crate) const fn note_preimage(&self) -> &[u8; 178] {
+        &self.note_preimage
+    }
 }
 
 /// One opaque P24 ownership proof bound to one input of a canonical `NXPU v1`

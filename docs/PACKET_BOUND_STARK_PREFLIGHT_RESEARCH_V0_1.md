@@ -10,7 +10,8 @@ canônicos pertencem aos dois digests públicos da mesma intenção `NXPT`.
 
 Em seguida, o preflight existente executa `H_INTENT` uma vez, duas relações de
 posse/inclusão e duas relações `H_NOTE` de saída contra a mesma declaração
-`NXPU`. O recibo final mantém ambos os comprovantes locais e pode revalidar os
+`NXPU`. Antes dessas provas, ele rejeita localmente ativo privado divergente,
+entrada de valor zero, overflow ou conservação `u128` inválida. O recibo final mantém ambos os comprovantes locais e pode revalidar os
 bytes do pacote antes de revalidar os resultados públicos retidos.
 
 ```text
@@ -35,6 +36,8 @@ então executa as cinco relações disponíveis.
 - envelope que não é `NXRE` estrito falha antes do digest;
 - envelope trocado de slot falha no digest;
 - commitment ou envelope alterado não produz o digest da intenção;
+- ativo privado divergente, entrada zero, overflow ou soma não conservada
+  falha antes de iniciar o STARK;
 - recibo de pacote cuja intenção não seja byte a byte a intenção da declaração
   STARK falha como `PacketIntentMismatch`.
 

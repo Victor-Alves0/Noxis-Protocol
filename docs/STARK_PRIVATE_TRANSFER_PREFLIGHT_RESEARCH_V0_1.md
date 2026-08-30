@@ -9,10 +9,12 @@ transação, witness `NXSM`, duas witnesses privadas de posse e duas witnesses
 privadas de saída. A execução faz, nesta ordem:
 
 1. revalida a declaração pública, âncora e transição local de nullifiers;
-2. prova e verifica `H_INTENT` **uma única vez**;
-3. prova e verifica posse/Merkle de profundidade 32 para cada input;
-4. prova e verifica `H_NOTE` com vínculo do ativo público para cada output;
-5. confere todos os resultados públicos contra os slots canônicos da mesma
+2. abre localmente as quatro notas privadas e exige versão canônica, ativo
+   público idêntico, entradas não nulas e conservação `u128` sem overflow;
+3. prova e verifica `H_INTENT` **uma única vez**;
+4. prova e verifica posse/Merkle de profundidade 32 para cada input;
+5. prova e verifica `H_NOTE` com vínculo do ativo público para cada output;
+6. confere todos os resultados públicos contra os slots canônicos da mesma
    intenção e devolve apenas um recibo de resultados públicos.
 
 As quatro provas privadas são sequenciais e são descartadas depois da
@@ -31,8 +33,8 @@ falha se a intenção desse pacote não for byte a byte a intenção da declara�
 Há agora um caminho executável que responde a uma pergunta concreta: “estas
 duas entradas pertencem à raiz declarada, produzem os nullifiers declarados, e
 estas duas notas de saída produzem os commitments declarados pela mesma
-transação?” Se um commitment, nullifier, raiz, slot ou `H_INTENT` não coincide,
-o caminho falha fechado.
+transação, com o mesmo ativo e valor conservado?” Se um commitment, nullifier,
+raiz, slot, ativo, valor ou `H_INTENT` não coincide, o caminho falha fechado.
 
 O código evita calcular `H_INTENT` duas vezes: os preflights de posse e de
 saída expõem variantes sem intent para que a composição superior faça essa
@@ -57,6 +59,11 @@ As verificações semânticas locais existentes em `noxis-note-opening` continua
 importantes, mas não são dependência deste crate: inverter a dependência criaria
 um ciclo arquitetural. O próximo AIR deverá incorporar as relações, não ligar
 crates em ciclo.
+
+A conservação `u128` já é uma checagem local de witness e não retém valores
+no recibo. Ela reduz falhas antes do prover, mas não é prova de conhecimento
+zero e precisa ser imposta por limbs e carries na AIR antes de qualquer
+admissão de pacote.
 
 ## Como reproduzir
 

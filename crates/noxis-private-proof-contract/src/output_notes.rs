@@ -36,6 +36,12 @@ impl CandidateOutputNoteWitnessV1 {
     pub const fn new(note_preimage: [u8; 178]) -> Self {
         Self { note_preimage }
     }
+
+    /// Exact in-memory opening consumed by local preflight-only relations.
+    /// It is crate-visible only and has no serialization path.
+    pub(crate) const fn note_preimage(&self) -> &[u8; 178] {
+        &self.note_preimage
+    }
 }
 
 /// Public receipt from one `H_INTENT` proof and two sequential output-note

@@ -21,6 +21,7 @@ mod output_notes;
 mod public_inputs;
 mod public_statement;
 mod transfer_preflight;
+mod value_conservation;
 
 pub use air_profile::{
     AIR_CONSTRAINT_CANONICAL_INTENT, AIR_CONSTRAINT_INPUT_NOTE_MEMBERSHIP,
@@ -74,6 +75,10 @@ pub use transfer_preflight::{
     revalidate_candidate_private_transfer_stark_preflight,
     run_candidate_packet_bound_private_transfer_stark_preflight,
     run_candidate_private_transfer_stark_preflight,
+};
+pub use value_conservation::{
+    CandidateValueConservationError, CandidateValueConservationPreflightV1,
+    CandidateValueNoteRoleV1, run_candidate_value_conservation_preflight,
 };
 
 /// SHA-256 domain for the full candidate-deployment checksum.

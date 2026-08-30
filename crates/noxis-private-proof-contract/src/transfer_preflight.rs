@@ -25,10 +25,10 @@ use crate::{
     CandidateOutputNotesError, CandidateOutputNotesPreflightV1,
     CandidatePrivateTransferProofPublicStatementError,
     CandidatePrivateTransferProofPublicStatementIdV1,
-    CandidatePrivateTransferProofPublicStatementV1,
+    CandidatePrivateTransferProofPublicStatementV1, CandidateValueConservationError,
     revalidate_candidate_anchored_ownership_pair_preflight,
     revalidate_candidate_output_notes_preflight, run_candidate_anchored_ownership_pair_preflight,
-    run_candidate_output_notes_preflight,
+    run_candidate_output_notes_preflight, run_candidate_value_conservation_preflight,
 };
 
 /// Public results retained after the complete sequential candidate preflight.
@@ -121,6 +121,15 @@ pub fn run_candidate_private_transfer_stark_preflight(
 ) -> Result<CandidatePrivateTransferStarkPreflightV1, CandidatePrivateTransferStarkPreflightError> {
     statement.revalidate(pre_tree)?;
     nxsm_witness.revalidate(statement.nullifier_transition())?;
+    // This is a local transparent gate, not a substitute for the future AIR.
+    // Run it before expensive STARK work so a malformed value/asset witness
+    // cannot consume proving resources or be mistaken for a transfer preflight.
+    run_candidate_value_conservation_preflight(
+        statement,
+        pre_tree,
+        input_witnesses,
+        output_witnesses,
+    )?;
 
     let intent_result = prove_and_verify_p24_intent(statement.air_public_inputs().intent())?;
     validate_intent_result(statement, &intent_result)?;
@@ -253,6 +262,7 @@ pub enum CandidatePrivateTransferStarkPreflightError {
     NxsmWitness(CandidateNxsmNullifierTransitionWitnessError),
     Ownership(CandidateAnchoredOwnershipError),
     OutputNotes(CandidateOutputNotesError),
+    ValueConservation(CandidateValueConservationError),
     PacketEnvelope(CandidatePrivatePacketEnvelopeValidationError),
     Stark(StarkExperimentError),
     StatementIdMismatch,
@@ -286,6 +296,12 @@ impl From<CandidateAnchoredOwnershipError> for CandidatePrivateTransferStarkPref
 impl From<CandidateOutputNotesError> for CandidatePrivateTransferStarkPreflightError {
     fn from(value: CandidateOutputNotesError) -> Self {
         Self::OutputNotes(value)
+    }
+}
+
+impl From<CandidateValueConservationError> for CandidatePrivateTransferStarkPreflightError {
+    fn from(value: CandidateValueConservationError) -> Self {
+        Self::ValueConservation(value)
     }
 }
 
@@ -373,8 +389,12 @@ mod tests {
             core::array::from_fn(|index| (index as u8).wrapping_mul(13).wrapping_add(3));
         let second_key =
             core::array::from_fn(|index| (index as u8).wrapping_mul(17).wrapping_add(5));
-        let first_note = note_with_recipient(privacy.hash_addr(&first_key).unwrap(), 7);
-        let second_note = note_with_recipient(privacy.hash_addr(&second_key).unwrap(), 11);
+        let mut first_note = note_with_recipient(privacy.hash_addr(&first_key).unwrap(), 7);
+        let mut second_note = note_with_recipient(privacy.hash_addr(&second_key).unwrap(), 11);
+        first_note[2..34].copy_from_slice(&[5; 32]);
+        second_note[2..34].copy_from_slice(&[5; 32]);
+        first_note[34..50].copy_from_slice(&40_u128.to_be_bytes());
+        second_note[34..50].copy_from_slice(&60_u128.to_be_bytes());
         let first_commitment = privacy.hash_note(&first_note).unwrap();
         let second_commitment = privacy.hash_note(&second_note).unwrap();
         let (_, first_siblings, root) = tree_reference
@@ -428,6 +448,8 @@ mod tests {
         let mut output_two = note_with_recipient(privacy.hash_addr(&[37; 32]).unwrap(), 17);
         output_one[2..34].copy_from_slice(&[5; 32]);
         output_two[2..34].copy_from_slice(&[5; 32]);
+        output_one[34..50].copy_from_slice(&45_u128.to_be_bytes());
+        output_two[34..50].copy_from_slice(&55_u128.to_be_bytes());
         let mut outputs = [output_one, output_two].map(|note| {
             (
                 NoteCommitmentV2::from_elements(privacy.hash_note(&note).unwrap()).unwrap(),

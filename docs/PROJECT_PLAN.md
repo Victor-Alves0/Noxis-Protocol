@@ -257,7 +257,8 @@ como gates separados. Ver
 
 **Preflight STARK ligado ao pacote:** o contrato de prova agora aceita o
 recibo validado de `NXPT`, exige que sua intenção seja a mesma da declaração e
-só então executa `H_INTENT`, duas posses e duas saídas. Uma execução release
+só então exige ativo privado igual ao ativo público, conservação `u128` sem
+overflow e executa `H_INTENT`, duas posses e duas saídas. Uma execução release
 completa passou em 466,64 s; continua composição sequencial local, sem AIR
 única, prova portátil, atualização de estado ou ponte entre `H_ADDR` e a chave
 híbrida do destinatário. Ver

@@ -25,6 +25,12 @@ H[0..16)  = H_INTENT(intent[640])
 
 Os bytes recompostos carregam, na ordem já congelada: circuito, gênese, contexto de validação, estado anterior, parâmetros da árvore, raiz privada, ativo, dois nullifiers, dois commitments de saída e dois digests de envelopes. A moldura [`CandidatePrivateTransferAirPublicInputsV1`](../crates/noxis-private-proof-contract/src/public_inputs.rs) só pode ser construída de uma `PrivateTransferIntentV2` canônica e rederiva `H_INTENT`.
 
+O preflight local já rejeita witnesses cujas quatro notas não tenham o ativo
+público, entradas de valor zero, overflow em qualquer soma `u128` ou
+conservação inválida. Isso reduz a superfície de erros antes do prover, mas
+não transforma a regra em zero conhecimento: a AIR única ainda precisa impor
+esses mesmos limbs e carries.
+
 ## Testemunha privada e restrições
 
 Para cada entrada, a testemunha contém abertura da nota, chave de nullifier, posição e 32 irmãos Merkle. Para cada saída, contém abertura da nota. A declaração `NXNT` exige ainda dois caminhos `NXSM` de 512 irmãos na sequência prévia → intermediária → posterior, conforme a [interface de witness](PRIVATE_TRANSFER_WITNESS_CONSTRAINT_INTERFACE_CANDIDATE_V0_1.md). A AIR deverá impor:
