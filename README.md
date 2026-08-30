@@ -58,6 +58,10 @@ review and testing expectations.
   two candidate ownership checks sequentially against one typed `NXPS v2`
   anchor and ordered transparent `NXSM` witness. It is not proof aggregation,
   a nullifier-absence, value-conservation or private-transfer proof.
+- A second research-only STARK component proves the exact first eight levels
+  of an `NXSM` absence path from its frozen empty leaf, including the sparse
+  tree's byte packing and nullifier-bit ordering. It is a bounded composition
+  component, not full 512-level nullifier absence or production privacy.
 - Canonical consensus data: weighted validator sets, block headers, record commitments and finality-certificate verification boundaries. This is not yet a running validator network or a finality claim.
 - Genesis and the protected local manifest commit to the validator set, public verification keys, declared fault budget and consensus limits. A node cannot reopen the same data directory with a different consensus configuration.
 - Tests for unauthorized issuance, duplicate nullifiers, duplicate commitments, and unknown assets.

@@ -8,6 +8,7 @@
 //! does **not** yet prove nullifier absence, state-anchor acceptance, asset
 //! conservation, a private transfer, or any production privacy property.
 
+use noxis_nullifier_tree_reference::NullifierTreeReferenceError;
 use noxis_poseidon2_privacy_reference::Poseidon2P24PrivacyReferenceError;
 use noxis_poseidon2_reference::{
     BabyBearDigestV2, BabyBearStateP24, P24_WIDTH, Poseidon2P24Reference,
@@ -15,7 +16,8 @@ use noxis_poseidon2_reference::{
 };
 use noxis_tree_params::{
     CandidatePoseidon2P24ManifestV2, Poseidon2P24CandidateError,
-    Poseidon2P24NoteDomainsCandidateError, Poseidon2P24TreeDomainV1,
+    Poseidon2P24NoteDomainsCandidateError, Poseidon2P24NullifierSparseCandidateError,
+    Poseidon2P24TreeDomainV1,
 };
 use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_baby_bear::BabyBear;
@@ -35,6 +37,7 @@ use rand_chacha::ChaCha12Rng;
 
 mod addr;
 mod note;
+mod nxsm;
 mod ownership;
 
 pub use addr::{
@@ -42,6 +45,11 @@ pub use addr::{
 };
 pub use note::{
     Poseidon2P24NoteExperimentResult, prove_and_verify_p24_note, run_p24_note_research_smoke,
+};
+pub use nxsm::{
+    Poseidon2P24NxsmPrefix8ExperimentResult, Poseidon2P24NxsmPrefix8Proof,
+    prove_and_verify_p24_nxsm_absence_prefix8, prove_p24_nxsm_absence_prefix8,
+    verify_p24_nxsm_absence_prefix8_proof,
 };
 pub use ownership::{
     Poseidon2P24OwnershipExperimentResult, Poseidon2P24OwnershipProof,
@@ -1321,6 +1329,8 @@ pub enum StarkExperimentError {
     CandidateTreeParameters(Poseidon2P24CandidateError),
     CandidatePrivateDomains(Poseidon2P24NoteDomainsCandidateError),
     CandidatePrivateReference(Poseidon2P24PrivacyReferenceError),
+    CandidateNullifierSparseDomains(Poseidon2P24NullifierSparseCandidateError),
+    CandidateNullifierSparseReference(NullifierTreeReferenceError),
     VerificationFailed,
     ProverThreadFailed,
 }
@@ -1349,6 +1359,18 @@ impl From<Poseidon2P24PrivacyReferenceError> for StarkExperimentError {
     }
 }
 
+impl From<Poseidon2P24NullifierSparseCandidateError> for StarkExperimentError {
+    fn from(value: Poseidon2P24NullifierSparseCandidateError) -> Self {
+        Self::CandidateNullifierSparseDomains(value)
+    }
+}
+
+impl From<NullifierTreeReferenceError> for StarkExperimentError {
+    fn from(value: NullifierTreeReferenceError) -> Self {
+        Self::CandidateNullifierSparseReference(value)
+    }
+}
+
 impl std::fmt::Display for StarkExperimentError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -1374,6 +1396,18 @@ impl std::fmt::Display for StarkExperimentError {
                 write!(
                     formatter,
                     "could not evaluate the frozen P24 private-domain reference: {error}"
+                )
+            }
+            Self::CandidateNullifierSparseDomains(error) => {
+                write!(
+                    formatter,
+                    "could not load frozen P24 sparse-nullifier parameters: {error}"
+                )
+            }
+            Self::CandidateNullifierSparseReference(error) => {
+                write!(
+                    formatter,
+                    "could not evaluate the frozen P24 sparse-nullifier reference: {error}"
                 )
             }
             Self::VerificationFailed => {

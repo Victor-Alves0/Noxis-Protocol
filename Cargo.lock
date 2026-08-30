@@ -676,8 +676,11 @@ dependencies = [
 name = "noxis-stark-experiment"
 version = "0.1.0"
 dependencies = [
+ "noxis-nullifier-tree-reference",
+ "noxis-nullifier-tree-state",
  "noxis-poseidon2-privacy-reference",
  "noxis-poseidon2-reference",
+ "noxis-privacy-types",
  "noxis-tree-params",
  "p3-air",
  "p3-baby-bear",
