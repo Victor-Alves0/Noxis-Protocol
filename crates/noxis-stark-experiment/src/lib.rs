@@ -42,6 +42,7 @@ mod note;
 mod nxsm;
 mod ownership;
 mod profile;
+mod value_conservation;
 
 pub use addr::{
     Poseidon2P24AddrExperimentResult, prove_and_verify_p24_addr, run_p24_addr_research_smoke,
@@ -66,6 +67,9 @@ pub use ownership::{
     run_p24_note_ownership_research_smoke, verify_p24_note_ownership_proof,
 };
 pub use profile::{RESEARCH_STARK_VERIFIER_PROFILE_VERSION, ResearchStarkVerifierProfileV1};
+pub use value_conservation::{
+    Poseidon2P24ValueConservationExperimentResult, prove_and_verify_p24_value_conservation,
+};
 
 const TRACE_WIDTH: usize = 2;
 const TRACE_ROWS: usize = 8;
@@ -1344,6 +1348,12 @@ pub enum StarkExperimentError {
     CandidateNullifierSparseReference(NullifierTreeReferenceError),
     InvalidNxsmSegmentByteIndex { actual: usize },
     NxsmSequentialRootMismatch,
+    ZeroValueConservationInput { index: usize },
+    UnsupportedValueConservationNoteVersion { index: usize },
+    ValueConservationAssetMismatch { index: usize },
+    ValueConservationInputOverflow,
+    ValueConservationOutputOverflow,
+    ValueConservationMismatch,
     VerificationFailed,
     ProverThreadFailed,
 }
@@ -1455,6 +1465,33 @@ impl std::fmt::Display for StarkExperimentError {
             }
             Self::NxsmSequentialRootMismatch => {
                 formatter.write_str("verified NXSM segments did not reach the expected root")
+            }
+            Self::ZeroValueConservationInput { index } => {
+                write!(
+                    formatter,
+                    "value-conservation input note {index} has zero value"
+                )
+            }
+            Self::UnsupportedValueConservationNoteVersion { index } => {
+                write!(
+                    formatter,
+                    "value-conservation note {index} has unsupported version"
+                )
+            }
+            Self::ValueConservationAssetMismatch { index } => {
+                write!(
+                    formatter,
+                    "value-conservation note {index} does not use the public asset"
+                )
+            }
+            Self::ValueConservationInputOverflow => {
+                formatter.write_str("value-conservation input sum overflows u128")
+            }
+            Self::ValueConservationOutputOverflow => {
+                formatter.write_str("value-conservation output sum overflows u128")
+            }
+            Self::ValueConservationMismatch => {
+                formatter.write_str("value-conservation input and output sums differ")
             }
             Self::VerificationFailed => {
                 formatter.write_str("Plonky3 rejected the research STARK proof")

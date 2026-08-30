@@ -1,13 +1,15 @@
-//! Transparent local checks for the private-transfer value relation.
+//! Local orchestration for the private-transfer value-conservation relation.
 //!
-//! The selected AIR does not exist yet, so this module deliberately does not
-//! claim zero knowledge or return a transferable proof. It makes the same
-//! fixed-width asset and value invariants executable at preflight time and
-//! fails before any expensive candidate STARK relation starts.
+//! This module retains transparent validation for precise, fail-closed witness
+//! errors, then proves the same fixed-width relation in the P3 AIR over the
+//! exact four private `H_NOTE` openings. The opaque proof is verified locally
+//! and discarded; this remains a preflight, not a portable proof or a ledger
+//! authorization.
 
 use std::fmt;
 
 use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
+use noxis_stark_experiment::{StarkExperimentError, prove_and_verify_p24_value_conservation};
 
 use crate::{
     CandidateAnchoredOwnershipWitnessV1, CandidateOutputNoteWitnessV1,
@@ -24,8 +26,9 @@ const VALUE_OFFSET: usize = ASSET_OFFSET + ASSET_LENGTH;
 const VALUE_LENGTH: usize = 16;
 const CANDIDATE_NOTE_VERSION: u16 = 1;
 
-/// Evidence that one process checked the fixed 2x2 value relation against the
-/// exact candidate statement. It deliberately retains no private values.
+/// Evidence that one process checked and locally verified the fixed 2x2
+/// value-conservation STARK against the exact candidate statement. It retains
+/// no note opening, amount, commitment or proof object.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CandidateValueConservationPreflightV1 {
     statement_id: CandidatePrivateTransferProofPublicStatementIdV1,
@@ -37,13 +40,14 @@ impl CandidateValueConservationPreflightV1 {
     }
 }
 
-/// Validates the transparent private-witness value relation for one exact
-/// 2x2 candidate statement.
+/// Validates and locally proves the private-witness value relation for one
+/// exact 2x2 candidate statement.
 ///
 /// Both input openings and both output openings must use the one public asset,
 /// input values must be nonzero, each sum must fit `u128`, and the sums must
-/// match. This must be reproduced inside a selected AIR before settlement; it
-/// is only an early local preflight gate today.
+/// match. The same constraints are then checked inside the dedicated four-note
+/// `H_NOTE` AIR. The result is still only a local research preflight today:
+/// it is not proof aggregation, portable verification or settlement.
 pub fn run_candidate_value_conservation_preflight(
     statement: &CandidatePrivateTransferProofPublicStatementV1,
     pre_tree: &NullifierSparseTreeStateV1,
@@ -87,6 +91,19 @@ pub fn run_candidate_value_conservation_preflight(
     if input_sum != output_sum {
         return Err(CandidateValueConservationError::ValueNotConserved);
     }
+
+    // Keep the exact witness openings inside the prover. The experimental
+    // result and opaque proof are deliberately dropped after verification;
+    // neither becomes a public transaction field.
+    let _stark_result = prove_and_verify_p24_value_conservation(
+        [
+            *input_witnesses[0].note_preimage(),
+            *input_witnesses[1].note_preimage(),
+            *output_witnesses[0].note_preimage(),
+            *output_witnesses[1].note_preimage(),
+        ],
+        expected_asset,
+    )?;
 
     Ok(CandidateValueConservationPreflightV1 {
         statement_id: statement.statement_id(),
@@ -146,6 +163,7 @@ fn validate_note(
 #[derive(Debug)]
 pub enum CandidateValueConservationError {
     PublicStatement(CandidatePrivateTransferProofPublicStatementError),
+    Stark(StarkExperimentError),
     UnsupportedNoteVersion {
         role: CandidateValueNoteRoleV1,
         index: usize,
@@ -168,12 +186,22 @@ impl From<CandidatePrivateTransferProofPublicStatementError> for CandidateValueC
     }
 }
 
+impl From<StarkExperimentError> for CandidateValueConservationError {
+    fn from(value: StarkExperimentError) -> Self {
+        Self::Stark(value)
+    }
+}
+
 impl fmt::Display for CandidateValueConservationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::PublicStatement(error) => write!(
                 formatter,
                 "candidate value relation rejected public statement: {error}"
+            ),
+            Self::Stark(error) => write!(
+                formatter,
+                "candidate value relation STARK proof or verification failed: {error}"
             ),
             Self::UnsupportedNoteVersion { role, index } => {
                 write!(
@@ -212,6 +240,7 @@ impl std::error::Error for CandidateValueConservationError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::PublicStatement(error) => Some(error),
+            Self::Stark(error) => Some(error),
             _ => None,
         }
     }

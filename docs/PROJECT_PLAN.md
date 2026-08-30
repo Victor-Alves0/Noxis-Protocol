@@ -176,6 +176,15 @@ resultado com o ativo da intenção; valor, destinatário, aleatoriedades e
 conservação ainda não fazem parte dessa relação. Ver
 [`STARK_H_NOTE_ASSET_BINDING_RESEARCH_V0_1.md`](STARK_H_NOTE_ASSET_BINDING_RESEARCH_V0_1.md).
 
+**Conservação de valor dentro da AIR:** uma relação P3 separada agora abre
+quatro `H_NOTE` privados no mesmo traço, prende todos ao ativo público e prova
+que as duas entradas não nulas conservam valor `u128` sem overflow, usando os
+16 bytes canônicos e carries Booleanos. A prova e os quatro commitments de
+pesquisa são verificados e descartados localmente; ela ainda não se une, numa
+única AIR, à posse, nullifier, slots de saída ou envelope e não ativa
+privacidade. Ver
+[`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
+
 **Transição local de estado privado:** `noxis-private-state` agora deriva,
 somente em memória, o estado posterior 2×2 a partir de `NXPS v2`, snapshot,
 árvore `NXSM` e intenção. Ela acrescenta os commitments de saída, marca os dois

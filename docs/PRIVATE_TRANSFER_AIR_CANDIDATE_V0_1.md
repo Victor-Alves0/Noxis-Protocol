@@ -2,7 +2,7 @@
 
 ## Estado e fronteira
 
-Esta é a especificação verificável da relação que uma prova futura deverá satisfazer. A implementação atual fornece a moldura pública, a revalidação local da testemunha e uma fatia AIR/STARK isolada para o sponge público `H_INTENT`; **não há AIR completo de transferência, chave verificadora selecionada, prova utilizável ou aceitação pelo ledger**.
+Esta é a especificação verificável da relação que uma prova futura deverá satisfazer. A implementação atual fornece a moldura pública, a revalidação local da testemunha, a fatia AIR/STARK do sponge público `H_INTENT` e uma relação separada que vincula quatro `H_NOTE` privados à conservação `u128`; **não há AIR completo de transferência, chave verificadora selecionada, prova utilizável ou aceitação pelo ledger**.
 
 Ela permanece deliberadamente isolada do ledger v1: aquele usa raízes, commitments e nullifiers SHA-256 de 32 bytes; a candidata privada usa valores Poseidon2/BabyBear de 64 bytes. Uma transferência privada precisará de estado, transição e gênese v2 próprios — nunca de conversão implícita para `TransferStatement` v1.
 
@@ -27,9 +27,12 @@ Os bytes recompostos carregam, na ordem já congelada: circuito, gênese, contex
 
 O preflight local já rejeita witnesses cujas quatro notas não tenham o ativo
 público, entradas de valor zero, overflow em qualquer soma `u128` ou
-conservação inválida. Isso reduz a superfície de erros antes do prover, mas
-não transforma a regra em zero conhecimento: a AIR única ainda precisa impor
-esses mesmos limbs e carries.
+conservação inválida. A relação STARK de conservação agora também impõe essas
+regras usando os bytes privados das quatro pré-imagens `H_NOTE`, carries
+Booleanos e commitments de pesquisa; ver
+[`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
+Ela ainda não se liga às relações de posse, nullifier, saída ou envelope na
+mesma prova e, por isso, não é a AIR única da transferência.
 
 ## Testemunha privada e restrições
 

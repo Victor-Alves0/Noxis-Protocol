@@ -9,8 +9,9 @@ transação, witness `NXSM`, duas witnesses privadas de posse e duas witnesses
 privadas de saída. A execução faz, nesta ordem:
 
 1. revalida a declaração pública, âncora e transição local de nullifiers;
-2. abre localmente as quatro notas privadas e exige versão canônica, ativo
-   público idêntico, entradas não nulas e conservação `u128` sem overflow;
+2. rejeita localmente versão, ativo, zero, overflow ou desequilíbrio com erros
+   precisos e então prova/verifica, no mesmo AIR, quatro `H_NOTE`, ativo comum
+   e conservação privada `u128` por bytes/carries;
 3. prova e verifica `H_INTENT` **uma única vez**;
 4. prova e verifica posse/Merkle de profundidade 32 para cada input;
 5. prova e verifica `H_NOTE` com vínculo do ativo público para cada output;
@@ -47,8 +48,8 @@ Esta execução **não** é uma transação privada submetível. Ainda não há:
 - AIR única que absorva todas as relações;
 - agregação ou recursão das quatro provas;
 - prova privada da transição completa `NXSM` (a witness é local transparente);
-- regras aritmetizadas de valor, unicidade de `rho`/`rcm` e semântica restante
-  de abertura no mesmo sistema de prova;
+- uma AIR única que vincule a conservação já aritmetizada às relações de posse,
+  nullifier, slots de saída e semântica restante de abertura;
 - AIR que recompute o vínculo já checado localmente entre commitment de saída,
   slot e envelope cifrado/digest de ciphertext, além da ponte entre `H_ADDR` e
   a chave híbrida de recebimento;
@@ -60,10 +61,12 @@ importantes, mas não são dependência deste crate: inverter a dependência cri
 um ciclo arquitetural. O próximo AIR deverá incorporar as relações, não ligar
 crates em ciclo.
 
-A conservação `u128` já é uma checagem local de witness e não retém valores
-no recibo. Ela reduz falhas antes do prover, mas não é prova de conhecimento
-zero e precisa ser imposta por limbs e carries na AIR antes de qualquer
-admissão de pacote.
+A conservação `u128` agora também é imposta pela relação STARK de quatro
+`H_NOTE`, com bytes range-checked e carries Booleanos, e não retém valores no
+recibo. O preflight continua a fazer a checagem local antes do provador para
+produzir rejeições claras. A relação isolada ainda não é uma prova transferível
+nem está ligada dentro de uma única AIR aos nullifiers, à posse ou aos outputs;
+ver [`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
 
 ## Como reproduzir
 
@@ -86,8 +89,7 @@ medição de pesquisa local, não meta de desempenho nem garantia operacional.
 ## Próximo passo correto
 
 Transformar esta sequência em uma especificação de composição AIR por etapas:
-primeiro compartilhar colunas e vínculos públicos entre `H_INTENT`, uma posse,
-uma saída e o digest de envelope; depois escalar para 2×2, conservação de valor
-e transição
-de estado. Nenhuma etapa deve ativar serviço de privacidade antes de backend,
+primeiro compartilhar witness e vínculos públicos entre a conservação 2×2,
+uma posse, uma saída e o digest de envelope; depois compor os dois inputs, os
+dois outputs e a transição de estado. Nenhuma etapa deve ativar serviço de privacidade antes de backend,
 formato de prova e revisão independente.
