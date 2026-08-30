@@ -11,7 +11,14 @@ use std::fmt;
 use rand_core::{OsRng, RngCore as _};
 use sha2::{Digest as _, Sha256};
 
+mod external_anchor;
 mod header_store;
+
+pub use external_anchor::{
+    CandidatePayloadCiphertextIdV1, EXTERNAL_ROLLBACK_ANCHOR_MAGIC,
+    EXTERNAL_ROLLBACK_ANCHOR_V1_LENGTH, EXTERNAL_ROLLBACK_ANCHOR_VERSION,
+    ExternalRollbackAnchorError, ExternalRollbackAnchorMismatch, ExternalRollbackAnchorV1,
+};
 
 pub use header_store::{
     CandidateKeystoreHeaderStore, HeaderStoreError, HeaderStoreInitializeOutcome,
@@ -64,6 +71,10 @@ pub struct KeystoreHeaderIdV1([u8; 32]);
 impl KeystoreHeaderIdV1 {
     pub const fn as_bytes(self) -> [u8; 32] {
         self.0
+    }
+
+    pub(crate) const fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
     }
 }
 

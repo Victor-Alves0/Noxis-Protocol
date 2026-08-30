@@ -2,8 +2,8 @@
 
 ## Estado
 
-**Política de segurança verificável para o futuro keystore; nenhum backup de
-segredo ou restauração de wallet é implementado.**
+**Recibo externo público executável; nenhum backup de segredo ou restauração de
+wallet é implementado.**
 
 O diretório atual persiste apenas o cabeçalho público `NXKS`. Cada cabeçalho
 canônico agora tem um `KeystoreHeaderIdV1`:
@@ -27,17 +27,32 @@ e também controla tudo o que a wallet usa para lembrar seu estado, **nenhum
 contador apenas local detecta rollback**. Um contador, journal ou hash dentro
 do mesmo diretório volta junto com a cópia antiga.
 
-Logo, a proteção de rollback exigirá pelo menos uma âncora independente do
-diretório principal. As opções que ainda precisam de decisão e revisão são:
+Logo, a proteção de rollback exige pelo menos uma âncora independente do
+diretório principal. A primeira estratégia candidata selecionada é um recibo
+binário externo mantido pelo usuário. Armazenamento seguro da plataforma e um
+serviço de sincronização autenticado seguem como alternativas futuras, mas não
+fazem parte desta entrega.
 
-1. uma cópia de backup externa mantida pelo usuário, contendo o recibo de
-   geração mais recente;
-2. armazenamento seguro fornecido pela plataforma, quando disponível; ou
-3. um serviço de sincronização autenticado que só aceite geração crescente,
-   sem receber a chave de gasto.
+O usuário deve guardar o recibo em um local independente — por exemplo, uma
+cópia de backup diferente, dispositivo separado ou cofre de senhas que preserve
+arquivo — e não ao lado do diretório da wallet. Uma cópia no mesmo diretório
+não protege contra rollback.
 
-Nenhuma dessas opções está ativa. A wallet não poderá alegar detecção de
-rollback enquanto uma delas não for selecionada e exercida em testes.
+## Recibo externo `NXKA v1`
+
+`ExternalRollbackAnchorV1` possui parser estrito e tamanho exato de 78 bytes:
+
+```text
+magic:4 = "NXKA"
+version:u16be = 1
+header_id:32
+payload_generation:u64be
+payload_ciphertext_id:32
+```
+
+Geração zero e identificador de ciphertext nulo são rejeitados. A estrutura
+não contém senha, raiz, plaintext ou chave. Ela tampouco tem API de arquivo:
+o chamador deve escolher um meio de armazenamento genuinamente externo.
 
 ## Contrato para o futuro payload secreto
 
@@ -57,7 +72,7 @@ deve ser registrado fora do diretório antes de a interface chamar a wallet de
 “backup confirmado”. Na abertura/restauração:
 
 1. a wallet compara `header_id` com a âncora externa;
-2. ela exige geração igual ou maior que a geração esperada;
+2. ela exige geração exatamente igual à geração esperada;
 3. ela exige o mesmo identificador do ciphertext para essa geração; e
 4. se faltar âncora, houver geração menor ou identificador diferente, não
    libera qualquer operação de gasto.
@@ -84,12 +99,12 @@ cargo test -p noxis-wallet-keystore --locked
 ```
 
 Os testes confirmam que o ID do cabeçalho é estável após encode/decode e muda
-quando a época muda. Eles não provam backup, restauração ou rollback de
-segredo, pois tal payload ainda não existe.
+quando a época muda. Eles também fazem round-trip de `NXKA` e rejeitam cabeçalho,
+geração ou ciphertext diferentes. Eles não provam backup, restauração ou
+rollback de segredo, pois tal payload ainda não existe.
 
 ## Próximo gate
 
-Selecionar uma única estratégia de âncora externa para a primeira plataforma
-suportada e construir fixtures de payload sintético com geração, backup,
-restauração, rollback e interrupção. Só após esses testes e revisão
+Construir fixtures de payload sintético com geração, backup, restauração,
+rollback e interrupção usando `NXKA`. Só após esses testes e revisão
 independente a raiz de wallet poderá atravessar a fronteira do keystore.

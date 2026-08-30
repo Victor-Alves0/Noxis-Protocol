@@ -71,8 +71,8 @@ CLI or public-address module.
 Before code may persist any secret, all of the following must exist:
 
 1. A reviewable threat model with an explicit rollback and backup policy.
-   **A candidate policy exists, but no external anchor or secret-payload test
-   has been selected.**
+   **The user-maintained external `NXKA` receipt is selected as the first
+   candidate anchor, but no secret-payload test exists yet.**
 2. A selected KDF and calibrated bounds for each supported platform, including
    safe rejection of attacker-controlled cost parameters.
 3. A versioned, bounded canonical secret-container specification entered in
