@@ -53,7 +53,10 @@ então executa as cinco relações disponíveis.
 
 ## Próximo gate
 
-Especificar a ponte entre o recipient commitment usado em `H_NOTE`/`H_ADDR` e
-o descriptor público de recebimento híbrido, com domínio, formato, vetores e
-prova de ligação. Só depois faz sentido projetar uma AIR única que consuma esse
-vínculo e a validação de pacote.
+Um descriptor local assinado já evita o mix-up de endereço e commitment na
+wallet, mas não prova derivação comum das chaves. O próximo gate é selecionar
+uma ponte criptográfica revisada entre o recipient commitment usado em
+`H_NOTE`/`H_ADDR` e as chaves híbridas, com formato público, vetores e prova de
+ligação. Só depois faz sentido projetar uma AIR única que consuma esse vínculo
+e a validação de pacote. Ver
+[`RECIPIENT_DESCRIPTOR_LOCAL_CANDIDATE_V0_1.md`](RECIPIENT_DESCRIPTOR_LOCAL_CANDIDATE_V0_1.md).

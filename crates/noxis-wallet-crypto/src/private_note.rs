@@ -10,7 +10,7 @@ use std::fmt;
 use noxis_poseidon2_privacy_reference::{
     Poseidon2P24PrivacyReference, Poseidon2P24PrivacyReferenceError,
 };
-use noxis_privacy_types::{NoteCommitmentV2, PrivacyTypesError};
+use noxis_privacy_types::{NoteCommitmentV2, PrivacyTypesError, RecipientCommitmentV2};
 use noxis_types::AssetId;
 use zeroize::Zeroize;
 
@@ -26,6 +26,8 @@ const ASSET_OFFSET: usize = 2;
 const ASSET_LENGTH: usize = 32;
 const VALUE_OFFSET: usize = ASSET_OFFSET + ASSET_LENGTH;
 const VALUE_LENGTH: usize = 16;
+const RECIPIENT_COMMITMENT_OFFSET: usize = VALUE_OFFSET + VALUE_LENGTH;
+const RECIPIENT_COMMITMENT_LENGTH: usize = 64;
 
 /// One public output commitment paired with its encrypted `NXRE` recipient
 /// envelope. It has no independent wire encoding: the surrounding transaction
@@ -98,6 +100,18 @@ impl ReceivedCandidatePrivateNoteV1 {
                 .expect("fixed value slice"),
         )
     }
+
+    /// Reads the canonical `H_ADDR` recipient commitment from the decrypted
+    /// candidate note. A noncanonical field vector is rejected rather than
+    /// interpreted as a recipient identity.
+    pub fn recipient_commitment(&self) -> Result<RecipientCommitmentV2, CandidatePrivateNoteError> {
+        Ok(RecipientCommitmentV2::new(
+            self.note_preimage[RECIPIENT_COMMITMENT_OFFSET
+                ..RECIPIENT_COMMITMENT_OFFSET + RECIPIENT_COMMITMENT_LENGTH]
+                .try_into()
+                .expect("fixed recipient commitment slice"),
+        )?)
+    }
 }
 
 impl Drop for ReceivedCandidatePrivateNoteV1 {
@@ -122,6 +136,28 @@ pub fn encrypt_candidate_private_note(
     ))
 }
 
+/// Encrypts a candidate note only after its embedded `H_ADDR` recipient
+/// commitment matches an authenticated public descriptor.
+pub fn encrypt_candidate_private_note_to_descriptor(
+    descriptor: &crate::CandidatePrivateRecipientDescriptorV1,
+    context: &RecipientEnvelopeContext,
+    note_preimage: [u8; CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH],
+) -> Result<CandidatePrivateNoteEnvelopeV1, CandidatePrivateNoteError> {
+    if !descriptor.verify() {
+        return Err(CandidatePrivateNoteError::InvalidRecipientDescriptor);
+    }
+    let recipient_commitment = RecipientCommitmentV2::new(
+        note_preimage[RECIPIENT_COMMITMENT_OFFSET
+            ..RECIPIENT_COMMITMENT_OFFSET + RECIPIENT_COMMITMENT_LENGTH]
+            .try_into()
+            .expect("fixed recipient commitment slice"),
+    )?;
+    if recipient_commitment != descriptor.recipient_commitment() {
+        return Err(CandidatePrivateNoteError::RecipientCommitmentMismatch);
+    }
+    encrypt_candidate_private_note(descriptor.payment_address(), context, note_preimage)
+}
+
 /// Authenticates, decrypts and validates one candidate note for its owner.
 ///
 /// A successful AEAD decrypt is insufficient: `H_NOTE(plaintext)` must also
@@ -132,7 +168,34 @@ pub fn decrypt_candidate_private_note(
     context: &RecipientEnvelopeContext,
     output: &CandidatePrivateNoteEnvelopeV1,
 ) -> Result<ReceivedCandidatePrivateNoteV1, CandidatePrivateNoteError> {
-    let mut plaintext = owner.decrypt_incoming(context, output.envelope())?;
+    decrypt_candidate_private_note_for_owner(
+        |envelope| owner.decrypt_incoming(context, envelope),
+        output,
+    )
+}
+
+/// Decrypts one candidate note for a local recipient keyset and requires its
+/// embedded `H_ADDR` commitment to be the keyset's own commitment.
+pub fn decrypt_candidate_private_note_for_recipient(
+    owner: &crate::CandidatePrivateRecipientKeysetV1,
+    context: &RecipientEnvelopeContext,
+    output: &CandidatePrivateNoteEnvelopeV1,
+) -> Result<ReceivedCandidatePrivateNoteV1, CandidatePrivateNoteError> {
+    let received = decrypt_candidate_private_note_for_owner(
+        |envelope| owner.decrypt_incoming(context, envelope),
+        output,
+    )?;
+    if received.recipient_commitment()? != owner.recipient_commitment() {
+        return Err(CandidatePrivateNoteError::RecipientCommitmentMismatch);
+    }
+    Ok(received)
+}
+
+fn decrypt_candidate_private_note_for_owner(
+    decrypt: impl FnOnce(&HybridRecipientEnvelope) -> Result<Vec<u8>, PaymentAddressError>,
+    output: &CandidatePrivateNoteEnvelopeV1,
+) -> Result<ReceivedCandidatePrivateNoteV1, CandidatePrivateNoteError> {
+    let mut plaintext = decrypt(output.envelope())?;
     if plaintext.len() != CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH {
         plaintext.zeroize();
         return Err(CandidatePrivateNoteError::InvalidPlaintextLength);
@@ -161,6 +224,8 @@ pub enum CandidatePrivateNoteError {
     PrivacyTypes(PrivacyTypesError),
     InvalidPlaintextLength,
     CommitmentMismatch,
+    InvalidRecipientDescriptor,
+    RecipientCommitmentMismatch,
 }
 
 impl From<PaymentAddressError> for CandidatePrivateNoteError {
@@ -189,8 +254,8 @@ impl std::error::Error for CandidatePrivateNoteError {}
 mod tests {
     use super::*;
     use crate::{
-        CandidatePrivateOutputSlotV1, decode_hybrid_recipient_envelope,
-        encode_hybrid_recipient_envelope,
+        CandidatePrivateOutputSlotV1, CandidatePrivateRecipientKeysetV1,
+        decode_hybrid_recipient_envelope, encode_hybrid_recipient_envelope,
     };
 
     fn note(asset: [u8; 32], value: u128) -> [u8; CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH] {
@@ -243,6 +308,59 @@ mod tests {
                 &CandidatePrivateNoteEnvelopeV1::from_parts(wrong, output.envelope),
             ),
             Err(CandidatePrivateNoteError::CommitmentMismatch)
+        ));
+    }
+
+    #[test]
+    fn recipient_descriptor_binds_the_embedded_h_addr_commitment_for_send_and_receive() {
+        let owner = CandidatePrivateRecipientKeysetV1::generate(9).unwrap();
+        let descriptor = owner.public_descriptor();
+        let context =
+            RecipientEnvelopeContext::new(b"noxis-private-recipient-research", 9).unwrap();
+        let mut expected_note = note([9; 32], 42);
+        expected_note[RECIPIENT_COMMITMENT_OFFSET
+            ..RECIPIENT_COMMITMENT_OFFSET + RECIPIENT_COMMITMENT_LENGTH]
+            .copy_from_slice(&descriptor.recipient_commitment().as_bytes());
+        let output =
+            encrypt_candidate_private_note_to_descriptor(&descriptor, &context, expected_note)
+                .unwrap();
+        let received =
+            decrypt_candidate_private_note_for_recipient(&owner, &context, &output).unwrap();
+        assert_eq!(
+            received.recipient_commitment().unwrap(),
+            descriptor.recipient_commitment()
+        );
+
+        let another = CandidatePrivateRecipientKeysetV1::generate(9).unwrap();
+        assert!(matches!(
+            encrypt_candidate_private_note_to_descriptor(
+                &another.public_descriptor(),
+                &context,
+                expected_note,
+            ),
+            Err(CandidatePrivateNoteError::RecipientCommitmentMismatch)
+        ));
+    }
+
+    #[test]
+    fn recipient_keyset_rejects_a_note_for_another_h_addr_commitment() {
+        let owner = CandidatePrivateRecipientKeysetV1::generate(10).unwrap();
+        let another = CandidatePrivateRecipientKeysetV1::generate(10).unwrap();
+        let context =
+            RecipientEnvelopeContext::new(b"noxis-private-recipient-research", 10).unwrap();
+        let mut wrong_note = note([9; 32], 42);
+        wrong_note[RECIPIENT_COMMITMENT_OFFSET
+            ..RECIPIENT_COMMITMENT_OFFSET + RECIPIENT_COMMITMENT_LENGTH]
+            .copy_from_slice(&another.recipient_commitment().as_bytes());
+        let output = encrypt_candidate_private_note(
+            owner.public_descriptor().payment_address(),
+            &context,
+            wrong_note,
+        )
+        .unwrap();
+        assert!(matches!(
+            decrypt_candidate_private_note_for_recipient(&owner, &context, &output),
+            Err(CandidatePrivateNoteError::RecipientCommitmentMismatch)
         ));
     }
 }

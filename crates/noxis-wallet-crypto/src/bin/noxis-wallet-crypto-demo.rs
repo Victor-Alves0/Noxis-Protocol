@@ -3,10 +3,11 @@
 
 use noxis_wallet_crypto::{
     CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH, CandidatePrivateNoteEnvelopeV1,
-    CandidatePrivateOutputSlotV1, HybridIdentityKeypair, HybridPaymentAddressEntry,
-    PaymentAddressError, PublicAddressBook, RecipientEnvelopeContext,
-    decode_hybrid_recipient_envelope, decode_payment_address, decrypt_candidate_private_note,
-    encode_hybrid_recipient_envelope, encode_payment_address, encrypt_candidate_private_note,
+    CandidatePrivateOutputSlotV1, CandidatePrivateRecipientKeysetV1, HybridIdentityKeypair,
+    HybridPaymentAddressEntry, PaymentAddressError, PublicAddressBook, RecipientEnvelopeContext,
+    decode_hybrid_recipient_envelope, decode_payment_address,
+    decrypt_candidate_private_note_for_recipient, encode_hybrid_recipient_envelope,
+    encode_payment_address, encrypt_candidate_private_note_to_descriptor,
 };
 
 const DEMO_CHAIN_ID: &[u8] = b"noxis-local-wallet-research";
@@ -58,23 +59,25 @@ fn parse_mode(arguments: impl IntoIterator<Item = String>) -> Result<DemoMode, s
 
 fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
     let context = RecipientEnvelopeContext::new(DEMO_CHAIN_ID, DEMO_KEY_EPOCH)?;
-    let recipient = HybridPaymentAddressEntry::generate(DEMO_KEY_EPOCH);
+    let recipient = CandidatePrivateRecipientKeysetV1::generate(DEMO_KEY_EPOCH)?;
+    let descriptor = recipient.public_descriptor();
     let mut note = [0_u8; CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH];
     note[..2].copy_from_slice(&1_u16.to_be_bytes());
     note[2..34].copy_from_slice(&[7; 32]);
     note[34..50].copy_from_slice(&42_u128.to_be_bytes());
+    note[50..114].copy_from_slice(&descriptor.recipient_commitment().as_bytes());
     // The remaining candidate witness fields are deliberately not displayed.
-    for (index, byte) in note[50..].iter_mut().enumerate() {
+    for (index, byte) in note[114..].iter_mut().enumerate() {
         *byte = (index as u8).wrapping_mul(29).wrapping_add(11);
     }
 
-    let output = encrypt_candidate_private_note(recipient.address(), &context, note)?;
+    let output = encrypt_candidate_private_note_to_descriptor(&descriptor, &context, note)?;
     let commitment = output.commitment();
     let ciphertext_digest =
         output.candidate_ciphertext_digest(CandidatePrivateOutputSlotV1::First)?;
     let envelope_bytes = encode_hybrid_recipient_envelope(output.envelope())?;
     let decoded_envelope = decode_hybrid_recipient_envelope(&envelope_bytes)?;
-    let received = decrypt_candidate_private_note(
+    let received = decrypt_candidate_private_note_for_recipient(
         &recipient,
         &context,
         &CandidatePrivateNoteEnvelopeV1::from_parts(commitment, decoded_envelope),
@@ -85,6 +88,7 @@ fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("Noxis encrypted candidate-note demo — EXPERIMENTAL / LOCAL ONLY");
+    println!("authenticated recipient descriptor bound address + H_ADDR commitment ... accepted");
     println!("sender computed H_NOTE and encrypted one 178-byte candidate note ... accepted");
     println!(
         "strict NXRE envelope round trip ... accepted ({} bytes)",
@@ -95,7 +99,7 @@ fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("candidate envelope digest bound to slot 0 and commitment: {ciphertext_digest}");
     println!("No note bytes, asset, value, secret key, balance or envelope bytes are printed.");
     println!("This is not a wallet, spend flow, ledger transaction or privacy activation.");
-    println!("This candidate digest is not yet accepted by an intent, proof or ledger.");
+    println!("This candidate digest is only used by local research preflight, never the ledger.");
     Ok(())
 }
 

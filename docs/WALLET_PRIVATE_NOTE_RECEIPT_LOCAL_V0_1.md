@@ -22,6 +22,11 @@ endereço público diversificado, faz o round-trip estrito de `NXRE`, decripta n
 dono e confere o commitment. Ele só imprime o commitment público e o tamanho
 do envelope; não grava nem mostra a nota, ativo, valor, segredo ou ciphertext.
 
+O modo `private-note` também usa o descriptor local autenticado: o remetente
+confere que a pré-imagem carrega o `H_ADDR` assinado junto ao endereço, e a
+wallet confere o mesmo valor depois de decriptar. Ver
+[`RECIPIENT_DESCRIPTOR_LOCAL_CANDIDATE_V0_1.md`](RECIPIENT_DESCRIPTOR_LOCAL_CANDIDATE_V0_1.md).
+
 ## Regra que é realmente verificada
 
 Para uma saída local `(cm, nxre)`:
@@ -57,6 +62,9 @@ cargo test -p noxis-wallet-crypto --locked private_note::tests
   `NXSM` ou gasto.
 - O perfil permanece experimental e não é aprovado para custódia, rede pública
   ou alegação de anonimato/resistência pós-quântica do protocolo completo.
+- O descriptor não prova uma derivação comum entre as chaves X25519/ML-KEM e a
+  chave de nullifier; sua assinatura exige uma identidade de descriptor já
+  confiável fora deste código.
 
 ## Próximo gate: digest de envelope
 

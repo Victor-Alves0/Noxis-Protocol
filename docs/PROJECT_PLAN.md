@@ -260,6 +260,14 @@ completa passou em 466,64 s; continua composição sequencial local, sem AIR
 híbrida do destinatário. Ver
 [`PACKET_BOUND_STARK_PREFLIGHT_RESEARCH_V0_1.md`](PACKET_BOUND_STARK_PREFLIGHT_RESEARCH_V0_1.md).
 
+**Descriptor local de destinatário:** a wallet agora cria junto um endereço
+`NXPA`, uma chave de nullifier/`H_ADDR` e uma identidade que assina o par
+endereço+commitment. Remetente e destinatário recusam nota cujo commitment não
+seja o do descriptor. Isto ainda não demonstra derivação comum das chaves de
+recebimento e gasto nem oferece formato público, diretório ou wallet
+persistente. Ver
+[`RECIPIENT_DESCRIPTOR_LOCAL_CANDIDATE_V0_1.md`](RECIPIENT_DESCRIPTOR_LOCAL_CANDIDATE_V0_1.md).
+
 **Catálogo local de endereços públicos:** a mesma camada já pode abrir um
 diretório com lock exclusivo, gravar bytes `NXPA` canônicos por ID, reabrir e
 validar estritamente o endereço. O catálogo nunca recebe chave privada, seed,
