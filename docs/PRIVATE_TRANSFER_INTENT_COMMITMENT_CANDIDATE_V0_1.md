@@ -75,9 +75,9 @@ isso permanece uma obrigação do futuro verificador híbrido.
 Uma fatia STARK que reavalia o sponge sobre os 214 elementos públicos já é
 confrontada com os dois vetores externos; ver
 [`STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md`](STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md).
-Ela não deve ser confundida com a AIR completa: a decomposição/recomposição de
-bytes, a ligação às witnesses, a seleção criptográfica e a revisão independente
-ainda faltam.
+Ela não deve ser confundida com a AIR completa: a fatia já aritmetiza a
+decomposição/recomposição dos 640 bytes, mas a ligação às witnesses, a seleção
+criptográfica e a revisão independente ainda faltam.
 
 O verificador futuro deverá recalcular o commitment a partir da intenção NXPT
 estritamente decodificada e comparar com a entrada pública da prova; receber

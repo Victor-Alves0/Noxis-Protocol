@@ -123,9 +123,9 @@ transferência privada. Ver [`STARK_NXSM_PREFIX_RESEARCH_V0_1.md`](STARK_NXSM_PR
 **Primeira relação AIR da transferência:** o experimento Plonky3 agora prova
 o `H_INTENT` exato sobre os 214 elementos públicos `BytePack3LE` da intenção
 canônica de 640 bytes e seu digest de 16 elementos. Os dois vetores externos
-`NXIV` passam pela prova; isso torna a primeira fatia de `NXAR v1`
-executável, mas ainda não aritmetiza o packing de bytes, não torna a intenção
-privada e não compõe notas, valores ou nullifiers. Ver [`STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md`](STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md).
+`NXIV` passam pela prova; ela aritmetiza os 640 bytes, seus bits e o packing
+canônico, mas não torna a intenção privada e não compõe notas, valores ou
+nullifiers. Ver [`STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md`](STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md).
 
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem

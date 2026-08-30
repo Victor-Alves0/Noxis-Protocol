@@ -21,7 +21,7 @@ M[0..214)  = BytePack3LE(PrivateTransferIntentV2::encode()[640])
 H[0..16)  = H_INTENT(intent[640])
 ```
 
-`M[0]` até `M[212]` devem ser menores que `2^24`; `M[213]` deve ser menor que `2^8`. A AIR completa deverá decompor os elementos em bytes, recompor exatamente os 640 bytes, fazer o range-check e reavaliar `H_INTENT`. A fatia atual já prova a avaliação do sponge sobre os `M` públicos recebidos da codificação tipada canônica, mas ainda não aritmetiza essa decomposição/recomposição. Assim, ela não pode ser tratada como a relação completa.
+`M[0]` até `M[212]` devem ser menores que `2^24`; `M[213]` deve ser menor que `2^8`. A fatia AIR atual já decompõe cada um dos 640 bytes privados do traço em oito bits Booleanos, recompõe os bytes e força cada `M` público a ser o `BytePack3LE` correspondente antes de reavaliar `H_INTENT`. Ela ainda não conecta esses bytes às witnesses de posse, abertura, valor ou nullifier; portanto não pode ser tratada como a relação completa.
 
 Os bytes recompostos carregam, na ordem já congelada: circuito, gênese, contexto de validação, estado anterior, parâmetros da árvore, raiz privada, ativo, dois nullifiers, dois commitments de saída e dois digests de envelopes. A moldura [`CandidatePrivateTransferAirPublicInputsV1`](../crates/noxis-private-proof-contract/src/public_inputs.rs) só pode ser construída de uma `PrivateTransferIntentV2` canônica e rederiva `H_INTENT`.
 

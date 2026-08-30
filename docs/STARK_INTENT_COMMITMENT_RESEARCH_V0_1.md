@@ -27,9 +27,11 @@ BytePack3LE(intent.encode())[0..214] || H_INTENT(intent.encode())[0..16]
 
 No caller-chosen packing is accepted by the public API: it receives a typed
 `PrivateTransferIntentV2`, uses its canonical encoder, and derives the digest
-again through the independent candidate reference before proving. The AIR does
-not yet decompose the public elements into bytes itself; that range and
-recomposition constraint remains part of the complete transfer AIR.
+again through the independent candidate reference before proving. Inside the
+AIR, every one of the 640 witness bytes is recomposed from eight Boolean bits;
+each public packed element is constrained to the corresponding one, two or
+three bytes. Thus the last four-byte partial block is also range checked and
+the public `M` frame cannot represent a non-canonical byte string.
 
 ## Evidence
 
@@ -40,9 +42,10 @@ cargo test --release -p noxis-stark-experiment intent_stark_matches_every_frozen
 cargo run --release -p noxis-stark-experiment --bin noxis-stark-smoke
 ```
 
-On the development machine, the two-vector release test completed in 15.83
-seconds. A direct constraint test also rejects a changed public packed element
-or a changed public commitment.
+On the development machine, the two-vector release test completed in 24.00
+seconds after adding canonical-byte constraints. A direct constraint test also
+rejects a changed public packed element or commitment, a non-Boolean private
+bit, and changed first or final private intent bytes.
 
 ## What this does not prove
 

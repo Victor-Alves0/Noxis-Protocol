@@ -60,8 +60,8 @@ review and testing expectations.
   two candidate ownership checks sequentially against one typed `NXPS v2`
   anchor and ordered transparent `NXSM` witness. It is not proof aggregation,
   a nullifier-absence, value-conservation or private-transfer proof. The
-  `H_INTENT` component alone does not yet arithmetize byte packing or bind any
-  private witness.
+  `H_INTENT` component arithmetizes the canonical byte packing, but does not
+  yet bind any private witness.
 - A second research-only STARK component proves exact private eight-level
   `NXSM` segments, including the sparse tree's byte packing and canonical
   nullifier-bit ordering. It can locally sequence all 64 segments to a real

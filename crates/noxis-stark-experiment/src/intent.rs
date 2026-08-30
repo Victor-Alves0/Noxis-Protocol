@@ -28,7 +28,13 @@ const INTENT_PERMUTATIONS: usize = INTENT_ABSORB_PERMUTATIONS + 1;
 const INTENT_STEPS: usize = INTENT_PERMUTATIONS * P24_ROUNDS;
 const INTENT_TRACE_ROWS: usize = 512;
 const INTENT_SELECTOR_OFFSET: usize = P24_WIDTH;
-const INTENT_TRACE_WIDTH: usize = INTENT_SELECTOR_OFFSET + INTENT_STEPS;
+const INTENT_WITNESS_OFFSET: usize = INTENT_SELECTOR_OFFSET + INTENT_STEPS;
+const INTENT_BYTES: usize = PrivateTransferIntentV2::ENCODED_LENGTH;
+const INTENT_BITS_PER_BYTE: usize = 8;
+const INTENT_BYTES_OFFSET: usize = 0;
+const INTENT_BITS_OFFSET: usize = INTENT_BYTES_OFFSET + INTENT_BYTES;
+const INTENT_WITNESS_ELEMENTS: usize = INTENT_BITS_OFFSET + (INTENT_BYTES * INTENT_BITS_PER_BYTE);
+const INTENT_TRACE_WIDTH: usize = INTENT_WITNESS_OFFSET + INTENT_WITNESS_ELEMENTS;
 const INTENT_PUBLIC_VALUES: usize = P24_INTENT_COMMITMENT_INPUT_ELEMENTS + 16;
 const INTENT_COMMITMENT_OFFSET: usize = P24_INTENT_COMMITMENT_INPUT_ELEMENTS;
 
@@ -82,6 +88,15 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24IntentAir {
         let next_state = &next[..P24_WIDTH];
         let selectors = &local[INTENT_SELECTOR_OFFSET..];
         let next_selectors = &next[INTENT_SELECTOR_OFFSET..];
+        let witness = &local[INTENT_WITNESS_OFFSET..];
+        let next_witness = &next[INTENT_WITNESS_OFFSET..];
+
+        self.assert_canonical_packing::<AB>(builder, witness, &public_values);
+        for lane in 0..INTENT_WITNESS_ELEMENTS {
+            builder
+                .when_transition()
+                .assert_eq(next_witness[lane], witness[lane]);
+        }
 
         let raw = (0..P24_WIDTH)
             .map(|lane| {
@@ -168,6 +183,44 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24IntentAir {
     }
 }
 
+impl Poseidon2P24IntentAir {
+    fn assert_canonical_packing<AB: AirBuilder>(
+        &self,
+        builder: &mut AB,
+        witness: &[AB::Var],
+        public_values: &[AB::PublicVar],
+    ) {
+        for byte_index in 0..INTENT_BYTES {
+            let mut recomposed: AB::Expr = AB::Expr::ZERO;
+            for bit_index in 0..INTENT_BITS_PER_BYTE {
+                let bit: AB::Expr = witness
+                    [INTENT_BITS_OFFSET + (byte_index * INTENT_BITS_PER_BYTE) + bit_index]
+                    .into();
+                builder.assert_zero(bit.clone() * (bit.clone() - AB::Expr::ONE));
+                recomposed += bit * AB::F::from_u32(1_u32 << bit_index);
+            }
+            builder.assert_eq(witness[INTENT_BYTES_OFFSET + byte_index], recomposed);
+        }
+
+        for (packed_index, public_value) in public_values
+            .iter()
+            .enumerate()
+            .take(P24_INTENT_COMMITMENT_INPUT_ELEMENTS)
+        {
+            let mut recomposed: AB::Expr = AB::Expr::ZERO;
+            for byte_offset in 0..3 {
+                let byte_index = (packed_index * 3) + byte_offset;
+                if byte_index >= INTENT_BYTES {
+                    break;
+                }
+                let byte: AB::Expr = witness[INTENT_BYTES_OFFSET + byte_index].into();
+                recomposed += byte * AB::F::from_u32(1_u32 << (byte_offset * 8));
+            }
+            builder.assert_eq(*public_value, recomposed);
+        }
+    }
+}
+
 /// Produces and independently verifies the candidate `H_INTENT` STARK.
 ///
 /// Every packed intent element and the resulting digest are public values. The
@@ -179,9 +232,10 @@ pub fn prove_and_verify_p24_intent(
     let reference = Poseidon2P24Reference::load_candidate()?;
     let private_reference = Poseidon2P24PrivacyReference::load_candidate()?;
     let intent_commitment = private_reference.hash_private_transfer_intent(intent)?;
-    let packed = byte_pack3le(intent.encode());
+    let encoded = intent.encode();
+    let packed = byte_pack3le(encoded);
     let air = Poseidon2P24IntentAir::from_reference(&reference)?;
-    let trace = build_p24_intent_trace(&air, packed);
+    let trace = build_p24_intent_trace(&air, encoded, packed);
     let public_values = packed
         .into_iter()
         .chain(intent_commitment.elements())
@@ -218,6 +272,7 @@ fn proof_and_verify(
 
 fn build_p24_intent_trace(
     air: &Poseidon2P24IntentAir,
+    encoded: [u8; INTENT_BYTES],
     packed: [u32; P24_INTENT_COMMITMENT_INPUT_ELEMENTS],
 ) -> RowMajorMatrix<Val> {
     let mut values = Val::zero_vec(INTENT_TRACE_ROWS * INTENT_TRACE_WIDTH);
@@ -233,6 +288,7 @@ fn build_p24_intent_trace(
     for row in 0..INTENT_TRACE_ROWS {
         let offset = row * INTENT_TRACE_WIDTH;
         values[offset..offset + P24_WIDTH].copy_from_slice(&state);
+        write_canonical_intent_witness(&mut values[offset + INTENT_WITNESS_OFFSET..], encoded);
         if row < INTENT_STEPS {
             values[offset + INTENT_SELECTOR_OFFSET + row] = Val::ONE;
             let round = row % P24_ROUNDS;
@@ -252,6 +308,16 @@ fn build_p24_intent_trace(
         }
     }
     RowMajorMatrix::new(values, INTENT_TRACE_WIDTH)
+}
+
+fn write_canonical_intent_witness(witness: &mut [Val], encoded: [u8; INTENT_BYTES]) {
+    for (byte_index, byte) in encoded.into_iter().enumerate() {
+        witness[INTENT_BYTES_OFFSET + byte_index] = Val::from_u8(byte);
+        for bit_index in 0..INTENT_BITS_PER_BYTE {
+            witness[INTENT_BITS_OFFSET + (byte_index * INTENT_BITS_PER_BYTE) + bit_index] =
+                Val::from_u8((byte >> bit_index) & 1);
+        }
+    }
 }
 
 fn byte_pack3le(
@@ -287,14 +353,14 @@ mod tests {
     }
 
     #[test]
-    fn intent_air_rejects_changed_public_packing_or_commitment() {
+    fn intent_air_rejects_changed_public_packing_commitment_or_private_bytes() {
         let corpus = P24IntentVectorCorpusV1::frozen_external_kat_corpus();
         let record = &corpus.records()[0];
         let intent = PrivateTransferIntentV2::decode(record.intent()).unwrap();
         let reference = Poseidon2P24Reference::load_candidate().unwrap();
         let air = Poseidon2P24IntentAir::from_reference(&reference).unwrap();
         let packed = byte_pack3le(intent.encode());
-        let trace = build_p24_intent_trace(&air, packed);
+        let trace = build_p24_intent_trace(&air, intent.encode(), packed);
         let commitment = record.digest();
         let public_values = packed
             .into_iter()
@@ -303,22 +369,47 @@ mod tests {
             .collect::<Vec<_>>();
         p3_air::check_constraints(&air, &trace, &public_values);
 
+        let assert_rejected = |trace: &RowMajorMatrix<Val>, public_values: &[Val]| {
+            assert!(
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    p3_air::check_constraints(&air, trace, public_values);
+                }))
+                .is_err()
+            );
+        };
+
         let mut changed_packing = public_values.clone();
         changed_packing[19] += Val::ONE;
-        assert!(
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                p3_air::check_constraints(&air, &trace, &changed_packing);
-            }))
-            .is_err()
-        );
+        assert_rejected(&trace, &changed_packing);
 
-        let mut changed_commitment = public_values;
+        let mut changed_commitment = public_values.clone();
         changed_commitment[INTENT_COMMITMENT_OFFSET] += Val::ONE;
-        assert!(
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                p3_air::check_constraints(&air, &trace, &changed_commitment);
-            }))
-            .is_err()
-        );
+        assert_rejected(&trace, &changed_commitment);
+
+        let mut non_boolean_bit = trace.clone();
+        for row in 0..INTENT_TRACE_ROWS {
+            non_boolean_bit.values
+                [row * INTENT_TRACE_WIDTH + INTENT_WITNESS_OFFSET + INTENT_BITS_OFFSET] =
+                Val::from_u32(2);
+        }
+        assert_rejected(&non_boolean_bit, &public_values);
+
+        let mut changed_byte = trace.clone();
+        for row in 0..INTENT_TRACE_ROWS {
+            changed_byte.values
+                [row * INTENT_TRACE_WIDTH + INTENT_WITNESS_OFFSET + INTENT_BYTES_OFFSET] +=
+                Val::ONE;
+        }
+        assert_rejected(&changed_byte, &public_values);
+
+        let mut changed_last_byte = trace;
+        for row in 0..INTENT_TRACE_ROWS {
+            changed_last_byte.values[row * INTENT_TRACE_WIDTH
+                + INTENT_WITNESS_OFFSET
+                + INTENT_BYTES_OFFSET
+                + INTENT_BYTES
+                - 1] += Val::ONE;
+        }
+        assert_rejected(&changed_last_byte, &public_values);
     }
 }
