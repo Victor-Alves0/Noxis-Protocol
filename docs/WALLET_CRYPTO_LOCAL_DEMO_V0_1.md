@@ -26,10 +26,12 @@ private note:
 cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo -- private-note
 ```
 
-That command converts the complete local recipient keyset into an incoming view
-key, then recovers the note only after recomputing `H_NOTE` and matching its
-public output commitment and `H_ADDR`. Its precise boundaries are documented in
-[`WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md`](WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md)
+That command derives recipient index zero from a fresh local wallet root,
+converts the complete local recipient keyset into an incoming view key, then
+recovers the note only after recomputing `H_NOTE` and matching its public output
+commitment and `H_ADDR`. Its precise boundaries are documented in
+[`WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md`](WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md),
+[`WALLET_ROOT_SESSION_LOCAL_CANDIDATE_V0_1.md`](WALLET_ROOT_SESSION_LOCAL_CANDIDATE_V0_1.md)
 and [`INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md`](INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md).
 
 List and revalidate every managed public address in that directory with:

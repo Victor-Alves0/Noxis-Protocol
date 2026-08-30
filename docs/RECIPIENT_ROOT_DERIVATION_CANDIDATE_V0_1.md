@@ -29,14 +29,17 @@ salt = "NOXIS/CANDIDATE-RECIPIENT-ROOT/V1/SALT\0"
 info = "NOXIS/CANDIDATE-RECIPIENT-ROOT/V1\0"
      || component_label
      || key_epoch:u64be
+     || address_index:u32be
      || diversifier:16                 (exceto ao derivar o diversificador)
 ```
 
 Os `component_label` canônicos são `DIVERSIFIER\0`, `NULLIFIER\0`,
 `X25519\0` e `ML-KEM-768\0`. Primeiro derivamos `DIVERSIFIER` com apenas
-`key_epoch`; todos os demais filhos incluem esse diversificador no `info`.
-Os quatro rótulos impedem que a mesma sequência de bytes seja reutilizada em
-duas funções de chave.
+`key_epoch` e `address_index`; todos os demais filhos incluem esse
+diversificador no `info`. Os quatro rótulos impedem que a mesma sequência de
+bytes seja reutilizada em duas funções de chave. O índice permite que uma raiz
+de sessão derive vários destinatários distintos; veja
+[`WALLET_ROOT_SESSION_LOCAL_CANDIDATE_V0_1.md`](WALLET_ROOT_SESSION_LOCAL_CANDIDATE_V0_1.md).
 
 A saída ML-KEM-768 é fornecida à interface determinística de semente de 64
 bytes da biblioteca. Esse modelo corresponde à entrada `(d, z)` definida para
@@ -50,10 +53,10 @@ por si só, a uma seleção de biblioteca ou aprovação do protocolo.
 cargo test -p noxis-wallet-crypto --locked
 ```
 
-Os testes verificam que a mesma raiz de teste e o mesmo `key_epoch` reproduzem
-o mesmo `H_ADDR` e `address_id`, e que mudar somente `key_epoch` muda ambos.
-Também continuam verificando cifra híbrida, decoder estrito e a rejeição de
-uma nota cujo `H_ADDR` não é o do destinatário local.
+Os testes verificam que a mesma raiz de teste, `key_epoch` e `address_index`
+reproduzem o mesmo `H_ADDR` e `address_id`, e que mudar época ou índice muda
+ambos. Também continuam verificando cifra híbrida, decoder estrito e a rejeição
+de uma nota cujo `H_ADDR` não é o do destinatário local.
 
 ## Limites deliberados
 

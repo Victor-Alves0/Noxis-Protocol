@@ -12,14 +12,14 @@ use noxis_poseidon2_privacy_reference::{
     Poseidon2P24PrivacyReference, Poseidon2P24PrivacyReferenceError,
 };
 use noxis_privacy_types::{PrivacyTypesError, RecipientCommitmentV2};
-use rand_core::{OsRng, RngCore as _};
 use sha2::Sha256;
 use zeroize::Zeroize;
 
 use crate::{
-    HybridIdentityKeypair, HybridIdentityPublicKey, HybridIdentitySignature, HybridPaymentAddress,
-    HybridPaymentAddressEntry, HybridRecipientEnvelope, HybridRecipientKeypair,
-    PaymentAddressError, PaymentDiversifier, RecipientEnvelopeContext, encode_payment_address,
+    CandidateWalletRootV1, HybridIdentityKeypair, HybridIdentityPublicKey, HybridIdentitySignature,
+    HybridPaymentAddress, HybridPaymentAddressEntry, HybridRecipientEnvelope,
+    HybridRecipientKeypair, PaymentAddressError, PaymentDiversifier, RecipientEnvelopeContext,
+    encode_payment_address,
 };
 
 /// Stable label inside the signed public recipient-descriptor transcript.
@@ -73,35 +73,47 @@ pub struct CandidatePrivateRecipientDescriptorV1 {
 }
 
 impl CandidatePrivateRecipientKeysetV1 {
-    /// Generates a fresh local root, derives diversified incoming and
-    /// nullifier material from it, erases the root, then derives the public
-    /// `H_ADDR` recipient commitment. Descriptor identity remains separate:
-    /// it authenticates the public pair but is not spend authority.
+    /// Generates a fresh local root, derives recipient index zero, erases the
+    /// root, then derives the public `H_ADDR` recipient commitment. Descriptor
+    /// identity remains separate: it authenticates the public pair but is not
+    /// spend authority.
     pub fn generate(key_epoch: u64) -> Result<Self, CandidatePrivateRecipientError> {
-        let mut root = [0_u8; 64];
-        OsRng.fill_bytes(&mut root);
-        let result = Self::from_root(root, key_epoch);
-        root.zeroize();
-        result
+        CandidateWalletRootV1::generate().derive_recipient_keyset(key_epoch, 0)
     }
 
-    fn from_root(
-        mut root: [u8; 64],
+    pub(crate) fn from_wallet_root(
+        root: &CandidateWalletRootV1,
         key_epoch: u64,
+        address_index: u32,
     ) -> Result<Self, CandidatePrivateRecipientError> {
         let diversifier = PaymentDiversifier::from_bytes(derive_root_child::<16>(
-            &root,
+            root.bytes(),
             key_epoch,
+            address_index,
             DIVERSIFIER_LABEL,
             None,
         ));
-        let mut nullifier_key =
-            derive_root_child::<32>(&root, key_epoch, NULLIFIER_LABEL, Some(diversifier));
-        let mut x25519_seed =
-            derive_root_child::<32>(&root, key_epoch, X25519_LABEL, Some(diversifier));
-        let mut ml_kem_768_seed =
-            derive_root_child::<64>(&root, key_epoch, ML_KEM_768_LABEL, Some(diversifier));
-        root.zeroize();
+        let mut nullifier_key = derive_root_child::<32>(
+            root.bytes(),
+            key_epoch,
+            address_index,
+            NULLIFIER_LABEL,
+            Some(diversifier),
+        );
+        let mut x25519_seed = derive_root_child::<32>(
+            root.bytes(),
+            key_epoch,
+            address_index,
+            X25519_LABEL,
+            Some(diversifier),
+        );
+        let mut ml_kem_768_seed = derive_root_child::<64>(
+            root.bytes(),
+            key_epoch,
+            address_index,
+            ML_KEM_768_LABEL,
+            Some(diversifier),
+        );
         let recipient = HybridRecipientKeypair::from_derived_seeds(x25519_seed, ml_kem_768_seed);
         x25519_seed.zeroize();
         ml_kem_768_seed.zeroize();
@@ -142,8 +154,10 @@ impl CandidatePrivateRecipientKeysetV1 {
     fn from_root_for_test(
         root: [u8; 64],
         key_epoch: u64,
+        address_index: u32,
     ) -> Result<Self, CandidatePrivateRecipientError> {
-        Self::from_root(root, key_epoch)
+        CandidateWalletRootV1::from_bytes_for_test(root)
+            .derive_recipient_keyset(key_epoch, address_index)
     }
 
     /// The public receiving material that a sender may verify and use.
@@ -253,6 +267,7 @@ fn descriptor_payload(
 fn derive_root_child<const OUTPUT_LENGTH: usize>(
     root: &[u8; 64],
     key_epoch: u64,
+    address_index: u32,
     label: &[u8],
     diversifier: Option<PaymentDiversifier>,
 ) -> [u8; OUTPUT_LENGTH] {
@@ -261,11 +276,13 @@ fn derive_root_child<const OUTPUT_LENGTH: usize>(
         CANDIDATE_RECIPIENT_ROOT_DERIVATION_DOMAIN.len()
             + label.len()
             + 8
+            + 4
             + diversifier.map_or(0, |_| 16),
     );
     info.extend_from_slice(CANDIDATE_RECIPIENT_ROOT_DERIVATION_DOMAIN);
     info.extend_from_slice(label);
     info.extend_from_slice(&key_epoch.to_be_bytes());
+    info.extend_from_slice(&address_index.to_be_bytes());
     if let Some(diversifier) = diversifier {
         info.extend_from_slice(&diversifier.as_bytes());
     }
@@ -332,8 +349,8 @@ mod tests {
     #[test]
     fn fixed_root_reproduces_the_complete_public_recipient_pair() {
         let root = [0xA5; 64];
-        let first = CandidatePrivateRecipientKeysetV1::from_root_for_test(root, 4).unwrap();
-        let second = CandidatePrivateRecipientKeysetV1::from_root_for_test(root, 4).unwrap();
+        let first = CandidatePrivateRecipientKeysetV1::from_root_for_test(root, 4, 0).unwrap();
+        let second = CandidatePrivateRecipientKeysetV1::from_root_for_test(root, 4, 0).unwrap();
 
         assert_eq!(first.recipient_commitment(), second.recipient_commitment());
         assert_eq!(
@@ -345,8 +362,8 @@ mod tests {
     #[test]
     fn key_epoch_domain_separates_one_root() {
         let root = [0x5A; 64];
-        let first = CandidatePrivateRecipientKeysetV1::from_root_for_test(root, 4).unwrap();
-        let second = CandidatePrivateRecipientKeysetV1::from_root_for_test(root, 5).unwrap();
+        let first = CandidatePrivateRecipientKeysetV1::from_root_for_test(root, 4, 0).unwrap();
+        let second = CandidatePrivateRecipientKeysetV1::from_root_for_test(root, 5, 0).unwrap();
 
         assert_ne!(first.recipient_commitment(), second.recipient_commitment());
         assert_ne!(

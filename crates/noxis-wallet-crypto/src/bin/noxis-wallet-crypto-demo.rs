@@ -3,7 +3,7 @@
 
 use noxis_wallet_crypto::{
     CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH, CandidatePrivateNoteEnvelopeV1,
-    CandidatePrivateOutputSlotV1, CandidatePrivateRecipientKeysetV1, HybridIdentityKeypair,
+    CandidatePrivateOutputSlotV1, CandidateWalletRootV1, HybridIdentityKeypair,
     HybridPaymentAddressEntry, PaymentAddressError, PublicAddressBook, RecipientEnvelopeContext,
     decode_hybrid_recipient_envelope, decode_payment_address,
     decrypt_candidate_private_note_for_incoming_view_key, encode_hybrid_recipient_envelope,
@@ -59,7 +59,8 @@ fn parse_mode(arguments: impl IntoIterator<Item = String>) -> Result<DemoMode, s
 
 fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
     let context = RecipientEnvelopeContext::new(DEMO_CHAIN_ID, DEMO_KEY_EPOCH)?;
-    let recipient = CandidatePrivateRecipientKeysetV1::generate(DEMO_KEY_EPOCH)?;
+    let wallet_root = CandidateWalletRootV1::generate();
+    let recipient = wallet_root.derive_recipient_keyset(DEMO_KEY_EPOCH, 0)?;
     let descriptor = recipient.public_descriptor();
     let mut note = [0_u8; CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH];
     note[..2].copy_from_slice(&1_u16.to_be_bytes());
@@ -89,6 +90,7 @@ fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("Noxis encrypted candidate-note demo — EXPERIMENTAL / LOCAL ONLY");
+    println!("local wallet root derived recipient index 0 ... accepted");
     println!("authenticated recipient descriptor bound address + H_ADDR commitment ... accepted");
     println!("sender computed H_NOTE and encrypted one 178-byte candidate note ... accepted");
     println!(

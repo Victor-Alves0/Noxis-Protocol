@@ -36,6 +36,7 @@ mod address_book;
 mod ciphertext_digest;
 mod private_note;
 mod recipient_descriptor;
+mod wallet_root;
 mod wire;
 
 pub use address::{
@@ -61,6 +62,7 @@ pub use recipient_descriptor::{
     CandidatePrivateRecipientDescriptorV1, CandidatePrivateRecipientError,
     CandidatePrivateRecipientKeysetV1,
 };
+pub use wallet_root::CandidateWalletRootV1;
 pub use wire::{
     HYBRID_RECIPIENT_ENVELOPE_MAGIC, PAYMENT_ADDRESS_MAGIC, PaymentAddressCodecError,
     decode_hybrid_recipient_envelope, decode_payment_address, encode_hybrid_recipient_envelope,
