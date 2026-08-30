@@ -127,6 +127,13 @@ canônica de 640 bytes e seu digest de 16 elementos. Os dois vetores externos
 canônico, mas não torna a intenção privada e não compõe notas, valores ou
 nullifiers. Ver [`STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md`](STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md).
 
+**Preflight de intenção e posse:** para uma entrada da declaração `NXPU`, o
+contrato de prova agora executa e verifica o `H_INTENT` canônico e a posse
+ancorada contra a mesma âncora e estado local, retendo apenas um recibo público
+após descartar ambas as provas opacas. Isso é evidência operacional de vínculo
+entre os componentes, não agregação, recursão ou prova de transferência; ver
+[`STARK_ANCHORED_OWNERSHIP_PREFLIGHT_RESEARCH_V0_1.md`](STARK_ANCHORED_OWNERSHIP_PREFLIGHT_RESEARCH_V0_1.md).
+
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem
 codec/`Debug`/`Clone`, caminho P24 de 32 níveis e uma declaração executável

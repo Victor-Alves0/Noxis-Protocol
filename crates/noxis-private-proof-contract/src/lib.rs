@@ -32,8 +32,11 @@ pub use air_profile::{
 pub use anchored_ownership::{
     CandidateAnchoredOwnershipError, CandidateAnchoredOwnershipPairPreflightV1,
     CandidateAnchoredOwnershipProofV1, CandidateAnchoredOwnershipWitnessV1,
-    prove_candidate_anchored_ownership, revalidate_candidate_anchored_ownership_pair_preflight,
-    run_candidate_anchored_ownership_pair_preflight, verify_candidate_anchored_ownership,
+    CandidateIntentAnchoredOwnershipPreflightV1, prove_candidate_anchored_ownership,
+    revalidate_candidate_anchored_ownership_pair_preflight,
+    revalidate_candidate_intent_anchored_ownership_preflight,
+    run_candidate_anchored_ownership_pair_preflight,
+    run_candidate_intent_anchored_ownership_preflight, verify_candidate_anchored_ownership,
 };
 pub use nxsm_transition::{
     CANDIDATE_NXSM_NULLIFIER_TRANSITION_ENCODED_LENGTH,

@@ -11,7 +11,8 @@ use std::fmt;
 use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
 use noxis_privacy_types::{MerkleRootV2, NullifierV2, PrivacyTypesError};
 use noxis_stark_experiment::{
-    Poseidon2P24OwnershipExperimentResult, Poseidon2P24OwnershipProof, StarkExperimentError,
+    Poseidon2P24IntentExperimentResult, Poseidon2P24OwnershipExperimentResult,
+    Poseidon2P24OwnershipProof, StarkExperimentError, prove_and_verify_p24_intent,
     prove_and_verify_p24_note_ownership_path32, prove_p24_note_ownership_path32,
     verify_p24_note_ownership_proof,
 };
@@ -95,6 +96,41 @@ pub struct CandidateAnchoredOwnershipPairPreflightV1 {
     statement_id: CandidatePrivateTransferProofPublicStatementIdV1,
 }
 
+/// Public receipt of one sequential `H_INTENT` plus anchored-ownership run.
+///
+/// The two independently verified opaque proofs are discarded before this
+/// receipt is returned. It records their public results and the exact `NXPU`
+/// statement identity, but is not an aggregate or transferable proof.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CandidateIntentAnchoredOwnershipPreflightV1 {
+    intent_result: Poseidon2P24IntentExperimentResult,
+    ownership_result: Poseidon2P24OwnershipExperimentResult,
+    input_index: u8,
+    statement_id: CandidatePrivateTransferProofPublicStatementIdV1,
+}
+
+impl CandidateIntentAnchoredOwnershipPreflightV1 {
+    /// Public `H_INTENT` result checked before the ownership proof begins.
+    pub const fn intent_result(&self) -> &Poseidon2P24IntentExperimentResult {
+        &self.intent_result
+    }
+
+    /// Public ownership nullifier and note-root result for the selected input.
+    pub const fn ownership_result(&self) -> &Poseidon2P24OwnershipExperimentResult {
+        &self.ownership_result
+    }
+
+    /// The selected input in the fixed two-input candidate statement.
+    pub const fn input_index(&self) -> u8 {
+        self.input_index
+    }
+
+    /// Identity of the statement both sequential checks used.
+    pub const fn statement_id(&self) -> CandidatePrivateTransferProofPublicStatementIdV1 {
+        self.statement_id
+    }
+}
+
 impl CandidateAnchoredOwnershipPairPreflightV1 {
     /// Public result bound to canonical input index zero.
     pub const fn first_result(&self) -> &Poseidon2P24OwnershipExperimentResult {
@@ -168,6 +204,75 @@ pub fn verify_candidate_anchored_ownership(
         &result,
     )?;
     Ok(result)
+}
+
+/// Runs and verifies the canonical public `H_INTENT` relation, then runs and
+/// verifies one private ownership proof against that same `NXPU v1` statement.
+///
+/// It is deliberately sequential: both opaque proof objects are discarded
+/// before the returned receipt escapes. This is operational evidence that the
+/// statement frame and one selected ownership result agree, not cryptographic
+/// proof composition or a private-transfer proof.
+pub fn run_candidate_intent_anchored_ownership_preflight(
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+    nxsm_witness: &CandidateNxsmNullifierTransitionWitnessV1,
+    input_index: u8,
+    ownership_witness: &CandidateAnchoredOwnershipWitnessV1,
+) -> Result<CandidateIntentAnchoredOwnershipPreflightV1, CandidateAnchoredOwnershipError> {
+    validate_input_index(input_index)?;
+    statement.revalidate(pre_tree)?;
+    nxsm_witness.revalidate(statement.nullifier_transition())?;
+
+    let intent_result = prove_and_verify_p24_intent(statement.air_public_inputs().intent())?;
+    validate_intent_result(statement, &intent_result)?;
+
+    let ownership = prove_candidate_anchored_ownership(
+        statement,
+        pre_tree,
+        nxsm_witness,
+        input_index,
+        ownership_witness,
+    )?;
+    let ownership_result = ownership.public_result().clone();
+    Ok(CandidateIntentAnchoredOwnershipPreflightV1 {
+        intent_result,
+        ownership_result,
+        input_index,
+        statement_id: statement.statement_id(),
+    })
+}
+
+/// Rechecks the retained public and transparent-state bindings of a completed
+/// sequential receipt. It cannot reverify the opaque proofs already dropped.
+pub fn revalidate_candidate_intent_anchored_ownership_preflight(
+    preflight: &CandidateIntentAnchoredOwnershipPreflightV1,
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+    nxsm_witness: &CandidateNxsmNullifierTransitionWitnessV1,
+) -> Result<Poseidon2P24OwnershipExperimentResult, CandidateAnchoredOwnershipError> {
+    if preflight.statement_id != statement.statement_id() {
+        return Err(CandidateAnchoredOwnershipError::StatementIdMismatch);
+    }
+    validate_intent_result(statement, &preflight.intent_result)?;
+    validate_public_result(
+        statement,
+        pre_tree,
+        nxsm_witness,
+        preflight.input_index,
+        &preflight.ownership_result,
+    )?;
+    Ok(preflight.ownership_result.clone())
+}
+
+fn validate_intent_result(
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    result: &Poseidon2P24IntentExperimentResult,
+) -> Result<(), CandidateAnchoredOwnershipError> {
+    if result.intent_commitment != statement.air_public_inputs().intent_commitment() {
+        return Err(CandidateAnchoredOwnershipError::IntentCommitmentMismatch);
+    }
+    Ok(())
 }
 
 fn validate_public_result(
@@ -284,6 +389,7 @@ pub enum CandidateAnchoredOwnershipError {
     StatementIdMismatch,
     NoteRootMismatch,
     NullifierMismatch,
+    IntentCommitmentMismatch,
     DuplicateNullifier,
 }
 
@@ -332,8 +438,8 @@ mod tests {
         CandidateNxsmNullifierTransitionWitnessV1, CandidatePrivateTransferProofPublicStatementV1,
     };
     use noxis_privacy_types::{
-        CiphertextDigestV2, CircuitId, NoteCommitmentV2, PrivateTransferIntentV2,
-        PrivateTransferOutputV2, TreeParametersId, TreeParametersV2,
+        CiphertextDigestV2, CircuitId, NoteCommitmentV2, PrivateTransferIntentCommitmentV2,
+        PrivateTransferIntentV2, PrivateTransferOutputV2, TreeParametersId, TreeParametersV2,
     };
 
     fn vector(value: u32) -> [u32; 16] {
@@ -454,7 +560,7 @@ mod tests {
         let ownership_witness =
             CandidateAnchoredOwnershipWitnessV1::new(key, note, position, siblings);
 
-        let anchored = prove_candidate_anchored_ownership(
+        let preflight = run_candidate_intent_anchored_ownership_preflight(
             &statement,
             &pre_tree,
             &nxsm_witness,
@@ -462,13 +568,40 @@ mod tests {
             &ownership_witness,
         )
         .unwrap();
-        let result =
-            verify_candidate_anchored_ownership(&anchored, &statement, &pre_tree, &nxsm_witness)
-                .unwrap();
+        let result = revalidate_candidate_intent_anchored_ownership_preflight(
+            &preflight,
+            &statement,
+            &pre_tree,
+            &nxsm_witness,
+        )
+        .unwrap();
         assert_eq!(result.nullifier, nullifier.elements());
         assert_eq!(result.root, expected_root);
-        assert_eq!(anchored.input_index(), input_index);
-        assert_eq!(anchored.statement_id(), statement.statement_id());
+        assert_eq!(
+            preflight.intent_result().intent_commitment,
+            statement.air_public_inputs().intent_commitment()
+        );
+        assert_eq!(preflight.ownership_result(), &result);
+        assert_eq!(preflight.input_index(), input_index);
+        assert_eq!(preflight.statement_id(), statement.statement_id());
+
+        let mut mismatched_intent_receipt = preflight.clone();
+        let mut changed_commitment = mismatched_intent_receipt
+            .intent_result
+            .intent_commitment
+            .elements();
+        changed_commitment[0] = changed_commitment[0].wrapping_add(1);
+        mismatched_intent_receipt.intent_result.intent_commitment =
+            PrivateTransferIntentCommitmentV2::from_elements(changed_commitment).unwrap();
+        assert!(matches!(
+            revalidate_candidate_intent_anchored_ownership_preflight(
+                &mismatched_intent_receipt,
+                &statement,
+                &pre_tree,
+                &nxsm_witness,
+            ),
+            Err(CandidateAnchoredOwnershipError::IntentCommitmentMismatch)
+        ));
 
         assert!(matches!(
             prove_candidate_anchored_ownership(

@@ -39,6 +39,15 @@ the ordered `NXPU` inputs, and the two results to have distinct nullifiers.
 The first proof object is dropped before the second proof begins. This is a
 memory-conscious sequential check, **not** proof aggregation.
 
+`run_candidate_intent_anchored_ownership_preflight` adds one narrower
+operational sequence for a selected input: it first proves and verifies the
+canonical `H_INTENT` relation, compares its public digest to that exact
+statement, then proves and verifies the anchored ownership relation. The
+returned receipt retains the intent digest, ownership result, input index and
+statement ID only after both opaque proof objects are dropped. Its revalidation
+checks those retained public and local-state bindings, but cannot reverify the
+dropped proofs.
+
 ## What this establishes
 
 It eliminates a previously implicit gap in the executable research path: a
@@ -49,6 +58,11 @@ statement and ordered `NXSM` transition. The exact `NXPU` statement identity is
 retained with the one-input proof wrapper or the two-input public receipt, and
 revalidation rejects a different statement.
 
+The single-input intent preflight additionally demonstrates that the executable
+canonical-byte `H_INTENT` proof and the ownership proof were both checked
+against one statement before either proof is discarded. A changed retained
+intent commitment is rejected during receipt revalidation.
+
 ## What this does not establish
 
 This is **not** a single zero-knowledge proof of nullifier absence. The 512
@@ -57,6 +71,11 @@ not constrain them. The two-input receipt cannot be independently used to
 reverify either discarded opaque proof, and it is not a transferable proof.
 It also does not prove outputs, value conservation, state transition
 authorization or ledger acceptance.
+
+It is also **not** cryptographic composition of `H_INTENT` and ownership: the
+current backend has verified two separate local proofs in sequence. Recursion
+or another reviewed composition scheme is required before a verifier can
+accept one proof in place of this local run.
 
 The next cryptographic composition must place the `NXSM` paths and their
 pre/intermediate/post roots inside a reviewed proof relation. Given the current
@@ -75,3 +94,7 @@ substantially more expensive:
 cargo test --release -p noxis-private-proof-contract locally_composes_ownership_proof_note_anchor_and_nxsm_absence
 cargo test --release -p noxis-private-proof-contract locally_composes_two_owned_notes_with_one_anchor_and_ordered_nxsm_transition
 ```
+
+The first command now executes the single-input `H_INTENT` plus anchored
+ownership sequence as part of the real candidate fixture. It also mutates the
+retained commitment and confirms that receipt revalidation rejects it.

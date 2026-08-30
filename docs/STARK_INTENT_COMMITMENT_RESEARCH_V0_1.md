@@ -53,12 +53,14 @@ bit, and changed first or final private intent bytes.
   intent public.
 - It does **not** prove note ownership, value conservation, output-note
   opening, nullifier absence or an `NXSM` transition.
-- It does **not** compose with the existing ownership or `NXSM` research
-  proofs, and is not a private transfer proof.
+- It has no cryptographic aggregation or recursion with the ownership or
+  `NXSM` research proofs. A local sequential preflight can verify it before
+  one anchored ownership proof against the same `NXPU` statement, but that
+  receipt remains non-transferable.
 - It is not a proof format, a wallet operation, a validator operation or a
   ledger authorization.
 
-The next AIR work joins this public frame to one witness family at a time,
-starting with the existing private ownership-and-note-membership relation. A
-backend must remain unselected and the service fail-closed until the complete
-relation, proof profile and independent review exist.
+The next cryptographic step is actual composition or recursion with the private
+ownership-and-note-membership relation. A backend must remain unselected and
+the service fail-closed until the complete relation, proof profile and
+independent review exist.
