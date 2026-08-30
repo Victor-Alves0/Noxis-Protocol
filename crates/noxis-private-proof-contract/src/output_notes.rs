@@ -51,6 +51,19 @@ pub struct CandidateIntentOutputNotesPreflightV1 {
     statement_id: CandidatePrivateTransferProofPublicStatementIdV1,
 }
 
+/// Public receipt of two sequential output `H_NOTE` checks without a separate
+/// `H_INTENT` proof.
+///
+/// This is useful when a larger local preflight has already checked `H_INTENT`
+/// once for the same statement. It still is not aggregation or a portable
+/// verification artifact.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CandidateOutputNotesPreflightV1 {
+    first_result: Poseidon2P24NoteExperimentResult,
+    second_result: Poseidon2P24NoteExperimentResult,
+    statement_id: CandidatePrivateTransferProofPublicStatementIdV1,
+}
+
 impl CandidateIntentOutputNotesPreflightV1 {
     /// Public `H_INTENT` commitment checked before the output proofs begin.
     pub const fn intent_result(&self) -> &Poseidon2P24IntentExperimentResult {
@@ -73,6 +86,23 @@ impl CandidateIntentOutputNotesPreflightV1 {
     }
 }
 
+impl CandidateOutputNotesPreflightV1 {
+    /// Public `H_NOTE` result for canonical output index zero.
+    pub const fn first_result(&self) -> &Poseidon2P24NoteExperimentResult {
+        &self.first_result
+    }
+
+    /// Public `H_NOTE` result for canonical output index one.
+    pub const fn second_result(&self) -> &Poseidon2P24NoteExperimentResult {
+        &self.second_result
+    }
+
+    /// Identity of the exact `NXPU v1` statement used by both checks.
+    pub const fn statement_id(&self) -> CandidatePrivateTransferProofPublicStatementIdV1 {
+        self.statement_id
+    }
+}
+
 /// Runs and independently verifies `H_INTENT` once and one private `H_NOTE`
 /// proof for each canonical output commitment in the supplied `NXPU v1`.
 ///
@@ -88,13 +118,29 @@ pub fn run_candidate_intent_output_notes_preflight(
     let intent_result = prove_and_verify_p24_intent(statement.air_public_inputs().intent())?;
     validate_intent_result(statement, &intent_result)?;
 
+    let outputs = run_candidate_output_notes_preflight(statement, pre_tree, witnesses)?;
+
+    Ok(CandidateIntentOutputNotesPreflightV1 {
+        intent_result,
+        first_result: outputs.first_result,
+        second_result: outputs.second_result,
+        statement_id: outputs.statement_id,
+    })
+}
+
+/// Runs one private `H_NOTE` proof for each canonical output commitment in a
+/// supplied `NXPU v1`, without repeating the independent `H_INTENT` proof.
+pub fn run_candidate_output_notes_preflight(
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+    witnesses: &[CandidateOutputNoteWitnessV1; 2],
+) -> Result<CandidateOutputNotesPreflightV1, CandidateOutputNotesError> {
+    statement.revalidate(pre_tree)?;
     let first_result = prove_and_verify_p24_note(witnesses[0].note_preimage)?;
     validate_output_result(statement, 0, &first_result)?;
     let second_result = prove_and_verify_p24_note(witnesses[1].note_preimage)?;
     validate_output_result(statement, 1, &second_result)?;
-
-    Ok(CandidateIntentOutputNotesPreflightV1 {
-        intent_result,
+    Ok(CandidateOutputNotesPreflightV1 {
         first_result,
         second_result,
         statement_id: statement.statement_id(),
@@ -111,8 +157,26 @@ pub fn revalidate_candidate_intent_output_notes_preflight(
     if preflight.statement_id != statement.statement_id() {
         return Err(CandidateOutputNotesError::StatementIdMismatch);
     }
-    statement.revalidate(pre_tree)?;
+    let outputs = CandidateOutputNotesPreflightV1 {
+        first_result: preflight.first_result.clone(),
+        second_result: preflight.second_result.clone(),
+        statement_id: preflight.statement_id,
+    };
     validate_intent_result(statement, &preflight.intent_result)?;
+    revalidate_candidate_output_notes_preflight(&outputs, statement, pre_tree)
+}
+
+/// Rechecks the public and candidate-state bindings retained by a completed
+/// two-output receipt. It cannot reverify the discarded opaque proofs.
+pub fn revalidate_candidate_output_notes_preflight(
+    preflight: &CandidateOutputNotesPreflightV1,
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+) -> Result<[Poseidon2P24NoteExperimentResult; 2], CandidateOutputNotesError> {
+    if preflight.statement_id != statement.statement_id() {
+        return Err(CandidateOutputNotesError::StatementIdMismatch);
+    }
+    statement.revalidate(pre_tree)?;
     validate_output_result(statement, 0, &preflight.first_result)?;
     validate_output_result(statement, 1, &preflight.second_result)?;
     Ok([

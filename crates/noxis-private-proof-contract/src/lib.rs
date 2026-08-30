@@ -20,6 +20,7 @@ mod nxsm_witness;
 mod output_notes;
 mod public_inputs;
 mod public_statement;
+mod transfer_preflight;
 
 pub use air_profile::{
     AIR_CONSTRAINT_CANONICAL_INTENT, AIR_CONSTRAINT_INPUT_NOTE_MEMBERSHIP,
@@ -51,8 +52,9 @@ pub use nxsm_witness::{
 };
 pub use output_notes::{
     CandidateIntentOutputNotesPreflightV1, CandidateOutputNoteWitnessV1, CandidateOutputNotesError,
-    revalidate_candidate_intent_output_notes_preflight,
-    run_candidate_intent_output_notes_preflight,
+    CandidateOutputNotesPreflightV1, revalidate_candidate_intent_output_notes_preflight,
+    revalidate_candidate_output_notes_preflight, run_candidate_intent_output_notes_preflight,
+    run_candidate_output_notes_preflight,
 };
 pub use public_inputs::{
     CandidatePrivateTransferAirPublicInputsError, CandidatePrivateTransferAirPublicInputsV1,
@@ -63,6 +65,12 @@ pub use public_statement::{
     CandidatePrivateTransferProofPublicStatementError,
     CandidatePrivateTransferProofPublicStatementIdV1,
     CandidatePrivateTransferProofPublicStatementV1,
+};
+pub use transfer_preflight::{
+    CandidatePrivateTransferStarkPreflightError, CandidatePrivateTransferStarkPreflightResultsV1,
+    CandidatePrivateTransferStarkPreflightV1,
+    revalidate_candidate_private_transfer_stark_preflight,
+    run_candidate_private_transfer_stark_preflight,
 };
 
 /// SHA-256 domain for the full candidate-deployment checksum.

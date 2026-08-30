@@ -160,6 +160,15 @@ isso não é agregação, não valida envelopes, valores ou inserção de saída
 autoriza o ledger. Ver
 [`STARK_OUTPUT_NOTES_PREFLIGHT_RESEARCH_V0_1.md`](STARK_OUTPUT_NOTES_PREFLIGHT_RESEARCH_V0_1.md).
 
+**Preflight completo de transferência:** uma nova entrada executável reúne as
+relações de pesquisa já disponíveis sob a mesma declaração `NXPU`: `H_INTENT`
+uma vez, duas posses/provas Merkle de profundidade 32 e duas provas `H_NOTE`
+de saída. Os resultados são checados contra a âncora, nullifiers e slots de
+output do mesmo statement; as provas seguem sequenciais e são descartadas.
+Ainda não há AIR única, agregação, envelope, transição privada `NXSM`, estado
+v2 ou aceitação pelo ledger. Ver
+[`STARK_PRIVATE_TRANSFER_PREFLIGHT_RESEARCH_V0_1.md`](STARK_PRIVATE_TRANSFER_PREFLIGHT_RESEARCH_V0_1.md).
+
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem
 codec/`Debug`/`Clone`, caminho P24 de 32 níveis e uma declaração executável
