@@ -33,6 +33,7 @@ use zeroize::Zeroize;
 
 mod address;
 mod address_book;
+mod private_note;
 mod wire;
 
 pub use address::{
@@ -41,6 +42,11 @@ pub use address::{
 pub use address_book::{
     AddressBookStoreOutcome, PUBLIC_ADDRESS_BOOK_LOCK_FILE_NAME, PublicAddressBook,
     PublicAddressBookError,
+};
+pub use private_note::{
+    CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH, CandidatePrivateNoteEnvelopeV1,
+    CandidatePrivateNoteError, ReceivedCandidatePrivateNoteV1, decrypt_candidate_private_note,
+    encrypt_candidate_private_note,
 };
 pub use wire::{
     HYBRID_RECIPIENT_ENVELOPE_MAGIC, PAYMENT_ADDRESS_MAGIC, PaymentAddressCodecError,

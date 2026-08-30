@@ -2,9 +2,10 @@
 //! recipient components.
 
 use noxis_wallet_crypto::{
-    HybridIdentityKeypair, HybridPaymentAddressEntry, PaymentAddressError, PublicAddressBook,
-    RecipientEnvelopeContext, decode_hybrid_recipient_envelope, decode_payment_address,
-    encode_hybrid_recipient_envelope, encode_payment_address,
+    CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH, CandidatePrivateNoteEnvelopeV1, HybridIdentityKeypair,
+    HybridPaymentAddressEntry, PaymentAddressError, PublicAddressBook, RecipientEnvelopeContext,
+    decode_hybrid_recipient_envelope, decode_payment_address, decrypt_candidate_private_note,
+    encode_hybrid_recipient_envelope, encode_payment_address, encrypt_candidate_private_note,
 };
 
 const DEMO_CHAIN_ID: &[u8] = b"noxis-local-wallet-research";
@@ -15,6 +16,7 @@ const IDENTITY_PAYLOAD: &[u8] = b"noxis local hybrid identity check v1";
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     match parse_mode(std::env::args().skip(1))? {
         DemoMode::Run => run_demo(),
+        DemoMode::PrivateNote => run_private_note_demo(),
         DemoMode::AddressBook { directory } => run_address_book_demo(directory),
         DemoMode::AddressBookList { directory } => run_address_book_list(directory),
     }
@@ -23,6 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum DemoMode {
     Run,
+    PrivateNote,
     AddressBook { directory: std::path::PathBuf },
     AddressBookList { directory: std::path::PathBuf },
 }
@@ -32,6 +35,7 @@ fn parse_mode(arguments: impl IntoIterator<Item = String>) -> Result<DemoMode, s
     match arguments.as_slice() {
         [] => Ok(DemoMode::Run),
         [command] if command == "demo" => Ok(DemoMode::Run),
+        [command] if command == "private-note" => Ok(DemoMode::PrivateNote),
         [command, flag, directory] if command == "address-book" && flag == "--data-dir" => {
             Ok(DemoMode::AddressBook {
                 directory: std::path::PathBuf::from(directory),
@@ -46,9 +50,49 @@ fn parse_mode(arguments: impl IntoIterator<Item = String>) -> Result<DemoMode, s
         }
         _ => Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "usage:\n  noxis-wallet-crypto-demo [demo]\n  noxis-wallet-crypto-demo address-book --data-dir PATH\n  noxis-wallet-crypto-demo address-book list --data-dir PATH",
+            "usage:\n  noxis-wallet-crypto-demo [demo]\n  noxis-wallet-crypto-demo private-note\n  noxis-wallet-crypto-demo address-book --data-dir PATH\n  noxis-wallet-crypto-demo address-book list --data-dir PATH",
         )),
     }
+}
+
+fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
+    let context = RecipientEnvelopeContext::new(DEMO_CHAIN_ID, DEMO_KEY_EPOCH)?;
+    let recipient = HybridPaymentAddressEntry::generate(DEMO_KEY_EPOCH);
+    let mut note = [0_u8; CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH];
+    note[..2].copy_from_slice(&1_u16.to_be_bytes());
+    note[2..34].copy_from_slice(&[7; 32]);
+    note[34..50].copy_from_slice(&42_u128.to_be_bytes());
+    // The remaining candidate witness fields are deliberately not displayed.
+    for (index, byte) in note[50..].iter_mut().enumerate() {
+        *byte = (index as u8).wrapping_mul(29).wrapping_add(11);
+    }
+
+    let output = encrypt_candidate_private_note(recipient.address(), &context, note)?;
+    let commitment = output.commitment();
+    let envelope_bytes = encode_hybrid_recipient_envelope(output.envelope())?;
+    let decoded_envelope = decode_hybrid_recipient_envelope(&envelope_bytes)?;
+    let received = decrypt_candidate_private_note(
+        &recipient,
+        &context,
+        &CandidatePrivateNoteEnvelopeV1::from_parts(commitment, decoded_envelope),
+    )?;
+
+    if received.commitment() != commitment {
+        return Err("the candidate private-note commitment changed after receive".into());
+    }
+
+    println!("Noxis encrypted candidate-note demo — EXPERIMENTAL / LOCAL ONLY");
+    println!("sender computed H_NOTE and encrypted one 178-byte candidate note ... accepted");
+    println!(
+        "strict NXRE envelope round trip ... accepted ({} bytes)",
+        envelope_bytes.len()
+    );
+    println!("recipient authenticated, decrypted and recomputed H_NOTE ... accepted");
+    println!("public output commitment: {commitment}");
+    println!("No note bytes, asset, value, secret key, balance or envelope bytes are printed.");
+    println!("This is not a wallet, spend flow, ledger transaction or privacy activation.");
+    println!("The transaction ciphertext_digest binding is deliberately not implemented yet.");
+    Ok(())
 }
 
 fn run_demo() -> Result<(), Box<dyn std::error::Error>> {
@@ -160,6 +204,10 @@ mod tests {
     fn defaults_to_and_accepts_the_explicit_demo_command() {
         assert_eq!(parse_mode([]).unwrap(), DemoMode::Run);
         assert_eq!(parse_mode([String::from("demo")]).unwrap(), DemoMode::Run);
+        assert_eq!(
+            parse_mode([String::from("private-note")]).unwrap(),
+            DemoMode::PrivateNote
+        );
         assert_eq!(
             parse_mode([
                 String::from("address-book"),

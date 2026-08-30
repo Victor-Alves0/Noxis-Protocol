@@ -230,6 +230,14 @@ verifica assinatura Ed25519 + ML-DSA-65. Nenhuma chave é persistida e isso não
 é wallet, stealth address, nota privada nem liquidação. Ver
 [`WALLET_CRYPTO_LOCAL_DEMO_V0_1.md`](WALLET_CRYPTO_LOCAL_DEMO_V0_1.md).
 
+**Recebimento local de nota candidata:** a mesma camada pode cifrar uma
+pré-imagem canônica de nota de 178 bytes em `NXRE`, recuperar somente no dono e
+recomputar `H_NOTE` antes de aceitar o commitment público da saída. Isso não
+persiste nota ou saldo, nem vincula os bytes do envelope ao
+`CiphertextDigestV2` da intenção; portanto não é transação, wallet ou
+privacidade ativada. Ver
+[`WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md`](WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md).
+
 **Catálogo local de endereços públicos:** a mesma camada já pode abrir um
 diretório com lock exclusivo, gravar bytes `NXPA` canônicos por ID, reabrir e
 validar estritamente o endereço. O catálogo nunca recebe chave privada, seed,
