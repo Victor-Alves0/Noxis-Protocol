@@ -283,9 +283,12 @@ outro projeto de keystore e não foram iniciadas aqui.
 
 **Gate de keystore:** a persistência de qualquer segredo de wallet permanece
 proibida até existir especificação de KDF/AEAD, formato limitado, inventário de
-chaves, política de backup/rollback e testes adversariais. A direção Argon2id
-é somente candidata; não há parâmetros nem formato selecionados. Ver
-[`WALLET_KEYSTORE_SECURITY_GATE_V0_1.md`](WALLET_KEYSTORE_SECURITY_GATE_V0_1.md).
+chaves, política de backup/rollback e testes adversariais. Um crate isolado já
+decodifica o cabeçalho público candidato `NXKS` e testa Argon2id + XChaCha sobre
+uma raiz sintética, mas não recebe segredo de usuário, não grava arquivo e não
+seleciona uma construção de custódia. Ver
+[`WALLET_KEYSTORE_SECURITY_GATE_V0_1.md`](WALLET_KEYSTORE_SECURITY_GATE_V0_1.md)
+e [`WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md).
 
 ### 6. Adaptadores de ativos e políticas de emissão
 

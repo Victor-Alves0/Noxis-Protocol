@@ -2,7 +2,7 @@
 
 ## Status
 
-**Decision gate — no secret persistence is implemented or approved.**
+**Decision gate — no user secret persistence is implemented or approved.**
 
 `noxis-wallet-crypto` currently keeps recipient and identity secrets only in
 process memory. Its persistent `PublicAddressBook` deliberately accepts only
@@ -10,7 +10,11 @@ canonical public `NXPA` address bytes. It cannot store a seed, private key,
 shared secret, note, balance or proof.
 
 This boundary is intentional. Encrypting an arbitrary byte blob with a
-password is not, on its own, a safe wallet keystore.
+password is not, on its own, a safe wallet keystore. The isolated
+`noxis-wallet-keystore` crate now parses only public candidate `NXKS` headers
+and exercises a synthetic root in unit tests; it writes no file and does not
+accept a real wallet root. See
+[`WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md).
 
 ## Security objective and attacker model
 
@@ -38,9 +42,11 @@ is already used for the experimental recipient envelope. Reusing a primitive
 does not select it for a keystore. Parameters, associated-data layout,
 container format, password UX, platform support and backup model remain open.
 
-No KDF cost, cipher, format magic, version, key hierarchy, recovery phrase or
-hardware-backed integration is selected by this document. Consequently, no
-secret-bearing file must be written yet.
+The public header candidate fixes Argon2id / XChaCha20-Poly1305 and a 64 MiB,
+3-pass, 4-lane profile only for bounded parser and synthetic-fixture review.
+It does not select a user keystore construction, key hierarchy, recovery phrase
+or hardware-backed integration. Consequently, no secret-bearing file must be
+written yet.
 
 ## Required secret inventory before implementation
 
@@ -89,11 +95,14 @@ confidentiality, inventory and key recovery among the management concerns; see
 
 1. Choose the supported operating systems and password/unlock UX.
 2. Publish a narrow keystore-container candidate and its parser limits for
-   review; do not put private-key bytes in it initially.
+   review; do not put private-key bytes in it initially. **Completed for the
+   public `NXKS v1` header only.**
 3. Define private-key export/import ownership inside a dedicated secret-type
    boundary.
 4. Add a test-only encrypted fixture with no real user wallet, then test
    unlock, wrong-password, tampering, rollback and interruption behavior.
+   **The synthetic unlock, wrong-password and header-substitution portions are
+   complete; rollback and interruption still require a file lifecycle design.**
 5. Only after review, make a persistent private recipient entry available to a
    non-spending local wallet session.
 
