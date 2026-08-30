@@ -120,6 +120,13 @@ qualquer uma das 64 bytes canônicas do nullifier, usando o domínio de nó, IV 
 resultado é somente uma checagem local, não agregação, prova portátil ou
 transferência privada. Ver [`STARK_NXSM_PREFIX_RESEARCH_V0_1.md`](STARK_NXSM_PREFIX_RESEARCH_V0_1.md).
 
+**Primeira relação AIR da transferência:** o experimento Plonky3 agora prova
+o `H_INTENT` exato sobre os 214 elementos públicos `BytePack3LE` da intenção
+canônica de 640 bytes e seu digest de 16 elementos. Os dois vetores externos
+`NXIV` passam pela prova; isso torna a primeira fatia de `NXAR v1`
+executável, mas ainda não aritmetiza o packing de bytes, não torna a intenção
+privada e não compõe notas, valores ou nullifiers. Ver [`STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md`](STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md).
+
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem
 codec/`Debug`/`Clone`, caminho P24 de 32 níveis e uma declaração executável

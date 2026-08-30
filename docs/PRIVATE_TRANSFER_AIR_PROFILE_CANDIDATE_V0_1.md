@@ -45,7 +45,12 @@ limite, máscara ou ID é recusado.
 
 ## O que vem depois
 
-O próximo passo técnico é implementar as mesmas famílias de restrições em um
-programa AIR concreto e comparar seus resultados contra a referência Rust e
-vetores externos. A escolha de backend STARK, FRI, transcript e parâmetros só
-deve acontecer junto desse programa e de sua revisão criptográfica.
+O sponge público `H_INTENT` já foi implementado como a primeira fatia
+executável, conferida contra os dois vetores externos `NXIV`; ver
+[`STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md`](STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md).
+Ele ainda não faz no AIR a decomposição/recomposição de bytes, nem implementa
+as outras nove famílias. O próximo passo técnico é juntar essa moldura a uma
+família de witness — começando por posse/inclusão de notas — e continuar a
+comparação contra a referência Rust e vetores externos. A escolha de backend
+STARK, FRI, transcript e parâmetros só deve acontecer junto da relação
+completa e de sua revisão criptográfica.

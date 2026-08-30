@@ -69,12 +69,16 @@ com o mesmo slot; a codificação ainda preserva o layout de 640 bytes
 ordem inversa e duplicatas. O codec ainda não recalcula o digest do envelope:
 isso permanece uma obrigação do futuro verificador híbrido.
 
-## Portões antes de implementação
+## Estado da primeira implementação
 
-Antes de expor `H_INTENT`, é obrigatório congelar `NXIC`, rederivar e conferir
-o IV, executar KATs em implementação externa independente, criar corpus
-canônico separado, confrontar uma referência local e testar mutação em cada um
-dos 640 bytes. O verificador futuro deverá recalcular o commitment a partir da
-intenção NXPT estritamente decodificada e comparar com a entrada pública da
-prova; receber somente um digest do chamador não basta. Ainda faltam a AIR,
-uma prova STARK, escolha criptográfica e revisão independente.
+`NXIC`, o IV, os KATs externos `NXIV` e a referência local estão congelados.
+Uma fatia STARK que reavalia o sponge sobre os 214 elementos públicos já é
+confrontada com os dois vetores externos; ver
+[`STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md`](STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md).
+Ela não deve ser confundida com a AIR completa: a decomposição/recomposição de
+bytes, a ligação às witnesses, a seleção criptográfica e a revisão independente
+ainda faltam.
+
+O verificador futuro deverá recalcular o commitment a partir da intenção NXPT
+estritamente decodificada e comparar com a entrada pública da prova; receber
+somente um digest do chamador não basta.

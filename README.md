@@ -49,15 +49,19 @@ review and testing expectations.
 - Versioned cryptographic-suite metadata to prevent permanent coupling to one primitive.
 - A research-only Plonky3 STARK experiment that proves the frozen
   Poseidon2-P24 candidate permutation, private `H_ADDR(key)` and
-  `H_NOTE(preimage)` relations, and a composed private key-to-note-to-nullifier
-  ownership-and-full-depth-private-membership binding, all with byte-exact `BytePack3LE`,
+  `H_NOTE(preimage)` relations, plus the public `H_INTENT` sponge over the
+  canonical candidate intent frame. It also proves a composed private
+  key-to-note-to-nullifier ownership-and-full-depth-private-membership binding,
+  all with byte-exact `BytePack3LE`,
   `Hash16(Leaf, commitment)` and ordered
   `Hash16(Node, left || right)` constructions against external vectors, plus
   one private ordered Merkle step, a two-level private path and a complete
   depth-32 private path bound to note ownership. A local preflight can run the
   two candidate ownership checks sequentially against one typed `NXPS v2`
   anchor and ordered transparent `NXSM` witness. It is not proof aggregation,
-  a nullifier-absence, value-conservation or private-transfer proof.
+  a nullifier-absence, value-conservation or private-transfer proof. The
+  `H_INTENT` component alone does not yet arithmetize byte packing or bind any
+  private witness.
 - A second research-only STARK component proves exact private eight-level
   `NXSM` segments, including the sparse tree's byte packing and canonical
   nullifier-bit ordering. It can locally sequence all 64 segments to a real

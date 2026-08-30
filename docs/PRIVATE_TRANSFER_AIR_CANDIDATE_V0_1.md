@@ -2,7 +2,7 @@
 
 ## Estado e fronteira
 
-Esta é a especificação verificável da relação que uma prova futura deverá satisfazer. A implementação atual fornece apenas a moldura pública e a revalidação local da testemunha; **não há AIR executável, STARK, chave verificadora, prova ou aceitação pelo ledger**.
+Esta é a especificação verificável da relação que uma prova futura deverá satisfazer. A implementação atual fornece a moldura pública, a revalidação local da testemunha e uma fatia AIR/STARK isolada para o sponge público `H_INTENT`; **não há AIR completo de transferência, chave verificadora selecionada, prova utilizável ou aceitação pelo ledger**.
 
 Ela permanece deliberadamente isolada do ledger v1: aquele usa raízes, commitments e nullifiers SHA-256 de 32 bytes; a candidata privada usa valores Poseidon2/BabyBear de 64 bytes. Uma transferência privada precisará de estado, transição e gênese v2 próprios — nunca de conversão implícita para `TransferStatement` v1.
 
@@ -21,7 +21,7 @@ M[0..214)  = BytePack3LE(PrivateTransferIntentV2::encode()[640])
 H[0..16)  = H_INTENT(intent[640])
 ```
 
-`M[0]` até `M[212]` devem ser menores que `2^24`; `M[213]` deve ser menor que `2^8`. A AIR decompõe os elementos em bytes, recompõe exatamente os 640 bytes, faz o range-check e reavalia `H_INTENT`. Assim, `H` não pode ser apresentado como compromisso de outra intenção.
+`M[0]` até `M[212]` devem ser menores que `2^24`; `M[213]` deve ser menor que `2^8`. A AIR completa deverá decompor os elementos em bytes, recompor exatamente os 640 bytes, fazer o range-check e reavaliar `H_INTENT`. A fatia atual já prova a avaliação do sponge sobre os `M` públicos recebidos da codificação tipada canônica, mas ainda não aritmetiza essa decomposição/recomposição. Assim, ela não pode ser tratada como a relação completa.
 
 Os bytes recompostos carregam, na ordem já congelada: circuito, gênese, contexto de validação, estado anterior, parâmetros da árvore, raiz privada, ativo, dois nullifiers, dois commitments de saída e dois digests de envelopes. A moldura [`CandidatePrivateTransferAirPublicInputsV1`](../crates/noxis-private-proof-contract/src/public_inputs.rs) só pode ser construída de uma `PrivateTransferIntentV2` canônica e rederiva `H_INTENT`.
 
@@ -50,4 +50,4 @@ O deployment AIR precisa comprometer os IDs e bytes completos de P24, NXPH e NXI
 - A declaração [`NXPU v1`](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md) já une a moldura de notas, `NXPS v2` e `NXNT v1`, mas ainda não há AIR que demonstre a relação em zero conhecimento nem que atualize a raiz de notas.
 - `CircuitId`, `ProofVerifierId`, digest do programa AIR e backend STARK permanecem não selecionados.
 
-Essas lacunas são bloqueios de segurança, não detalhes de implementação. O perfil [`NXAR v1`](PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md) já congela a forma e as famílias de restrição existentes; o próximo artefato deve ser um programa AIR executável que continue falhando fechado até existir backend auditado.
+Essas lacunas são bloqueios de segurança, não detalhes de implementação. O perfil [`NXAR v1`](PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md) já congela a forma e as famílias de restrição existentes; o próximo artefato deve juntar a fatia `H_INTENT` a uma primeira família de witness, continuando a falhar fechado até existir backend auditado.

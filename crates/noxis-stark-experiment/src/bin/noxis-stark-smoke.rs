@@ -1,8 +1,8 @@
 use noxis_stark_experiment::{
-    run_p24_addr_research_smoke, run_p24_leaf_research_smoke, run_p24_merkle_path2_research_smoke,
-    run_p24_merkle_path32_research_smoke, run_p24_merkle_step_research_smoke,
-    run_p24_node_research_smoke, run_p24_note_ownership_research_smoke,
-    run_p24_note_research_smoke,
+    run_p24_addr_research_smoke, run_p24_intent_research_smoke, run_p24_leaf_research_smoke,
+    run_p24_merkle_path2_research_smoke, run_p24_merkle_path32_research_smoke,
+    run_p24_merkle_step_research_smoke, run_p24_node_research_smoke,
+    run_p24_note_ownership_research_smoke, run_p24_note_research_smoke,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,6 +36,7 @@ fn parse_smoke_mode(
 fn run_default_smoke() -> Result<(), Box<dyn std::error::Error>> {
     let addr = run_p24_addr_research_smoke()?;
     let note = run_p24_note_research_smoke()?;
+    let intent = run_p24_intent_research_smoke()?;
     let ownership = run_p24_note_ownership_research_smoke()?;
     let leaf = run_p24_leaf_research_smoke()?;
     let node = run_p24_node_research_smoke()?;
@@ -49,6 +50,11 @@ fn run_default_smoke() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!("Noxis Poseidon2-P24 private H_NOTE STARK proof accepted");
     println!("Public note commitment lane 0: {}", note.note_commitment[0]);
+    println!("Noxis Poseidon2-P24 public H_INTENT STARK proof accepted");
+    println!(
+        "Public intent commitment lane 0: {}",
+        intent.intent_commitment.elements()[0]
+    );
     println!("Noxis Poseidon2-P24 private ownership-and-depth-32-membership STARK proof accepted");
     println!("Public nullifier lane 0: {}", ownership.nullifier[0]);
     println!(
@@ -74,9 +80,10 @@ fn run_default_smoke() -> Result<(), Box<dyn std::error::Error>> {
     println!("Noxis Poseidon2-P24 private depth-32 Merkle-path STARK proof accepted");
     println!("Public depth-32 root lane 0: {}", merkle_path32.root[0]);
     println!(
-        "Private sponge trace rows (addr/note/ownership/leaf/node/step/path2/path32): {}/{}/{}/{}/{}/{}/{}/{}",
+        "STARK trace rows (addr/note/intent/ownership/leaf/node/step/path2/path32): {}/{}/{}/{}/{}/{}/{}/{}/{}",
         addr.trace_rows,
         note.trace_rows,
+        intent.trace_rows,
         ownership.trace_rows,
         leaf.trace_rows,
         node.trace_rows,

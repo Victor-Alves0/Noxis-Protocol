@@ -14,10 +14,11 @@ use noxis_poseidon2_reference::{
     BabyBearDigestV2, BabyBearStateP24, P24_WIDTH, Poseidon2P24Reference,
     Poseidon2P24ReferenceError,
 };
+use noxis_privacy_types::PrivacyTypesError;
 use noxis_tree_params::{
     CandidatePoseidon2P24ManifestV2, Poseidon2P24CandidateError,
-    Poseidon2P24NoteDomainsCandidateError, Poseidon2P24NullifierSparseCandidateError,
-    Poseidon2P24TreeDomainV1,
+    Poseidon2P24IntentCommitmentCandidateError, Poseidon2P24NoteDomainsCandidateError,
+    Poseidon2P24NullifierSparseCandidateError, Poseidon2P24TreeDomainV1,
 };
 use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_baby_bear::BabyBear;
@@ -36,12 +37,16 @@ use rand::SeedableRng as _;
 use rand_chacha::ChaCha12Rng;
 
 mod addr;
+mod intent;
 mod note;
 mod nxsm;
 mod ownership;
 
 pub use addr::{
     Poseidon2P24AddrExperimentResult, prove_and_verify_p24_addr, run_p24_addr_research_smoke,
+};
+pub use intent::{
+    Poseidon2P24IntentExperimentResult, prove_and_verify_p24_intent, run_p24_intent_research_smoke,
 };
 pub use note::{
     Poseidon2P24NoteExperimentResult, prove_and_verify_p24_note, run_p24_note_research_smoke,
@@ -1329,7 +1334,9 @@ pub enum StarkExperimentError {
     CandidateParameters(Poseidon2P24ReferenceError),
     CandidateTreeParameters(Poseidon2P24CandidateError),
     CandidatePrivateDomains(Poseidon2P24NoteDomainsCandidateError),
+    CandidateIntentCommitment(Poseidon2P24IntentCommitmentCandidateError),
     CandidatePrivateReference(Poseidon2P24PrivacyReferenceError),
+    PrivacyTypes(PrivacyTypesError),
     CandidateNullifierSparseDomains(Poseidon2P24NullifierSparseCandidateError),
     CandidateNullifierSparseReference(NullifierTreeReferenceError),
     InvalidNxsmSegmentByteIndex { actual: usize },
@@ -1356,9 +1363,21 @@ impl From<Poseidon2P24NoteDomainsCandidateError> for StarkExperimentError {
     }
 }
 
+impl From<Poseidon2P24IntentCommitmentCandidateError> for StarkExperimentError {
+    fn from(value: Poseidon2P24IntentCommitmentCandidateError) -> Self {
+        Self::CandidateIntentCommitment(value)
+    }
+}
+
 impl From<Poseidon2P24PrivacyReferenceError> for StarkExperimentError {
     fn from(value: Poseidon2P24PrivacyReferenceError) -> Self {
         Self::CandidatePrivateReference(value)
+    }
+}
+
+impl From<PrivacyTypesError> for StarkExperimentError {
+    fn from(value: PrivacyTypesError) -> Self {
+        Self::PrivacyTypes(value)
     }
 }
 
@@ -1395,10 +1414,22 @@ impl std::fmt::Display for StarkExperimentError {
                     "could not load frozen P24 private-domain parameters: {error}"
                 )
             }
+            Self::CandidateIntentCommitment(error) => {
+                write!(
+                    formatter,
+                    "could not load frozen P24 intent-commitment parameters: {error}"
+                )
+            }
             Self::CandidatePrivateReference(error) => {
                 write!(
                     formatter,
                     "could not evaluate the frozen P24 private-domain reference: {error}"
+                )
+            }
+            Self::PrivacyTypes(error) => {
+                write!(
+                    formatter,
+                    "invalid candidate private-transfer value: {error}"
                 )
             }
             Self::CandidateNullifierSparseDomains(error) => {
