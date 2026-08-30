@@ -6,7 +6,7 @@
 
 use std::fmt;
 
-use crate::KeystoreHeaderIdV1;
+use crate::{CandidatePayloadCiphertextIdV1, KeystoreHeaderIdV1};
 
 /// Magic for a public external rollback-anchor receipt.
 pub const EXTERNAL_ROLLBACK_ANCHOR_MAGIC: [u8; 4] = *b"NXKA";
@@ -14,26 +14,6 @@ pub const EXTERNAL_ROLLBACK_ANCHOR_MAGIC: [u8; 4] = *b"NXKA";
 pub const EXTERNAL_ROLLBACK_ANCHOR_VERSION: u16 = 1;
 /// Exact byte length of one `NXKA v1` receipt.
 pub const EXTERNAL_ROLLBACK_ANCHOR_V1_LENGTH: usize = 78;
-
-/// Opaque public identifier of one future encrypted payload. Its construction
-/// is deliberately not selected until the candidate secret payload exists.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct CandidatePayloadCiphertextIdV1([u8; 32]);
-
-impl CandidatePayloadCiphertextIdV1 {
-    /// Wraps an externally computed public ciphertext identifier. All-zero
-    /// values are rejected so an absent payload cannot masquerade as anchored.
-    pub fn new(bytes: [u8; 32]) -> Result<Self, ExternalRollbackAnchorError> {
-        if is_all_zero(&bytes) {
-            return Err(ExternalRollbackAnchorError::ZeroCiphertextId);
-        }
-        Ok(Self(bytes))
-    }
-
-    pub const fn as_bytes(self) -> [u8; 32] {
-        self.0
-    }
-}
 
 /// Canonical public receipt that a user must retain outside the keystore
 /// directory to detect restoration of a different known payload generation.
@@ -86,7 +66,8 @@ impl ExternalRollbackAnchorV1 {
             u64::from_be_bytes(bytes[38..46].try_into().expect("fixed generation slice"));
         let ciphertext_id = CandidatePayloadCiphertextIdV1::new(
             bytes[46..78].try_into().expect("fixed ciphertext ID slice"),
-        )?;
+        )
+        .map_err(|_| ExternalRollbackAnchorError::ZeroCiphertextId)?;
         Self::new(header_id, payload_generation, ciphertext_id)
     }
 
@@ -179,16 +160,6 @@ impl fmt::Display for ExternalRollbackAnchorMismatch {
 
 impl std::error::Error for ExternalRollbackAnchorMismatch {}
 
-const fn is_all_zero(bytes: &[u8; 32]) -> bool {
-    let mut index = 0;
-    let mut value = 0_u8;
-    while index < bytes.len() {
-        value |= bytes[index];
-        index += 1;
-    }
-    value == 0
-}
-
 #[cfg(test)]
 mod tests {
     use crate::KeystoreHeaderV2;
@@ -234,7 +205,7 @@ mod tests {
         );
         assert_eq!(
             CandidatePayloadCiphertextIdV1::new([0; 32]),
-            Err(ExternalRollbackAnchorError::ZeroCiphertextId)
+            Err(crate::KeystorePayloadError::ZeroCiphertextId)
         );
         let anchor = ExternalRollbackAnchorV1::new(header_id, 7, ciphertext_id(9)).unwrap();
         let mut malformed = anchor.encode();
@@ -242,6 +213,12 @@ mod tests {
         assert_eq!(
             ExternalRollbackAnchorV1::decode(&malformed),
             Err(ExternalRollbackAnchorError::InvalidMagic)
+        );
+        let mut absent_ciphertext_id = anchor.encode();
+        absent_ciphertext_id[46..78].fill(0);
+        assert_eq!(
+            ExternalRollbackAnchorV1::decode(&absent_ciphertext_id),
+            Err(ExternalRollbackAnchorError::ZeroCiphertextId)
         );
         assert_eq!(
             anchor.verify(

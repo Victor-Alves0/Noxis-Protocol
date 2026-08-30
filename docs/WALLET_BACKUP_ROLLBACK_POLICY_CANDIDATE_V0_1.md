@@ -2,8 +2,8 @@
 
 ## Estado
 
-**Recibo externo público executável; nenhum backup de segredo ou restauração de
-wallet é implementado.**
+**Recibo externo público e payload sintético executáveis; nenhum backup de
+segredo ou restauração de wallet é implementado.**
 
 O diretório atual persiste apenas o cabeçalho público `NXKS`. Cada cabeçalho
 canônico agora tem um `KeystoreHeaderIdV1`:
@@ -66,9 +66,9 @@ payload_generation:u64be
 payload_ciphertext_id:32
 ```
 
-O nonce fará parte dos bytes canônicos autenticados do payload — nunca do
-cabeçalho imutável `NXKS`. O `payload_ciphertext_id` será um hash com domínio
-próprio sobre os bytes canônicos completos do payload cifrado, e **não** sobre plaintext. O recibo
+O nonce faz parte dos bytes canônicos autenticados do `NXKP v1` sintético —
+nunca do cabeçalho imutável `NXKS`. O `payload_ciphertext_id` é um hash com
+domínio próprio sobre os bytes canônicos completos do payload cifrado, e **não** sobre plaintext. O recibo
 deve ser registrado fora do diretório antes de a interface chamar a wallet de
 “backup confirmado”. Na abertura/restauração:
 
@@ -101,11 +101,13 @@ cargo test -p noxis-wallet-keystore --locked
 
 Os testes confirmam que o ID do cabeçalho é estável após encode/decode e muda
 quando a época muda. Eles também fazem round-trip de `NXKA` e rejeitam cabeçalho,
-geração ou ciphertext diferentes. Eles não provam backup, restauração ou
-rollback de segredo, pois tal payload ainda não existe.
+geração ou ciphertext diferentes. `NXKP v1` agora exercita em memória a mesma
+ligação com uma raiz sintética; ele ainda não prova backup, restauração ou
+rollback de segredo.
 
 ## Próximo gate
 
-Construir fixtures de payload sintético com geração, backup, restauração,
-rollback e interrupção usando `NXKA`. Só após esses testes e revisão
-independente a raiz de wallet poderá atravessar a fronteira do keystore.
+Construir o ciclo de vida em arquivo da fixture `NXKP`: geração, publicação,
+backup, restauração, rollback e interrupção usando `NXKA`. Só após esses testes
+e revisão independente a raiz de wallet poderá atravessar a fronteira do
+keystore.

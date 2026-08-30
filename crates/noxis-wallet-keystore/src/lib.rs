@@ -11,13 +11,19 @@ use std::fmt;
 use rand_core::{OsRng, RngCore as _};
 use sha2::{Digest as _, Sha256};
 
+mod candidate_payload;
 mod external_anchor;
 mod header_store;
 
+pub use candidate_payload::{
+    CandidateKeystorePayloadV1, CandidatePayloadCiphertextIdV1, KEYSTORE_PAYLOAD_MAGIC,
+    KEYSTORE_PAYLOAD_V1_LENGTH, KEYSTORE_PAYLOAD_VERSION, KeystorePayloadBindingError,
+    KeystorePayloadError,
+};
 pub use external_anchor::{
-    CandidatePayloadCiphertextIdV1, EXTERNAL_ROLLBACK_ANCHOR_MAGIC,
-    EXTERNAL_ROLLBACK_ANCHOR_V1_LENGTH, EXTERNAL_ROLLBACK_ANCHOR_VERSION,
-    ExternalRollbackAnchorError, ExternalRollbackAnchorMismatch, ExternalRollbackAnchorV1,
+    EXTERNAL_ROLLBACK_ANCHOR_MAGIC, EXTERNAL_ROLLBACK_ANCHOR_V1_LENGTH,
+    EXTERNAL_ROLLBACK_ANCHOR_VERSION, ExternalRollbackAnchorError, ExternalRollbackAnchorMismatch,
+    ExternalRollbackAnchorV1,
 };
 
 pub use header_store::{
@@ -44,12 +50,6 @@ pub const KEYSTORE_HEADER_ID_DOMAIN: &[u8] = b"NOXIS/KEYSTORE-HEADER-ID/V1\0";
 const ARGON2ID_KDF_ID: u8 = 1;
 const XCHACHA20POLY1305_AEAD_ID: u8 = 1;
 const REVOKED_KEYSTORE_HEADER_V1: u16 = 1;
-#[cfg(test)]
-const ROOT_FIXTURE_LENGTH: usize = 64;
-#[cfg(test)]
-const AEAD_TAG_LENGTH: usize = 16;
-#[cfg(test)]
-const SEALED_ROOT_FIXTURE_LENGTH: usize = ROOT_FIXTURE_LENGTH + AEAD_TAG_LENGTH;
 
 /// Exact public metadata that will become authenticated associated data for a
 /// future keystore payload. Its constructor always selects the one candidate
@@ -183,7 +183,7 @@ impl KeystoreHeaderV2 {
     }
 
     #[cfg(test)]
-    const fn with_test_entropy(
+    pub(crate) const fn with_test_entropy(
         wallet_id: [u8; 32],
         key_epoch: u64,
         salt: [u8; CANDIDATE_SALT_LENGTH],
@@ -193,6 +193,11 @@ impl KeystoreHeaderV2 {
             wallet_id,
             key_epoch,
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn salt_for_test_only_crypto(self) -> [u8; CANDIDATE_SALT_LENGTH] {
+        self.salt
     }
 }
 
@@ -241,13 +246,6 @@ const fn is_all_zero<const LENGTH: usize>(bytes: &[u8; LENGTH]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use argon2::{Algorithm, Argon2, Params, Version};
-    use chacha20poly1305::{
-        XChaCha20Poly1305, XNonce,
-        aead::{Aead as _, KeyInit as _, Payload},
-    };
-    use zeroize::Zeroize;
-
     use super::*;
 
     #[test]
@@ -284,145 +282,5 @@ mod tests {
         );
         let changed_epoch = KeystoreHeaderV2::with_test_entropy([7; 32], 43, [8; 16]);
         assert_ne!(header.id(), changed_epoch.id());
-    }
-
-    #[test]
-    fn test_only_root_fixture_requires_exact_password_and_header() {
-        let header = KeystoreHeaderV2::with_test_entropy([7; 32], 42, [8; 16]);
-        let nonce = [9; 24];
-        let mut root = [0xA5; ROOT_FIXTURE_LENGTH];
-        let sealed =
-            seal_test_only_root_fixture(&header, &nonce, b"correct horse battery staple", &root)
-                .unwrap();
-        root.zeroize();
-        let mut recovered =
-            open_test_only_root_fixture(&header, &nonce, b"correct horse battery staple", &sealed)
-                .unwrap();
-        assert_eq!(recovered, [0xA5; ROOT_FIXTURE_LENGTH]);
-        recovered.zeroize();
-        let wrong_password =
-            open_test_only_root_fixture(&header, &nonce, b"wrong password", &sealed);
-        assert_eq!(wrong_password, Err(TestOnlyFixtureError::UnlockFailed));
-        let mut tampered_ciphertext = sealed;
-        tampered_ciphertext[0] ^= 1;
-        assert_eq!(
-            open_test_only_root_fixture(
-                &header,
-                &nonce,
-                b"correct horse battery staple",
-                &tampered_ciphertext,
-            ),
-            Err(TestOnlyFixtureError::UnlockFailed)
-        );
-        let mut substituted = header;
-        substituted.key_epoch = 43;
-        let substituted_header = open_test_only_root_fixture(
-            &substituted,
-            &nonce,
-            b"correct horse battery staple",
-            &sealed,
-        );
-        assert_eq!(substituted_header, Err(TestOnlyFixtureError::UnlockFailed));
-
-        // A later encrypted payload is required to use a different nonce under
-        // the same password-derived key. The nonce belongs to that payload,
-        // never to the immutable header.
-        let next_nonce = [10; 24];
-        let mut next_root = [0xA5; ROOT_FIXTURE_LENGTH];
-        let next_sealed = seal_test_only_root_fixture(
-            &header,
-            &next_nonce,
-            b"correct horse battery staple",
-            &next_root,
-        )
-        .unwrap();
-        next_root.zeroize();
-        assert_ne!(sealed, next_sealed);
-        let mut next_recovered = open_test_only_root_fixture(
-            &header,
-            &next_nonce,
-            b"correct horse battery staple",
-            &next_sealed,
-        )
-        .unwrap();
-        assert_eq!(next_recovered, [0xA5; ROOT_FIXTURE_LENGTH]);
-        next_recovered.zeroize();
-    }
-
-    fn seal_test_only_root_fixture(
-        header: &KeystoreHeaderV2,
-        nonce: &[u8; 24],
-        password: &[u8],
-        root: &[u8; ROOT_FIXTURE_LENGTH],
-    ) -> Result<[u8; SEALED_ROOT_FIXTURE_LENGTH], TestOnlyFixtureError> {
-        let mut key = derive_test_only_key(header, password)?;
-        let cipher = XChaCha20Poly1305::new_from_slice(&key)
-            .expect("fixed 32-byte Argon2 output is a valid XChaCha20 key");
-        let ciphertext = cipher.encrypt(
-            XNonce::from_slice(nonce),
-            Payload {
-                msg: root,
-                aad: &header.encode(),
-            },
-        );
-        key.zeroize();
-        ciphertext
-            .map_err(|_| TestOnlyFixtureError::UnlockFailed)?
-            .try_into()
-            .map_err(|_| TestOnlyFixtureError::UnlockFailed)
-    }
-
-    fn open_test_only_root_fixture(
-        header: &KeystoreHeaderV2,
-        nonce: &[u8; 24],
-        password: &[u8],
-        sealed: &[u8; SEALED_ROOT_FIXTURE_LENGTH],
-    ) -> Result<[u8; ROOT_FIXTURE_LENGTH], TestOnlyFixtureError> {
-        let mut key = derive_test_only_key(header, password)?;
-        let cipher = XChaCha20Poly1305::new_from_slice(&key)
-            .expect("fixed 32-byte Argon2 output is a valid XChaCha20 key");
-        let plaintext = cipher.decrypt(
-            XNonce::from_slice(nonce),
-            Payload {
-                msg: sealed,
-                aad: &header.encode(),
-            },
-        );
-        key.zeroize();
-        let mut plaintext = plaintext.map_err(|_| TestOnlyFixtureError::UnlockFailed)?;
-        if plaintext.len() != ROOT_FIXTURE_LENGTH {
-            plaintext.zeroize();
-            return Err(TestOnlyFixtureError::UnlockFailed);
-        }
-        let root = plaintext
-            .as_slice()
-            .try_into()
-            .expect("fixed root-fixture length");
-        plaintext.zeroize();
-        Ok(root)
-    }
-
-    fn derive_test_only_key(
-        header: &KeystoreHeaderV2,
-        password: &[u8],
-    ) -> Result<[u8; 32], TestOnlyFixtureError> {
-        let parameters = Params::new(
-            CANDIDATE_ARGON2_MEMORY_KIB,
-            CANDIDATE_ARGON2_TIME_COST,
-            CANDIDATE_ARGON2_LANES,
-            Some(32),
-        )
-        .map_err(|_| TestOnlyFixtureError::UnlockFailed)?;
-        let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, parameters);
-        let mut key = [0_u8; 32];
-        argon2
-            .hash_password_into(password, &header.salt, &mut key)
-            .map_err(|_| TestOnlyFixtureError::UnlockFailed)?;
-        Ok(key)
-    }
-
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    enum TestOnlyFixtureError {
-        UnlockFailed,
     }
 }
