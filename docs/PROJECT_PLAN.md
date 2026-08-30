@@ -102,10 +102,14 @@ transferência privada.
 
 **Preflight de posse ancorada:** `noxis-private-proof-contract` agora conecta
 uma prova P24 de posse de uma nota à raiz de notas do `NXPS v2`, ao nullifier
-da intenção `NXPU` e ao witness local de ausência/transição `NXSM`. Isso impede
-combinar uma prova válida com uma âncora ou nullifier de outra intenção. Os 512
-irmãos `NXSM` ainda são testemunha transparente local; portanto, isto não é
-prova privada de ausência, autorização de ledger nem transferência privada.
+da intenção `NXPU` e ao witness local de ausência/transição `NXSM`. Para a
+declaração candidata fixa de duas entradas, ele executa as duas provas de posse
+em sequência, contra a mesma âncora e os nullifiers ordenados, e descarta cada
+prova opaca após verificá-la. Isso impede combinar uma prova válida com uma
+âncora ou nullifier de outra intenção; não é agregação nem recibo verificável
+por terceiros. Os 512 irmãos `NXSM` ainda são testemunha transparente local;
+portanto, isto não é prova privada de ausência, autorização de ledger nem
+transferência privada.
 
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem

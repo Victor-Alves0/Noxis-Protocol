@@ -54,8 +54,10 @@ review and testing expectations.
   `Hash16(Leaf, commitment)` and ordered
   `Hash16(Node, left || right)` constructions against external vectors, plus
   one private ordered Merkle step, a two-level private path and a complete
-  depth-32 private path bound to note ownership. This is not yet a nullifier-
-  absence, value-conservation or private-transfer proof.
+  depth-32 private path bound to note ownership. A local preflight can run the
+  two candidate ownership checks sequentially against one typed `NXPS v2`
+  anchor and ordered transparent `NXSM` witness. It is not proof aggregation,
+  a nullifier-absence, value-conservation or private-transfer proof.
 - Canonical consensus data: weighted validator sets, block headers, record commitments and finality-certificate verification boundaries. This is not yet a running validator network or a finality claim.
 - Genesis and the protected local manifest commit to the validator set, public verification keys, declared fault budget and consensus limits. A node cannot reopen the same data directory with a different consensus configuration.
 - Tests for unauthorized issuance, duplicate nullifiers, duplicate commitments, and unknown assets.

@@ -19,13 +19,15 @@ personal data.
 
 `prove_p24_note_ownership_path32` returns an opaque in-memory proof object and
 its public result. `verify_p24_note_ownership_proof` reconstructs the frozen
-AIR and independently verifies that object using only its public nullifier and
-root. The compatibility helper still performs both steps in one call.
+AIR and verifies that object against its public nullifier and root using the
+same local Plonky3 configuration with which it was produced. The compatibility
+helper still performs both steps in one call.
 
 There is deliberately no proof encoder, decoder, wire frame or ledger adapter.
-Plonky3 serialization details, the candidate parameters and a verifier profile
-must be selected and reviewed together before a proof can cross a process or
-network boundary.
+The in-memory configuration is not a selected verifier profile or transferable
+key. Plonky3 serialization details, a fixed verifier profile and the candidate
+parameters must be selected and reviewed together before a proof can cross a
+process or network boundary.
 
 ## Statement
 
@@ -96,7 +98,9 @@ commitment byte, an altered private tree leaf or an altered private sibling.
 The mutation suite covers both the first and terminal private path levels, as
 well as the final private intermediate node.
 The proof is intentionally expensive research code: its 8,192-row trace and
-wide private witness are not a wallet or validator performance target.
+wide private witness use a 64 MiB dedicated prover stack and a hiding-FRI
+profile with `log_blowup = 4`. They are not a wallet or validator performance
+target.
 
 ## Next required composition
 

@@ -12,7 +12,8 @@ use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
 use noxis_privacy_types::{MerkleRootV2, NullifierV2, PrivacyTypesError};
 use noxis_stark_experiment::{
     Poseidon2P24OwnershipExperimentResult, Poseidon2P24OwnershipProof, StarkExperimentError,
-    prove_p24_note_ownership_path32, verify_p24_note_ownership_proof,
+    prove_and_verify_p24_note_ownership_path32, prove_p24_note_ownership_path32,
+    verify_p24_note_ownership_proof,
 };
 
 use crate::{
@@ -82,6 +83,35 @@ impl CandidateAnchoredOwnershipProofV1 {
     }
 }
 
+/// Public receipt of a sequential two-input ownership preflight.
+///
+/// Each P24 proof is generated and independently verified before it is
+/// discarded, so this type retains only public results. It is explicitly not
+/// an aggregate proof or a transferable verification artifact.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CandidateAnchoredOwnershipPairPreflightV1 {
+    first_result: Poseidon2P24OwnershipExperimentResult,
+    second_result: Poseidon2P24OwnershipExperimentResult,
+    statement_id: CandidatePrivateTransferProofPublicStatementIdV1,
+}
+
+impl CandidateAnchoredOwnershipPairPreflightV1 {
+    /// Public result bound to canonical input index zero.
+    pub const fn first_result(&self) -> &Poseidon2P24OwnershipExperimentResult {
+        &self.first_result
+    }
+
+    /// Public result bound to canonical input index one.
+    pub const fn second_result(&self) -> &Poseidon2P24OwnershipExperimentResult {
+        &self.second_result
+    }
+
+    /// Identity of the public statement checked during the sequential run.
+    pub const fn statement_id(&self) -> CandidatePrivateTransferProofPublicStatementIdV1 {
+        self.statement_id
+    }
+}
+
 /// Produces and revalidates a P24 ownership proof against one exact `NXPS v2`
 /// anchor and the existing local `NXSM` absence witness.
 ///
@@ -130,17 +160,110 @@ pub fn verify_candidate_anchored_ownership(
     nxsm_witness.revalidate(statement.nullifier_transition())?;
 
     let result = verify_p24_note_ownership_proof(&anchored.ownership_proof)?;
+    validate_public_result(
+        statement,
+        pre_tree,
+        nxsm_witness,
+        anchored.input_index,
+        &result,
+    )?;
+    Ok(result)
+}
+
+fn validate_public_result(
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+    nxsm_witness: &CandidateNxsmNullifierTransitionWitnessV1,
+    input_index: u8,
+    result: &Poseidon2P24OwnershipExperimentResult,
+) -> Result<(), CandidateAnchoredOwnershipError> {
+    validate_input_index(input_index)?;
+    statement.revalidate(pre_tree)?;
+    nxsm_witness.revalidate(statement.nullifier_transition())?;
     let note_root = MerkleRootV2::from_elements(result.root)?;
     if note_root != statement.anchor().note_root() {
         return Err(CandidateAnchoredOwnershipError::NoteRootMismatch);
     }
     let nullifier = NullifierV2::from_elements(result.nullifier)?;
-    let expected =
-        statement.air_public_inputs().intent().nullifiers()[usize::from(anchored.input_index)];
+    let expected = statement.air_public_inputs().intent().nullifiers()[usize::from(input_index)];
     if nullifier != expected {
         return Err(CandidateAnchoredOwnershipError::NullifierMismatch);
     }
-    Ok(result)
+    Ok(())
+}
+
+/// Runs both ownership proofs sequentially against one candidate statement.
+///
+/// This deliberately drops the first opaque proof before beginning the second
+/// one. The current P24 research proof uses substantial memory; retaining both
+/// objects would create a false impression that the backend supports proof
+/// aggregation. The returned receipt can revalidate public and `NXSM`
+/// cross-bindings, but cannot replace either discarded proof.
+pub fn run_candidate_anchored_ownership_pair_preflight(
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+    nxsm_witness: &CandidateNxsmNullifierTransitionWitnessV1,
+    first_witness: &CandidateAnchoredOwnershipWitnessV1,
+    second_witness: &CandidateAnchoredOwnershipWitnessV1,
+) -> Result<CandidateAnchoredOwnershipPairPreflightV1, CandidateAnchoredOwnershipError> {
+    statement.revalidate(pre_tree)?;
+    nxsm_witness.revalidate(statement.nullifier_transition())?;
+    let first_result = prove_and_verify_p24_note_ownership_path32(
+        first_witness.nullifier_key,
+        first_witness.note_preimage,
+        first_witness.leaf_position,
+        first_witness.siblings,
+    )?;
+    validate_public_result(statement, pre_tree, nxsm_witness, 0, &first_result)?;
+    let second_result = prove_and_verify_p24_note_ownership_path32(
+        second_witness.nullifier_key,
+        second_witness.note_preimage,
+        second_witness.leaf_position,
+        second_witness.siblings,
+    )?;
+    validate_public_result(statement, pre_tree, nxsm_witness, 1, &second_result)?;
+    if first_result.nullifier == second_result.nullifier {
+        return Err(CandidateAnchoredOwnershipError::DuplicateNullifier);
+    }
+    Ok(CandidateAnchoredOwnershipPairPreflightV1 {
+        first_result,
+        second_result,
+        statement_id: statement.statement_id(),
+    })
+}
+
+/// Revalidates the public and `NXSM` bindings retained by a sequential
+/// preflight receipt. It cannot reverify the discarded opaque P24 proofs.
+pub fn revalidate_candidate_anchored_ownership_pair_preflight(
+    preflight: &CandidateAnchoredOwnershipPairPreflightV1,
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+    nxsm_witness: &CandidateNxsmNullifierTransitionWitnessV1,
+) -> Result<[Poseidon2P24OwnershipExperimentResult; 2], CandidateAnchoredOwnershipError> {
+    if preflight.statement_id != statement.statement_id() {
+        return Err(CandidateAnchoredOwnershipError::StatementIdMismatch);
+    }
+    validate_public_result(
+        statement,
+        pre_tree,
+        nxsm_witness,
+        0,
+        &preflight.first_result,
+    )?;
+    validate_public_result(
+        statement,
+        pre_tree,
+        nxsm_witness,
+        1,
+        &preflight.second_result,
+    )?;
+    if preflight.first_result.nullifier == preflight.second_result.nullifier {
+        return Err(CandidateAnchoredOwnershipError::DuplicateNullifier);
+    }
+    Ok([
+        preflight.first_result.clone(),
+        preflight.second_result.clone(),
+    ])
 }
 
 fn validate_input_index(input_index: u8) -> Result<(), CandidateAnchoredOwnershipError> {
@@ -161,6 +284,7 @@ pub enum CandidateAnchoredOwnershipError {
     StatementIdMismatch,
     NoteRootMismatch,
     NullifierMismatch,
+    DuplicateNullifier,
 }
 
 impl From<CandidatePrivateTransferProofPublicStatementError> for CandidateAnchoredOwnershipError {
@@ -356,6 +480,148 @@ mod tests {
             ),
             Err(CandidateAnchoredOwnershipError::InputIndexOutOfRange { input_index: 2 })
         ));
+    }
+
+    #[test]
+    fn locally_composes_two_owned_notes_with_one_anchor_and_ordered_nxsm_transition() {
+        let private_reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
+        let tree_reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let first_key =
+            core::array::from_fn(|index| (index as u8).wrapping_mul(13).wrapping_add(3));
+        let second_key =
+            core::array::from_fn(|index| (index as u8).wrapping_mul(17).wrapping_add(5));
+        let first_note = note_with_recipient(private_reference.hash_addr(&first_key).unwrap());
+        let second_note = note_with_recipient(private_reference.hash_addr(&second_key).unwrap());
+        let first_commitment = private_reference.hash_note(&first_note).unwrap();
+        let second_commitment = private_reference.hash_note(&second_note).unwrap();
+        let commitments = [first_commitment, second_commitment];
+        let (_, first_siblings, root) = tree_reference.small_tree_path(&commitments, 0).unwrap();
+        let (_, second_siblings, second_root) =
+            tree_reference.small_tree_path(&commitments, 1).unwrap();
+        assert_eq!(root, second_root);
+
+        let first_nullifier = NullifierV2::from_elements(
+            private_reference
+                .hash_nullifier_preimage(&nullifier_preimage(
+                    first_key,
+                    first_note,
+                    first_commitment,
+                    0,
+                ))
+                .unwrap(),
+        )
+        .unwrap();
+        let second_nullifier = NullifierV2::from_elements(
+            private_reference
+                .hash_nullifier_preimage(&nullifier_preimage(
+                    second_key,
+                    second_note,
+                    second_commitment,
+                    1,
+                ))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_ne!(first_nullifier, second_nullifier);
+        let first_note_witness =
+            CandidateAnchoredOwnershipWitnessV1::new(first_key, first_note, 0, first_siblings);
+        let second_note_witness =
+            CandidateAnchoredOwnershipWitnessV1::new(second_key, second_note, 1, second_siblings);
+        let (intent_nullifiers, first_witness, second_witness) =
+            if first_nullifier.as_bytes() < second_nullifier.as_bytes() {
+                (
+                    [first_nullifier, second_nullifier],
+                    first_note_witness,
+                    second_note_witness,
+                )
+            } else {
+                (
+                    [second_nullifier, first_nullifier],
+                    second_note_witness,
+                    first_note_witness,
+                )
+            };
+
+        let snapshot = CandidatePrivateStateSnapshotV1::new(
+            vec![
+                NoteCommitmentV2::from_elements(first_commitment).unwrap(),
+                NoteCommitmentV2::from_elements(second_commitment).unwrap(),
+            ],
+            vec![
+                NullifierV2::from_elements(vector(3)).unwrap(),
+                NullifierV2::from_elements(vector(9)).unwrap(),
+            ],
+            &tree_reference,
+        )
+        .unwrap();
+        assert_eq!(snapshot.root().elements(), root);
+        let mut pre_tree = NullifierSparseTreeStateV1::new_candidate().unwrap();
+        for spent in snapshot.spent_nullifiers() {
+            pre_tree.mark_spent(*spent).unwrap();
+        }
+        let tree_parameters = TreeParametersV2::new(TreeParametersId::new(
+            CandidatePoseidon2P24ManifestV2::new()
+                .candidate_id()
+                .unwrap()
+                .as_bytes(),
+        ));
+        let anchor = PrivateStateAnchorV2::new(
+            GenesisId::new([1; 32]),
+            ValidationContextId::new([2; 32]),
+            tree_parameters,
+            &snapshot,
+            &pre_tree,
+        )
+        .unwrap();
+        let intent = PrivateTransferIntentV2::new(
+            CircuitId::new([4; 32]),
+            anchor.genesis_id(),
+            anchor.validation_context_id(),
+            anchor.state_id(),
+            anchor.note_tree_parameters(),
+            anchor.note_root(),
+            AssetId::new([5; 32]),
+            intent_nullifiers,
+            [
+                PrivateTransferOutputV2::new(
+                    NoteCommitmentV2::from_elements(vector(12)).unwrap(),
+                    CiphertextDigestV2::from_elements(vector(12)).unwrap(),
+                ),
+                PrivateTransferOutputV2::new(
+                    NoteCommitmentV2::from_elements(vector(13)).unwrap(),
+                    CiphertextDigestV2::from_elements(vector(13)).unwrap(),
+                ),
+            ],
+        )
+        .unwrap();
+        let statement =
+            CandidatePrivateTransferProofPublicStatementV1::new(anchor, &pre_tree, intent.clone())
+                .unwrap();
+        let nxsm_witness =
+            CandidateNxsmNullifierTransitionWitnessV1::from_pre_tree(&pre_tree, &intent).unwrap();
+
+        let preflight = run_candidate_anchored_ownership_pair_preflight(
+            &statement,
+            &pre_tree,
+            &nxsm_witness,
+            &first_witness,
+            &second_witness,
+        )
+        .unwrap();
+        let results = revalidate_candidate_anchored_ownership_pair_preflight(
+            &preflight,
+            &statement,
+            &pre_tree,
+            &nxsm_witness,
+        )
+        .unwrap();
+        assert_eq!(results[0].nullifier, intent.nullifiers()[0].elements());
+        assert_eq!(results[1].nullifier, intent.nullifiers()[1].elements());
+        assert_eq!(results[0].root, root);
+        assert_eq!(results[1].root, root);
+        assert_eq!(preflight.first_result(), &results[0]);
+        assert_eq!(preflight.second_result(), &results[1]);
+        assert_eq!(preflight.statement_id(), statement.statement_id());
     }
 
     #[test]

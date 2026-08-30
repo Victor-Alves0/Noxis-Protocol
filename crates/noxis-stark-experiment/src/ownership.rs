@@ -21,8 +21,8 @@ use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{Proof, prove, verify};
 
 use crate::{
-    P24_ROUNDS, Poseidon2P24Air, StarkExperimentError, Val, make_hiding_config, matrix_expression,
-    matrix_values, round_values,
+    P24_ROUNDS, Poseidon2P24Air, StarkExperimentError, Val, make_hiding_config_with_log_blowup,
+    matrix_expression, matrix_values, round_values,
 };
 
 const KEY_BYTES: usize = 32;
@@ -113,6 +113,10 @@ pub struct Poseidon2P24OwnershipExperimentResult {
 /// before the candidate, proof parameters and serialization profile are
 /// selected and independently reviewed.
 pub struct Poseidon2P24OwnershipProof {
+    /// The exact local Plonky3 configuration that committed to this proof.
+    /// It remains opaque together with the proof and is not a selected
+    /// verifier profile or transferable key material.
+    config: crate::Config,
     proof: Proof<crate::Config>,
     public_result: Poseidon2P24OwnershipExperimentResult,
 }
@@ -852,9 +856,14 @@ pub fn prove_p24_note_ownership_path32(
         .name("noxis-p24-ownership-path32-prover".to_owned())
         .stack_size(PROVER_STACK_BYTES)
         .spawn(move || {
-            let config = make_hiding_config();
+            // The composed AIR has the same private direction/input degree as
+            // the full-depth path AIR, which requires a four-bit FRI blowup.
+            // The generic three-bit research configuration is insufficient
+            // here and yields an invalid quotient opening at verification.
+            let config = make_hiding_config_with_log_blowup(4);
             let proof = prove(&config, &air, trace, &public_values);
             Ok(Poseidon2P24OwnershipProof {
+                config,
                 proof,
                 public_result: Poseidon2P24OwnershipExperimentResult {
                     nullifier,
@@ -886,9 +895,13 @@ pub fn verify_p24_note_ownership_proof(
         .chain(ownership_proof.public_result.root)
         .map(Val::from_u32)
         .collect::<Vec<_>>();
-    let config = make_hiding_config();
-    verify(&config, &air, &ownership_proof.proof, &public_values)
-        .map_err(|_| StarkExperimentError::VerificationFailed)?;
+    verify(
+        &ownership_proof.config,
+        &air,
+        &ownership_proof.proof,
+        &public_values,
+    )
+    .map_err(|_| StarkExperimentError::VerificationFailed)?;
     Ok(ownership_proof.public_result.clone())
 }
 
