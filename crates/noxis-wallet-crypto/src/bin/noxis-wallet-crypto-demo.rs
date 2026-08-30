@@ -2,8 +2,9 @@
 //! recipient components.
 
 use noxis_wallet_crypto::{
-    CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH, CandidatePrivateNoteEnvelopeV1, HybridIdentityKeypair,
-    HybridPaymentAddressEntry, PaymentAddressError, PublicAddressBook, RecipientEnvelopeContext,
+    CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH, CandidatePrivateNoteEnvelopeV1,
+    CandidatePrivateOutputSlotV1, HybridIdentityKeypair, HybridPaymentAddressEntry,
+    PaymentAddressError, PublicAddressBook, RecipientEnvelopeContext,
     decode_hybrid_recipient_envelope, decode_payment_address, decrypt_candidate_private_note,
     encode_hybrid_recipient_envelope, encode_payment_address, encrypt_candidate_private_note,
 };
@@ -69,6 +70,8 @@ fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
 
     let output = encrypt_candidate_private_note(recipient.address(), &context, note)?;
     let commitment = output.commitment();
+    let ciphertext_digest =
+        output.candidate_ciphertext_digest(CandidatePrivateOutputSlotV1::First)?;
     let envelope_bytes = encode_hybrid_recipient_envelope(output.envelope())?;
     let decoded_envelope = decode_hybrid_recipient_envelope(&envelope_bytes)?;
     let received = decrypt_candidate_private_note(
@@ -89,9 +92,10 @@ fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!("recipient authenticated, decrypted and recomputed H_NOTE ... accepted");
     println!("public output commitment: {commitment}");
+    println!("candidate envelope digest bound to slot 0 and commitment: {ciphertext_digest}");
     println!("No note bytes, asset, value, secret key, balance or envelope bytes are printed.");
     println!("This is not a wallet, spend flow, ledger transaction or privacy activation.");
-    println!("The transaction ciphertext_digest binding is deliberately not implemented yet.");
+    println!("This candidate digest is not yet accepted by an intent, proof or ledger.");
     Ok(())
 }
 

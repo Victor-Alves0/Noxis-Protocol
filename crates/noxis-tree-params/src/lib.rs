@@ -16,6 +16,7 @@ mod intent_corpus_v1;
 mod note_corpus_v1;
 mod nullifier_sparse_corpus_v1;
 mod p24;
+mod p24_envelope_digest;
 mod p24_intent_commitment;
 mod p24_note_domains;
 mod p24_nullifier_sparse;
@@ -49,6 +50,13 @@ pub use p24::{
     CandidatePoseidon2P24ManifestIdV2, CandidatePoseidon2P24ManifestV2,
     P24_CANDIDATE_MANIFEST_ID_DOMAIN, P24_CANDIDATE_MANIFEST_LENGTH, P24_PARAMETER_PAYLOAD_LENGTH,
     Poseidon2P24CandidateError, Poseidon2P24TreeDomainV1,
+};
+pub use p24_envelope_digest::{
+    CandidatePoseidon2P24EnvelopeDigestIdV1, CandidatePoseidon2P24EnvelopeDigestV1,
+    P24_ENVELOPE_DIGEST_CANDIDATE_ID_DOMAIN, P24_ENVELOPE_DIGEST_FRAME_PREFIX_BYTES,
+    P24_ENVELOPE_DIGEST_LABEL, P24_ENVELOPE_DIGEST_MAX_INPUT_BYTES,
+    P24_ENVELOPE_DIGEST_MAX_INPUT_ELEMENTS, P24_ENVELOPE_DIGEST_MAX_NXRE_BYTES,
+    Poseidon2P24EnvelopeDigestCandidateError, Poseidon2P24EnvelopeDigestDomainV1,
 };
 pub use p24_intent_commitment::{
     CandidatePoseidon2P24IntentCommitmentIdV1, CandidatePoseidon2P24IntentCommitmentManifestV1,

@@ -761,6 +761,7 @@ dependencies = [
  "ml-kem",
  "noxis-poseidon2-privacy-reference",
  "noxis-privacy-types",
+ "noxis-tree-params",
  "noxis-types",
  "rand_core 0.6.4",
  "sha2",

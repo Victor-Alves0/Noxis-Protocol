@@ -238,6 +238,13 @@ persiste nota ou saldo, nem vincula os bytes do envelope ao
 privacidade ativada. Ver
 [`WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md`](WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md).
 
+**Digest candidato de envelope:** `noxis-wallet-crypto` agora recompõe o
+`NXRE` canônico e calcula `H_ENVELOPE` P24 sobre versão, slot, commitment e
+comprimento/bytes do envelope. Alterar qualquer um desses itens muda o digest;
+contudo `NXPT`, AIR e ledger ainda não o recomputam nem o aceitam. Vetores
+externos e uma fronteira de verificação de pacote são os próximos gates. Ver
+[`RECIPIENT_ENVELOPE_DIGEST_CANDIDATE_V0_1.md`](RECIPIENT_ENVELOPE_DIGEST_CANDIDATE_V0_1.md).
+
 **Catálogo local de endereços públicos:** a mesma camada já pode abrir um
 diretório com lock exclusivo, gravar bytes `NXPA` canônicos por ID, reabrir e
 validar estritamente o endereço. O catálogo nunca recebe chave privada, seed,

@@ -33,6 +33,7 @@ use zeroize::Zeroize;
 
 mod address;
 mod address_book;
+mod ciphertext_digest;
 mod private_note;
 mod wire;
 
@@ -42,6 +43,10 @@ pub use address::{
 pub use address_book::{
     AddressBookStoreOutcome, PUBLIC_ADDRESS_BOOK_LOCK_FILE_NAME, PublicAddressBook,
     PublicAddressBookError,
+};
+pub use ciphertext_digest::{
+    CANDIDATE_CIPHERTEXT_DIGEST_FRAME_VERSION, CandidateCiphertextDigestError,
+    CandidatePrivateOutputSlotV1, candidate_ciphertext_digest_v1,
 };
 pub use private_note::{
     CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH, CandidatePrivateNoteEnvelopeV1,

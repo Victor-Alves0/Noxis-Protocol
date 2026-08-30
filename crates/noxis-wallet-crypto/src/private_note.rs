@@ -15,8 +15,9 @@ use noxis_types::AssetId;
 use zeroize::Zeroize;
 
 use crate::{
-    HybridPaymentAddress, HybridPaymentAddressEntry, HybridRecipientEnvelope, PaymentAddressError,
-    RecipientEnvelopeContext,
+    CandidateCiphertextDigestError, CandidatePrivateOutputSlotV1, HybridPaymentAddress,
+    HybridPaymentAddressEntry, HybridRecipientEnvelope, PaymentAddressError,
+    RecipientEnvelopeContext, candidate_ciphertext_digest_v1,
 };
 
 /// Fixed candidate private-note preimage size from the v2 note-opening format.
@@ -55,6 +56,15 @@ impl CandidatePrivateNoteEnvelopeV1 {
     /// The strictly decoded hybrid recipient envelope to hand to the owner.
     pub const fn envelope(&self) -> &HybridRecipientEnvelope {
         &self.envelope
+    }
+
+    /// Derives the candidate public digest that commits to this exact envelope,
+    /// this public note commitment and one fixed 2×2 output slot.
+    pub fn candidate_ciphertext_digest(
+        &self,
+        slot: CandidatePrivateOutputSlotV1,
+    ) -> Result<noxis_privacy_types::CiphertextDigestV2, CandidateCiphertextDigestError> {
+        candidate_ciphertext_digest_v1(slot, self.commitment, &self.envelope)
     }
 }
 
@@ -178,7 +188,10 @@ impl std::error::Error for CandidatePrivateNoteError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{decode_hybrid_recipient_envelope, encode_hybrid_recipient_envelope};
+    use crate::{
+        CandidatePrivateOutputSlotV1, decode_hybrid_recipient_envelope,
+        encode_hybrid_recipient_envelope,
+    };
 
     fn note(asset: [u8; 32], value: u128) -> [u8; CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH] {
         let mut note = core::array::from_fn(|index| (index as u8).wrapping_mul(17).wrapping_add(3));
@@ -196,16 +209,21 @@ mod tests {
         let output =
             encrypt_candidate_private_note(owner.address(), &context, expected_note).unwrap();
         let commitment = output.commitment();
+        let ciphertext_digest = output
+            .candidate_ciphertext_digest(CandidatePrivateOutputSlotV1::First)
+            .unwrap();
         let decoded = decode_hybrid_recipient_envelope(
             &encode_hybrid_recipient_envelope(output.envelope()).unwrap(),
         )
         .unwrap();
-        let received = decrypt_candidate_private_note(
-            &owner,
-            &context,
-            &CandidatePrivateNoteEnvelopeV1::from_parts(commitment, decoded),
-        )
-        .unwrap();
+        let rebuilt = CandidatePrivateNoteEnvelopeV1::from_parts(commitment, decoded);
+        assert_eq!(
+            ciphertext_digest,
+            rebuilt
+                .candidate_ciphertext_digest(CandidatePrivateOutputSlotV1::First)
+                .unwrap()
+        );
+        let received = decrypt_candidate_private_note(&owner, &context, &rebuilt).unwrap();
         assert_eq!(received.commitment(), commitment);
         assert_eq!(received.asset_id(), AssetId::new([9; 32]));
         assert_eq!(received.value(), 42);

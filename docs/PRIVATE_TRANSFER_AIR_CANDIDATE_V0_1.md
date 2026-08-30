@@ -44,7 +44,7 @@ O deployment AIR precisa comprometer os IDs e bytes completos de P24, NXPH e NXI
 
 ## Lacunas que bloqueiam uma prova utilizável
 
-- Não há especificação de cifra/envelope que prove que cada digest de ciphertext corresponde à nota, slot, AAD e chave do destinatário.
+- Há uma frame candidata local que compromete slot, commitment e `NXRE` canônico, mas ainda não há verificador de pacote, vetores externos, AAD de transação selecionada ou AIR que recompute cada digest de ciphertext. Portanto ela não prova correspondência com nota, chave do destinatário ou intenção recebida.
 - A chave ligada por `H_ADDR` ainda não está ligada a uma chave de recebimento X25519/ML-KEM.
 - Não existe estado privado persistente v2, política de raízes, conjunto global de nullifiers ou inserção atômica das saídas.
 - A declaração [`NXPU v1`](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md) já une a moldura de notas, `NXPS v2` e `NXNT v1`, mas ainda não há AIR que demonstre a relação em zero conhecimento nem que atualize a raiz de notas.

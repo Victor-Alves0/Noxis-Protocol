@@ -12,10 +12,13 @@ use noxis_privacy_types::{
     PrivacyTypesError, PrivateTransferIntentCommitmentV2, PrivateTransferIntentV2,
 };
 use noxis_tree_params::{
-    CandidatePoseidon2P24IntentCommitmentManifestV1, CandidatePoseidon2P24NoteDomainsManifestV1,
-    P24_BYTE_PACK_WIDTH, P24_INTENT_COMMITMENT_INPUT_BYTES, P24_INTENT_COMMITMENT_INPUT_ELEMENTS,
-    Poseidon2P24IntentCommitmentCandidateError, Poseidon2P24IntentCommitmentDomainV1,
-    Poseidon2P24NoteDomainV1, Poseidon2P24NoteDomainsCandidateError,
+    CandidatePoseidon2P24EnvelopeDigestV1, CandidatePoseidon2P24IntentCommitmentManifestV1,
+    CandidatePoseidon2P24NoteDomainsManifestV1, P24_BYTE_PACK_WIDTH,
+    P24_ENVELOPE_DIGEST_MAX_INPUT_BYTES, P24_INTENT_COMMITMENT_INPUT_BYTES,
+    P24_INTENT_COMMITMENT_INPUT_ELEMENTS, Poseidon2P24EnvelopeDigestCandidateError,
+    Poseidon2P24EnvelopeDigestDomainV1, Poseidon2P24IntentCommitmentCandidateError,
+    Poseidon2P24IntentCommitmentDomainV1, Poseidon2P24NoteDomainV1,
+    Poseidon2P24NoteDomainsCandidateError,
 };
 
 const RATE: usize = 15;
@@ -33,6 +36,7 @@ impl Poseidon2P24PrivacyReference {
     pub fn load_candidate() -> Result<Self, Poseidon2P24PrivacyReferenceError> {
         CandidatePoseidon2P24NoteDomainsManifestV1::new().encode()?;
         CandidatePoseidon2P24IntentCommitmentManifestV1::new().encode()?;
+        CandidatePoseidon2P24EnvelopeDigestV1::new().candidate_id()?;
         Ok(Self {
             permutation: Poseidon2P24Reference::load_candidate()?,
         })
@@ -116,6 +120,28 @@ impl Poseidon2P24PrivacyReference {
         self.hash_elements(&elements, iv)
     }
 
+    /// Hashes one canonical recipient-envelope binding frame under its own
+    /// unselected P24 domain. The caller owns the frame construction so this
+    /// reference does not become a wallet or transaction API.
+    pub fn hash_recipient_envelope_digest_frame(
+        &self,
+        frame: &[u8],
+    ) -> Result<BabyBearDigestV2, Poseidon2P24PrivacyReferenceError> {
+        let domain = Poseidon2P24EnvelopeDigestDomainV1::RecipientEnvelope;
+        if !(domain.min_input_bytes()..=domain.max_input_bytes()).contains(&frame.len()) {
+            return Err(
+                Poseidon2P24PrivacyReferenceError::InvalidEnvelopeDigestFrameLength {
+                    actual: frame.len(),
+                    minimum: domain.min_input_bytes(),
+                    maximum: P24_ENVELOPE_DIGEST_MAX_INPUT_BYTES,
+                },
+            );
+        }
+        let elements = byte_pack3le_variable(frame);
+        let iv = CandidatePoseidon2P24EnvelopeDigestV1::new().iv(domain)?;
+        self.hash_elements(&elements, iv)
+    }
+
     fn hash_intent_encoding(
         &self,
         input: &[u8; P24_INTENT_COMMITMENT_INPUT_BYTES],
@@ -168,6 +194,20 @@ fn byte_pack3le_fixed(input: &[u8], expected_bytes: usize, expected_elements: us
     packed
 }
 
+fn byte_pack3le_variable(input: &[u8]) -> Vec<u32> {
+    input
+        .chunks(P24_BYTE_PACK_WIDTH)
+        .map(|chunk| {
+            chunk
+                .iter()
+                .enumerate()
+                .fold(0_u32, |value, (offset, byte)| {
+                    value | (u32::from(*byte) << (offset * 8))
+                })
+        })
+        .collect()
+}
+
 fn add(left: u32, right: u32) -> u32 {
     ((u64::from(left) + u64::from(right)) % u64::from(BABYBEAR_MODULUS)) as u32
 }
@@ -178,11 +218,17 @@ pub enum Poseidon2P24PrivacyReferenceError {
     TreeReference(Poseidon2P24ReferenceError),
     Candidate(Poseidon2P24NoteDomainsCandidateError),
     IntentCandidate(Poseidon2P24IntentCommitmentCandidateError),
+    EnvelopeDigestCandidate(Poseidon2P24EnvelopeDigestCandidateError),
     PrivacyTypes(PrivacyTypesError),
     InvalidInputLength {
         domain: Poseidon2P24NoteDomainV1,
         actual: usize,
         expected: usize,
+    },
+    InvalidEnvelopeDigestFrameLength {
+        actual: usize,
+        minimum: usize,
+        maximum: usize,
     },
 }
 
@@ -204,6 +250,12 @@ impl From<Poseidon2P24IntentCommitmentCandidateError> for Poseidon2P24PrivacyRef
     }
 }
 
+impl From<Poseidon2P24EnvelopeDigestCandidateError> for Poseidon2P24PrivacyReferenceError {
+    fn from(value: Poseidon2P24EnvelopeDigestCandidateError) -> Self {
+        Self::EnvelopeDigestCandidate(value)
+    }
+}
+
 impl From<PrivacyTypesError> for Poseidon2P24PrivacyReferenceError {
     fn from(value: PrivacyTypesError) -> Self {
         Self::PrivacyTypes(value)
@@ -216,6 +268,12 @@ impl fmt::Display for Poseidon2P24PrivacyReferenceError {
             Self::TreeReference(error) => write!(formatter, "invalid P24 reference: {error}"),
             Self::Candidate(error) => write!(formatter, "invalid NXPH candidate: {error}"),
             Self::IntentCandidate(error) => write!(formatter, "invalid NXIC candidate: {error}"),
+            Self::EnvelopeDigestCandidate(error) => {
+                write!(
+                    formatter,
+                    "invalid recipient-envelope digest candidate: {error}"
+                )
+            }
             Self::PrivacyTypes(error) => write!(formatter, "invalid H_INTENT digest: {error}"),
             Self::InvalidInputLength {
                 domain,
@@ -224,6 +282,14 @@ impl fmt::Display for Poseidon2P24PrivacyReferenceError {
             } => write!(
                 formatter,
                 "P24 private {domain:?} input has {actual} bytes, expected {expected}"
+            ),
+            Self::InvalidEnvelopeDigestFrameLength {
+                actual,
+                minimum,
+                maximum,
+            } => write!(
+                formatter,
+                "P24 recipient-envelope digest frame has {actual} bytes, expected {minimum}..={maximum}"
             ),
         }
     }
@@ -381,6 +447,48 @@ mod tests {
                 expected: 178,
             })
         );
+    }
+
+    #[test]
+    fn recipient_envelope_digest_frame_has_a_bounded_and_sensitive_reference_path() {
+        let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
+        let frame = ascending::<1_279>(19);
+        let baseline = reference
+            .hash_recipient_envelope_digest_frame(&frame)
+            .unwrap();
+        assert_eq!(
+            reference
+                .hash_recipient_envelope_digest_frame(&frame)
+                .unwrap(),
+            baseline
+        );
+        let mut changed_first = frame;
+        changed_first[0] ^= 1;
+        assert_ne!(
+            reference
+                .hash_recipient_envelope_digest_frame(&changed_first)
+                .unwrap(),
+            baseline
+        );
+        let mut changed_last = frame;
+        let last = changed_last.len() - 1;
+        changed_last[last] ^= 1;
+        assert_ne!(
+            reference
+                .hash_recipient_envelope_digest_frame(&changed_last)
+                .unwrap(),
+            baseline
+        );
+        assert!(matches!(
+            reference.hash_recipient_envelope_digest_frame(&frame[..1_278]),
+            Err(
+                Poseidon2P24PrivacyReferenceError::InvalidEnvelopeDigestFrameLength {
+                    actual: 1_278,
+                    minimum: 1_279,
+                    maximum: 3_311,
+                }
+            )
+        ));
     }
 
     #[test]
