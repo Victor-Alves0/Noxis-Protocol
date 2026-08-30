@@ -10,10 +10,11 @@ proof bytes, or enable private-transfer settlement.
 
 `noxis-stark-experiment` constructs a P24 permutation proof, serializes that
 opaque Plonky3 proof with `postcard`, deserializes it, and verifies it again
-with the **same held local STARK configuration**:
+with a **freshly constructed local STARK configuration** using the same pinned
+code profile:
 
 ```powershell
-cargo test --release -p noxis-stark-experiment p24_research_proof_round_trips_through_postcard_with_held_local_config
+cargo test --release -p noxis-stark-experiment p24_research_proof_round_trips_to_a_fresh_local_verifier_config
 ```
 
 This is useful evidence that the experimental proof object has a serializable
@@ -21,11 +22,19 @@ representation in the pinned dependency set. It is intentionally a test-only
 round trip: no bytes are emitted by a Noxis public API, persisted, accepted by
 the ledger, or sent over the network.
 
-## Crucial limitation: this is not portable verification
+## What this clarifies
 
 The current hiding-FRI configuration is created with fresh operating-system
-randomness. The test therefore retains the exact configuration used to create
-the proof; it does **not** reconstruct one from a public verifier descriptor.
+randomness for proof generation. The test proves that this process-local
+randomness is not needed by a newly constructed verifier configuration with
+the same code-level parameters.
+
+## Crucial limitation: this is still not portable verification
+
+The configuration is implicit in Rust code and pinned library versions; it is
+not a public, versioned Noxis verifier descriptor. The test also executes in
+one process and does not establish a cross-process, cross-version or
+independent-implementation compatibility guarantee.
 
 Consequently, these claims remain false:
 
@@ -45,9 +54,9 @@ portable proof system.
 2. Define a public, versioned verifier descriptor that fixes field, AIR,
    Poseidon parameters, FRI/PCS parameters, verifier material and dependency
    compatibility rules.
-3. Make verification configuration reconstructible from that descriptor (or
-   prescribe immutable verifier material) without secret or process-local
-   state.
+3. Publish a descriptor that reconstructs the verification configuration (or
+   prescribes immutable verifier material) without relying on implicit Rust
+   code or process-local state.
 4. Specify a bounded canonical proof envelope in the wire/storage registry,
    including parser behavior, upgrade policy and negative test vectors.
 5. Add cross-process and independent-implementation verification evidence,

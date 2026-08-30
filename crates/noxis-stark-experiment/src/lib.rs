@@ -1958,7 +1958,7 @@ mod tests {
     }
 
     #[test]
-    fn p24_research_proof_round_trips_through_postcard_with_held_local_config() {
+    fn p24_research_proof_round_trips_to_a_fresh_local_verifier_config() {
         let input = core::array::from_fn(|index| index as u32 + 1);
         let reference = Poseidon2P24Reference::load_candidate().unwrap();
         let output = reference.permutation(input).unwrap();
@@ -1976,8 +1976,10 @@ mod tests {
         let decoded = postcard::from_bytes(&encoded)
             .expect("the locally serialized experimental proof should deserialize");
 
-        verify(&config, &air, &decoded, &public_values)
-            .expect("a proof decoded under the same held configuration should verify");
+        let verifier_config = make_hiding_config();
+        verify(&verifier_config, &air, &decoded, &public_values).expect(
+            "a proof decoded under a fresh configuration with the same profile should verify",
+        );
     }
 
     #[test]

@@ -11,9 +11,9 @@ The implementation is
 [`intent.rs`](../crates/noxis-stark-experiment/src/intent.rs). It is a Plonky3
 research component with a hiding-FRI configuration, but its 214 input elements
 and resulting 16-element commitment are public by design. A test-only proof
-object round trip through `postcard` works when the exact local configuration
-is retained; it has no portable verifier profile, Noxis proof serialization or
-production activation. See
+object round trip through `postcard` verifies with a fresh configuration using
+the same pinned code profile; it has no portable verifier profile, Noxis proof
+serialization or production activation. See
 [the verifier-profile research boundary](STARK_VERIFIER_PROFILE_RESEARCH_V0_1.md).
 
 ## Exact relation
