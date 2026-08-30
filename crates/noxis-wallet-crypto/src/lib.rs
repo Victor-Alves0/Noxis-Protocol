@@ -23,7 +23,7 @@ use ml_dsa::{
     SigningKey as MlDsaSigningKey, Verifier as _, VerifyingKey as MlDsaVerifyingKey,
 };
 use ml_kem::{
-    DecapsulationKey768, EncapsulationKey768, KeyExport as _, MlKem768,
+    DecapsulationKey768, EncapsulationKey768, KeyExport as _, MlKem768, Seed as MlKemSeed,
     kem::{Decapsulate as _, Encapsulate as _, Kem as _},
 };
 use rand_core::{OsRng, RngCore as _};
@@ -251,6 +251,27 @@ impl HybridRecipientKeypair {
         let x25519_secret = X25519StaticSecret::random_from_rng(OsRng);
         let x25519_public = X25519PublicKey::from(&x25519_secret);
         let (ml_kem_768_secret, ml_kem_768_public) = MlKem768::generate_keypair();
+        Self {
+            x25519_secret,
+            x25519_public,
+            ml_kem_768_secret,
+            ml_kem_768_public,
+        }
+    }
+
+    /// Constructs receiving material from independently domain-separated
+    /// secret inputs owned by the wallet derivation layer. This stays crate
+    /// private: callers must never select or reuse these inputs directly.
+    pub(crate) fn from_derived_seeds(
+        mut x25519_seed: [u8; 32],
+        mut ml_kem_768_seed: [u8; 64],
+    ) -> Self {
+        let x25519_secret = X25519StaticSecret::from(x25519_seed);
+        let x25519_public = X25519PublicKey::from(&x25519_secret);
+        let ml_kem_768_secret = DecapsulationKey768::from_seed(MlKemSeed::from(ml_kem_768_seed));
+        let ml_kem_768_public = ml_kem_768_secret.encapsulation_key().clone();
+        x25519_seed.zeroize();
+        ml_kem_768_seed.zeroize();
         Self {
             x25519_secret,
             x25519_public,

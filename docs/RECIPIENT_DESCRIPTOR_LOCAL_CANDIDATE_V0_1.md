@@ -3,12 +3,14 @@
 ## Estado
 
 **Capacidade local autenticada, não uma identidade de gasto.**
-`CandidatePrivateRecipientKeysetV1` gera, no mesmo processo:
+`CandidatePrivateRecipientKeysetV1` gera, no mesmo processo, uma raiz
+aleatória efêmera e dela deriva:
 
 - uma chave de recebimento X25519 + ML-KEM-768 para `NXRE`;
 - uma chave de nullifier privada, da qual `H_ADDR` deriva o
   `RecipientCommitmentV2`; e
-- uma identidade Ed25519 + ML-DSA-65 usada para assinar o descriptor público.
+- uma identidade Ed25519 + ML-DSA-65 separada, usada para assinar o descriptor
+  público.
 
 O descriptor contém o endereço público de recebimento e o commitment `H_ADDR`.
 O transcript assinado é exatamente:
@@ -42,10 +44,13 @@ de commitment de outro keyset.
 
 ## Limite de segurança crucial
 
-Este descriptor **não prova matematicamente** que a chave X25519/ML-KEM e a
-chave de nullifier derivam da mesma raiz secreta. Ambas são independentes no
-keyset atual; a assinatura apenas autentica a declaração conjunta para uma
-identidade que o remetente já conhece por outro canal.
+Neste keyset local, a chave X25519/ML-KEM e a chave de nullifier são derivadas
+de uma mesma raiz efêmera, com rótulos HKDF distintos. Porém, o descriptor
+**não prova publicamente** essa relação: um remetente, nó ou verificador STARK
+não recebe a raiz nem uma prova dela. A assinatura continua apenas autenticando
+a declaração conjunta para uma identidade que o remetente já conhece por outro
+canal. A derivação completa e seus limites estão em
+[`RECIPIENT_ROOT_DERIVATION_CANDIDATE_V0_1.md`](RECIPIENT_ROOT_DERIVATION_CANDIDATE_V0_1.md).
 
 Ele também não tem encoding público, diretório confiável, rotação, backup ou
 política de confiança. Portanto não é stealth address, chave de gasto, prova
@@ -54,8 +59,8 @@ descriptor em uma distribuição não autenticada.
 
 ## Próximo gate
 
-Antes de promover esse vínculo a protocolo, é necessário decidir entre uma
-derivação revisada a partir de uma raiz de wallet com vetores para X25519 e
-ML-KEM, ou uma prova explícita de posse/ligação. A opção escolhida precisa
-definir a relação de ameaça, formato público, KDF, rotação, recuperação,
-revogação e a relação AIR antes de qualquer ativação.
+Antes de promover esse vínculo a protocolo, é necessário especificar a
+derivação e o keystore de forma recuperável, criar chaves de visualização sem
+autoridade de gasto e decidir como a relação aparece no AIR ou em uma prova de
+posse. Isso exige vetores independentes para X25519 e ML-KEM, formato público,
+KDF, rotação, recuperação, revogação e revisão antes de qualquer ativação.

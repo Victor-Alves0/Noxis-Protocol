@@ -107,6 +107,25 @@ impl HybridPaymentAddressEntry {
     /// useful for deterministic test vectors and imported address records.
     pub fn with_diversifier(diversifier: PaymentDiversifier, key_epoch: u64) -> Self {
         let recipient_secret = HybridRecipientKeypair::generate();
+        Self::with_recipient(diversifier, key_epoch, recipient_secret)
+    }
+
+    /// Creates an entry from receiving keys already derived by the local
+    /// private-recipient keyset. This prevents the derivation boundary from
+    /// leaking secret material through the public address API.
+    pub(crate) fn with_derived_recipient(
+        diversifier: PaymentDiversifier,
+        key_epoch: u64,
+        recipient_secret: HybridRecipientKeypair,
+    ) -> Self {
+        Self::with_recipient(diversifier, key_epoch, recipient_secret)
+    }
+
+    fn with_recipient(
+        diversifier: PaymentDiversifier,
+        key_epoch: u64,
+        recipient_secret: HybridRecipientKeypair,
+    ) -> Self {
         let recipient = recipient_secret.public_key();
         let address = HybridPaymentAddress::new(diversifier, key_epoch, recipient);
         Self {
