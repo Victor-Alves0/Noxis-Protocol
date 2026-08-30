@@ -2,7 +2,7 @@
 //! recipient components.
 
 use noxis_wallet_crypto::{
-    HybridIdentityKeypair, HybridPaymentAddressEntry, PaymentAddressError,
+    HybridIdentityKeypair, HybridPaymentAddressEntry, PaymentAddressError, PublicAddressBook,
     RecipientEnvelopeContext, decode_hybrid_recipient_envelope, decode_payment_address,
     encode_hybrid_recipient_envelope, encode_payment_address,
 };
@@ -15,12 +15,14 @@ const IDENTITY_PAYLOAD: &[u8] = b"noxis local hybrid identity check v1";
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     match parse_mode(std::env::args().skip(1))? {
         DemoMode::Run => run_demo(),
+        DemoMode::AddressBook { directory } => run_address_book_demo(directory),
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum DemoMode {
     Run,
+    AddressBook { directory: std::path::PathBuf },
 }
 
 fn parse_mode(arguments: impl IntoIterator<Item = String>) -> Result<DemoMode, std::io::Error> {
@@ -28,9 +30,14 @@ fn parse_mode(arguments: impl IntoIterator<Item = String>) -> Result<DemoMode, s
     match arguments.as_slice() {
         [] => Ok(DemoMode::Run),
         [command] if command == "demo" => Ok(DemoMode::Run),
+        [command, flag, directory] if command == "address-book" && flag == "--data-dir" => {
+            Ok(DemoMode::AddressBook {
+                directory: std::path::PathBuf::from(directory),
+            })
+        }
         _ => Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "usage: noxis-wallet-crypto-demo [demo]",
+            "usage:\n  noxis-wallet-crypto-demo [demo]\n  noxis-wallet-crypto-demo address-book --data-dir PATH",
         )),
     }
 }
@@ -85,6 +92,29 @@ fn print_demo(address_id: [u8; 32], address_bytes: usize, envelope_bytes: usize)
     );
 }
 
+fn run_address_book_demo(directory: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let entry = HybridPaymentAddressEntry::generate(DEMO_KEY_EPOCH);
+    let address_id = entry.address().address_id();
+    let book = PublicAddressBook::open(&directory)?;
+    let stored = book.store(entry.address())?;
+    drop(book);
+    let reopened = PublicAddressBook::open(&directory)?;
+    let loaded = reopened.load(address_id)?;
+
+    if loaded.address_id() != address_id {
+        return Err("reopened public address does not match the stored address".into());
+    }
+    println!("Noxis public address-book demo — EXPERIMENTAL / PUBLIC DATA ONLY");
+    println!("Directory: {}", directory.display());
+    println!("stored public NXPA address ... {stored:?}");
+    println!("reopened public NXPA address ... accepted");
+    println!("Address ID: {}", hex(&address_id));
+    println!(
+        "No private recipient key, seed, spend key, note, balance, or transaction was stored."
+    );
+    Ok(())
+}
+
 fn hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(bytes.len() * 2);
@@ -103,11 +133,23 @@ mod tests {
     fn defaults_to_and_accepts_the_explicit_demo_command() {
         assert_eq!(parse_mode([]).unwrap(), DemoMode::Run);
         assert_eq!(parse_mode([String::from("demo")]).unwrap(), DemoMode::Run);
+        assert_eq!(
+            parse_mode([
+                String::from("address-book"),
+                String::from("--data-dir"),
+                String::from("wallet-public"),
+            ])
+            .unwrap(),
+            DemoMode::AddressBook {
+                directory: std::path::PathBuf::from("wallet-public"),
+            }
+        );
     }
 
     #[test]
     fn rejects_unknown_or_extra_demo_arguments() {
         assert!(parse_mode([String::from("other")]).is_err());
         assert!(parse_mode([String::from("demo"), String::from("extra")]).is_err());
+        assert!(parse_mode([String::from("address-book")]).is_err());
     }
 }

@@ -209,6 +209,15 @@ address owner, rejects an unrelated recipient and verifies a hybrid identity
 signature. It is not a wallet, private transfer or production cryptography;
 see [`docs/WALLET_CRYPTO_LOCAL_DEMO_V0_1.md`](docs/WALLET_CRYPTO_LOCAL_DEMO_V0_1.md).
 
+To persist and reopen only public address material, use:
+
+```powershell
+cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo -- address-book --data-dir .\target\noxis-public-addresses
+```
+
+The address book stores canonical `NXPA` files with a single-writer lock. It
+cannot store a private key, decrypt a payload, restore a wallet or spend funds.
+
 This deliberately does **not** start CometBFT or claim consensus, custody or
 privacy: the displayed `AppHash` is explicitly unavailable in local-admission
 mode, and the transfer uses a research fixture rather than a private proof.

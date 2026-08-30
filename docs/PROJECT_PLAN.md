@@ -197,6 +197,13 @@ verifica assinatura Ed25519 + ML-DSA-65. Nenhuma chave é persistida e isso não
 é wallet, stealth address, nota privada nem liquidação. Ver
 [`WALLET_CRYPTO_LOCAL_DEMO_V0_1.md`](WALLET_CRYPTO_LOCAL_DEMO_V0_1.md).
 
+**Catálogo local de endereços públicos:** a mesma camada já pode abrir um
+diretório com lock exclusivo, gravar bytes `NXPA` canônicos por ID, reabrir e
+validar estritamente o endereço. O catálogo nunca recebe chave privada, seed,
+nota, saldo ou prova; ele serve somente à distribuição/reuso seguro de
+endereços públicos. Persistência de segredo e recuperação de carteira exigem
+outro projeto de keystore e não foram iniciadas aqui.
+
 ### 6. Adaptadores de ativos e políticas de emissão
 
 Conecta ativos apenas onde o backing, a custódia, resgate, falhas e responsabilidades forem explicitamente especificados. Fiat externo nunca é aceito como prova automática de backing.

@@ -13,6 +13,12 @@ connect to a Noxis node.
 cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo
 ```
 
+To create and reopen an explicit directory containing only one public address:
+
+```powershell
+cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo -- address-book --data-dir .\target\noxis-public-addresses
+```
+
 The command creates fresh process-local keys and performs this sequence:
 
 1. create one diversified payment address at key epoch 1;
@@ -27,6 +33,20 @@ The command creates fresh process-local keys and performs this sequence:
 
 The program prints only a public address identifier and byte lengths. It never
 prints or writes a private key, shared secret, plaintext, or envelope bytes.
+
+## Public address book
+
+`PublicAddressBook` stores each public `NXPA v1` encoding under an address-ID
+derived filename. It holds an exclusive process-lifetime lock, writes a fresh
+file through a synchronized temporary file and then reopens and decodes it
+strictly. Storing the same address again is idempotent; altered or oversized
+address bytes are rejected on load.
+
+This catalog intentionally has no private-key slot. Reopening it lets a sender
+reuse public addresses, but cannot decrypt an envelope or spend a note. A
+process crash can leave an ignored temporary public file, while any visible
+entry has first been synchronized and then renamed. It is not a keystore,
+backup format or wallet-recovery mechanism.
 
 ## What this establishes
 

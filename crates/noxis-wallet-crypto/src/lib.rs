@@ -32,10 +32,15 @@ use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSec
 use zeroize::Zeroize;
 
 mod address;
+mod address_book;
 mod wire;
 
 pub use address::{
     HybridPaymentAddress, HybridPaymentAddressEntry, PaymentAddressError, PaymentDiversifier,
+};
+pub use address_book::{
+    AddressBookStoreOutcome, PUBLIC_ADDRESS_BOOK_LOCK_FILE_NAME, PublicAddressBook,
+    PublicAddressBookError,
 };
 pub use wire::{
     HYBRID_RECIPIENT_ENVELOPE_MAGIC, PAYMENT_ADDRESS_MAGIC, PaymentAddressCodecError,
