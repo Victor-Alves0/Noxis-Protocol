@@ -1958,6 +1958,29 @@ mod tests {
     }
 
     #[test]
+    fn p24_research_proof_round_trips_through_postcard_with_held_local_config() {
+        let input = core::array::from_fn(|index| index as u32 + 1);
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let output = reference.permutation(input).unwrap();
+        let air = Poseidon2P24Air::from_reference(&reference);
+        let trace = build_p24_trace(&air, input);
+        let public_values = input
+            .into_iter()
+            .chain(output)
+            .map(Val::from_u32)
+            .collect::<Vec<_>>();
+        let config = make_hiding_config();
+        let proof = prove(&config, &air, trace, &public_values);
+        let encoded = postcard::to_allocvec(&proof)
+            .expect("the experimental Plonky3 proof should serialize for this local test");
+        let decoded = postcard::from_bytes(&encoded)
+            .expect("the locally serialized experimental proof should deserialize");
+
+        verify(&config, &air, &decoded, &public_values)
+            .expect("a proof decoded under the same held configuration should verify");
+    }
+
+    #[test]
     fn leaf_hash_stark_matches_the_frozen_candidate_reference() {
         let commitment = core::array::from_fn(|index| index as u32 + 1);
         let result = prove_and_verify_p24_leaf(commitment).unwrap();

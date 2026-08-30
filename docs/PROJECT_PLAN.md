@@ -127,6 +127,14 @@ canônica de 640 bytes e seu digest de 16 elementos. Os dois vetores externos
 canônico, mas não torna a intenção privada e não compõe notas, valores ou
 nullifiers. Ver [`STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md`](STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md).
 
+**Limite de portabilidade do backend:** um teste serializa e desserializa uma
+prova P24 de pesquisa com `postcard` e a verifica novamente usando a mesma
+configuração local que a produziu. Isso demonstra apenas uma capacidade do
+objeto da biblioteca fixada; a configuração hiding-FRI atual usa aleatoriedade
+nova e não é reconstruída por um descritor público. Portanto, ainda não existe
+formato Noxis de prova, verificação entre processos ou perfil de verificador
+selecionado. Ver [`STARK_VERIFIER_PROFILE_RESEARCH_V0_1.md`](STARK_VERIFIER_PROFILE_RESEARCH_V0_1.md).
+
 **Preflight de intenção e posse:** para uma entrada da declaração `NXPU`, o
 contrato de prova agora executa e verifica o `H_INTENT` canônico e a posse
 ancorada contra a mesma âncora e estado local, retendo apenas um recibo público
