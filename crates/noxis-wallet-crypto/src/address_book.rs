@@ -62,6 +62,9 @@ pub enum PublicAddressBookError {
         path: PathBuf,
         source: PaymentAddressCodecError,
     },
+    InvalidAddressFileName {
+        path: PathBuf,
+    },
     AddressFileIdentityMismatch {
         path: PathBuf,
     },
@@ -99,6 +102,11 @@ impl fmt::Display for PublicAddressBookError {
                     path.display()
                 )
             }
+            Self::InvalidAddressFileName { path } => write!(
+                formatter,
+                "public address file has an invalid address-ID filename: {}",
+                path.display()
+            ),
             Self::AddressFileIdentityMismatch { path } => write!(
                 formatter,
                 "public address file name does not match the address identity: {}",
@@ -194,6 +202,42 @@ impl PublicAddressBook {
             return Err(PublicAddressBookError::AddressFileIdentityMismatch { path });
         }
         Ok(address)
+    }
+
+    /// Enumerates every canonical public address entry in deterministic
+    /// address-ID order. Temporary files and the process lock are ignored;
+    /// malformed managed entry names or bytes fail closed.
+    pub fn list(&self) -> Result<Vec<HybridPaymentAddress>, PublicAddressBookError> {
+        let entries = fs::read_dir(&self.root).map_err(|source| PublicAddressBookError::Io {
+            operation: "list public address-book directory",
+            path: self.root.clone(),
+            source,
+        })?;
+        let mut addresses = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(|source| PublicAddressBookError::Io {
+                operation: "read public address-book directory entry",
+                path: self.root.clone(),
+                source,
+            })?;
+            let path = entry.path();
+            let file_name = entry.file_name();
+            let Some(file_name) = file_name.to_str() else {
+                continue;
+            };
+            if file_name == PUBLIC_ADDRESS_BOOK_LOCK_FILE_NAME || file_name.starts_with('.') {
+                continue;
+            }
+            if !file_name.starts_with(ADDRESS_FILE_PREFIX) {
+                continue;
+            }
+            let address_id = parse_address_id_file_name(file_name).ok_or_else(|| {
+                PublicAddressBookError::InvalidAddressFileName { path: path.clone() }
+            })?;
+            addresses.push(self.load(address_id)?);
+        }
+        addresses.sort_by_key(HybridPaymentAddress::address_id);
+        Ok(addresses)
     }
 
     fn address_path(&self, address_id: [u8; 32]) -> PathBuf {
@@ -296,11 +340,26 @@ fn hex(bytes: &[u8]) -> String {
     output
 }
 
+fn parse_address_id_file_name(file_name: &str) -> Option<[u8; 32]> {
+    let encoded = file_name
+        .strip_prefix(ADDRESS_FILE_PREFIX)?
+        .strip_suffix(ADDRESS_FILE_SUFFIX)?;
+    if encoded.len() != 64 {
+        return None;
+    }
+    let mut address_id = [0_u8; 32];
+    for (index, byte) in address_id.iter_mut().enumerate() {
+        let digits = &encoded[index * 2..index * 2 + 2];
+        *byte = u8::from_str_radix(digits, 16).ok()?;
+    }
+    Some(address_id)
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    use crate::{HybridPaymentAddressEntry, PaymentDiversifier};
+    use crate::{HybridPaymentAddress, HybridPaymentAddressEntry, PaymentDiversifier};
 
     use super::{AddressBookStoreOutcome, PublicAddressBook, PublicAddressBookError};
 
@@ -369,6 +428,31 @@ mod tests {
             book.load(address_id),
             Err(PublicAddressBookError::InvalidAddressFile { .. })
         ));
+        drop(book);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn address_book_lists_every_valid_address_in_address_id_order() {
+        let root = test_directory("list");
+        let first =
+            HybridPaymentAddressEntry::with_diversifier(PaymentDiversifier::from_bytes([1; 16]), 1);
+        let second =
+            HybridPaymentAddressEntry::with_diversifier(PaymentDiversifier::from_bytes([2; 16]), 2);
+        let book = PublicAddressBook::open(&root).unwrap();
+        book.store(first.address()).unwrap();
+        book.store(second.address()).unwrap();
+
+        let addresses = book.list().unwrap();
+        let mut expected = [first.address().address_id(), second.address().address_id()];
+        expected.sort();
+        assert_eq!(
+            addresses
+                .iter()
+                .map(HybridPaymentAddress::address_id)
+                .collect::<Vec<_>>(),
+            expected
+        );
         drop(book);
         std::fs::remove_dir_all(root).unwrap();
     }

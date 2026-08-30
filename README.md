@@ -213,6 +213,8 @@ To persist and reopen only public address material, use:
 
 ```powershell
 cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo -- address-book --data-dir .\target\noxis-public-addresses
+# List and strictly revalidate stored public addresses:
+cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo -- address-book list --data-dir .\target\noxis-public-addresses
 ```
 
 The address book stores canonical `NXPA` files with a single-writer lock. It

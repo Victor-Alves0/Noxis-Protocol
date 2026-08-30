@@ -16,6 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match parse_mode(std::env::args().skip(1))? {
         DemoMode::Run => run_demo(),
         DemoMode::AddressBook { directory } => run_address_book_demo(directory),
+        DemoMode::AddressBookList { directory } => run_address_book_list(directory),
     }
 }
 
@@ -23,6 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 enum DemoMode {
     Run,
     AddressBook { directory: std::path::PathBuf },
+    AddressBookList { directory: std::path::PathBuf },
 }
 
 fn parse_mode(arguments: impl IntoIterator<Item = String>) -> Result<DemoMode, std::io::Error> {
@@ -35,9 +37,16 @@ fn parse_mode(arguments: impl IntoIterator<Item = String>) -> Result<DemoMode, s
                 directory: std::path::PathBuf::from(directory),
             })
         }
+        [command, list, flag, directory]
+            if command == "address-book" && list == "list" && flag == "--data-dir" =>
+        {
+            Ok(DemoMode::AddressBookList {
+                directory: std::path::PathBuf::from(directory),
+            })
+        }
         _ => Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "usage:\n  noxis-wallet-crypto-demo [demo]\n  noxis-wallet-crypto-demo address-book --data-dir PATH",
+            "usage:\n  noxis-wallet-crypto-demo [demo]\n  noxis-wallet-crypto-demo address-book --data-dir PATH\n  noxis-wallet-crypto-demo address-book list --data-dir PATH",
         )),
     }
 }
@@ -115,6 +124,24 @@ fn run_address_book_demo(directory: std::path::PathBuf) -> Result<(), Box<dyn st
     Ok(())
 }
 
+fn run_address_book_list(directory: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let book = PublicAddressBook::open(&directory)?;
+    let addresses = book.list()?;
+
+    println!("Noxis public address-book listing — EXPERIMENTAL / PUBLIC DATA ONLY");
+    println!("Directory: {}", directory.display());
+    println!("Canonical public addresses: {}", addresses.len());
+    for address in addresses {
+        println!(
+            "- {} (key epoch {})",
+            hex(&address.address_id()),
+            address.key_epoch()
+        );
+    }
+    println!("No private recipient key, seed, spend key, note, balance, or transaction was read.");
+    Ok(())
+}
+
 fn hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(bytes.len() * 2);
@@ -144,6 +171,18 @@ mod tests {
                 directory: std::path::PathBuf::from("wallet-public"),
             }
         );
+        assert_eq!(
+            parse_mode([
+                String::from("address-book"),
+                String::from("list"),
+                String::from("--data-dir"),
+                String::from("wallet-public"),
+            ])
+            .unwrap(),
+            DemoMode::AddressBookList {
+                directory: std::path::PathBuf::from("wallet-public"),
+            }
+        );
     }
 
     #[test]
@@ -151,5 +190,13 @@ mod tests {
         assert!(parse_mode([String::from("other")]).is_err());
         assert!(parse_mode([String::from("demo"), String::from("extra")]).is_err());
         assert!(parse_mode([String::from("address-book")]).is_err());
+        assert!(
+            parse_mode([
+                String::from("address-book"),
+                String::from("list"),
+                String::from("--data-dir"),
+            ])
+            .is_err()
+        );
     }
 }

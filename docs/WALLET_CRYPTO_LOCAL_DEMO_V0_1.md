@@ -19,6 +19,12 @@ To create and reopen an explicit directory containing only one public address:
 cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo -- address-book --data-dir .\target\noxis-public-addresses
 ```
 
+List and revalidate every managed public address in that directory with:
+
+```powershell
+cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo -- address-book list --data-dir .\target\noxis-public-addresses
+```
+
 The command creates fresh process-local keys and performs this sequence:
 
 1. create one diversified payment address at key epoch 1;
@@ -40,7 +46,9 @@ prints or writes a private key, shared secret, plaintext, or envelope bytes.
 derived filename. It holds an exclusive process-lifetime lock, writes a fresh
 file through a synchronized temporary file and then reopens and decodes it
 strictly. Storing the same address again is idempotent; altered or oversized
-address bytes are rejected on load.
+address bytes are rejected on load. Listing is deterministic by address ID and
+revalidates every managed `address-<id>.nxpa` file before displaying its public
+ID and key epoch.
 
 This catalog intentionally has no private-key slot. Reopening it lets a sender
 reuse public addresses, but cannot decrypt an envelope or spend a note. A
