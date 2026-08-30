@@ -11,7 +11,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{KEYSTORE_HEADER_V2_LENGTH, KeystoreHeaderError, KeystoreHeaderV2};
+use crate::{
+    CandidateKeystorePayloadStore, KEYSTORE_HEADER_V2_LENGTH, KeystoreHeaderError,
+    KeystoreHeaderV2, PayloadStoreError,
+};
 
 /// Process-lifetime lock file for the public candidate-header directory.
 pub const KEYSTORE_HEADER_LOCK_FILE_NAME: &str = ".noxis-wallet-keystore.lock";
@@ -154,6 +157,13 @@ impl CandidateKeystoreHeaderStore {
     /// payload because none exists in this candidate store.
     pub fn load(&self) -> Result<KeystoreHeaderV2, HeaderStoreError> {
         self.load_header_file(&self.header_path())
+    }
+
+    /// Opens the separate synthetic-payload lifecycle while retaining this
+    /// store's exclusive directory lock. It fails closed if a prior payload
+    /// publication left a malformed or unbound temporary file behind.
+    pub fn open_payloads(&self) -> Result<CandidateKeystorePayloadStore<'_>, PayloadStoreError> {
+        CandidateKeystorePayloadStore::open(self)
     }
 
     fn header_path(&self) -> PathBuf {

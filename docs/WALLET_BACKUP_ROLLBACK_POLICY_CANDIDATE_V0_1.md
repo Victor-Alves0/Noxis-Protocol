@@ -2,8 +2,8 @@
 
 ## Estado
 
-**Recibo externo público e payload sintético executáveis; nenhum backup de
-segredo ou restauração de wallet é implementado.**
+**Recibo externo público e ciclo de vida de payload sintético executáveis;
+nenhum backup de segredo ou restauração de wallet é implementado.**
 
 O diretório atual persiste apenas o cabeçalho público `NXKS`. Cada cabeçalho
 canônico agora tem um `KeystoreHeaderIdV1`:
@@ -101,13 +101,13 @@ cargo test -p noxis-wallet-keystore --locked
 
 Os testes confirmam que o ID do cabeçalho é estável após encode/decode e muda
 quando a época muda. Eles também fazem round-trip de `NXKA` e rejeitam cabeçalho,
-geração ou ciphertext diferentes. `NXKP v1` agora exercita em memória a mesma
-ligação com uma raiz sintética; ele ainda não prova backup, restauração ou
-rollback de segredo.
+geração ou ciphertext diferentes. `NXKP v1` agora exercita essa ligação com
+uma raiz sintética e seu ciclo de arquivo; ele ainda não prova backup,
+restauração ou rollback de segredo.
 
 ## Próximo gate
 
-Construir o ciclo de vida em arquivo da fixture `NXKP`: geração, publicação,
-backup, restauração, rollback e interrupção usando `NXKA`. Só após esses testes
-e revisão independente a raiz de wallet poderá atravessar a fronteira do
-keystore.
+Construir e testar o procedimento operacional de backup/restauração da unidade
+`NXKS` + `NXKP` + `NXKA` em locais independentes, incluindo processos
+separados. Só após esses testes, inventário de segredo e revisão independente
+a raiz de wallet poderá atravessar a fronteira do keystore.

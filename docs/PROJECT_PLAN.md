@@ -289,7 +289,8 @@ uma raiz sintética, mas não recebe segredo de usuário nem seleciona uma
 construção de custódia. Um armazenamento separado já grava apenas o cabeçalho
 público de forma atômica/com lock e recupera um temporário canônico. O payload
 opaco sintético `NXKP` já vincula cabeçalho, geração, nonce e recibo `NXKA` em
-testes, mas não existe arquivo de payload, recuperação ou segredo real. Ver
+testes e persiste gerações imutáveis com recuperação de temporário, mas não
+existe backup operacional, restauração ou segredo real. Ver
 [`WALLET_KEYSTORE_SECURITY_GATE_V0_1.md`](WALLET_KEYSTORE_SECURITY_GATE_V0_1.md)
 e [`WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md),
 além do [`WALLET_KEYSTORE_PAYLOAD_SYNTHETIC_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_PAYLOAD_SYNTHETIC_CANDIDATE_V0_1.md).

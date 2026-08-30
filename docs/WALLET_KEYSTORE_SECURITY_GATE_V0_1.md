@@ -11,9 +11,10 @@ shared secret, note, balance or proof.
 
 This boundary is intentional. Encrypting an arbitrary byte blob with a
 password is not, on its own, a safe wallet keystore. The isolated
-`noxis-wallet-keystore` crate now parses and atomically stores only public
-candidate `NXKS` headers, and exercises a synthetic root in unit tests; it does
-not accept a real wallet root. See
+`noxis-wallet-keystore` crate now parses and atomically stores public
+candidate `NXKS` headers plus opaque synthetic `NXKP` ciphertext generations,
+and exercises a synthetic root only in unit tests; it does not accept a real
+wallet root. See
 [`WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md).
 The candidate backup/rollback policy is documented separately in
 [`WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md`](WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md).
@@ -103,16 +104,17 @@ confidentiality, inventory and key recovery among the management concerns; see
 1. Choose the supported operating systems and password/unlock UX.
 2. Publish a narrow keystore-container candidate and its parser limits for
    review; do not put private-key bytes in it initially. **Completed for the
-   public `NXKS v2` header only. `NXKS v1` is revoked.**
+   public `NXKS v2` header and opaque synthetic `NXKP v1` payload only.
+   `NXKS v1` is revoked.**
 3. Define private-key export/import ownership inside a dedicated secret-type
    boundary.
 4. Add a test-only encrypted fixture with no real user wallet, then test
    unlock, wrong-password, tampering, rollback and interruption behavior.
    **The synthetic unlock, wrong-password and header-substitution portions are
-   complete. The public-header lifecycle also covers exclusive locking,
-   synchronized temporary publication and fail-closed temporary recovery;
-   rollback and secret-payload interruption still require a file lifecycle
-   design.**
+   complete. The public-header and synthetic-payload lifecycles also cover one
+   exclusive lock, synchronized temporary publication and fail-closed
+   temporary recovery; operational backup/restore, cross-process evidence and
+   all secret-payload behavior still require design and review.**
 5. Only after review, make a persistent private recipient entry available to a
    non-spending local wallet session.
 

@@ -10,8 +10,11 @@ endereços públicos ou `noxis-wallet-crypto`. Ele define o cabeçalho canônico
 `NXKS v2` de uma futura raiz de wallet e testa internamente a combinação
 Argon2id + XChaCha20-Poly1305 contra uma raiz sintética de 64 bytes.
 
-Há somente um armazenamento de arquivo para o cabeçalho público, com lock e
-publicação atômica. Não há API de importação/exportação de raiz, integração com
+Há armazenamento de arquivo para o cabeçalho público, com lock e publicação
+atômica. Sob esse mesmo lock, a fixture `NXKP` pode persistir ciphertext
+sintético em gerações imutáveis; seu ciclo está descrito em
+[`WALLET_KEYSTORE_PAYLOAD_SYNTHETIC_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_PAYLOAD_SYNTHETIC_CANDIDATE_V0_1.md).
+Não há API de importação/exportação de raiz, integração com
 `CandidateWalletRootV1` nem container de segredo liberado em build normal.
 Consequentemente, este trabalho não cria uma carteira persistente ou
 custodiante.
@@ -69,10 +72,10 @@ Os testes cobrem:
 ## Limites de segurança e operação
 
 - A fixture não grava arquivos e não recebe uma raiz de wallet real.
-- O ciclo de vida **do cabeçalho público** já tem lock exclusivo, criação de
-  arquivo temporário, `sync_all`, rename e recuperação somente de temporário
-  completo/canônico. Um temporário truncado falha fechado. Isso não persiste
-  segredo nem prova durabilidade de um payload futuro.
+- O ciclo de vida do cabeçalho público e da fixture de ciphertext já tem lock
+  exclusivo, criação de temporário, `sync_all`, rename e recuperação somente
+  de temporário completo/canônico. Um temporário truncado falha fechado. Isso
+  não persiste segredo nem prova a durabilidade de um payload real.
 - Ainda não existe backup, recuperação de segredo, UX de senha ou suporte a
   dispositivos. A âncora externa `NXKA` define a política candidata de
   rollback, mas ainda não há payload secreto para protegê-la na prática.
@@ -87,7 +90,7 @@ Os testes cobrem:
 
 A política explícita de backup e rollback foi publicada em
 [`WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md`](WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md).
-O próximo trabalho é estender os testes de interrupção ao futuro arquivo de
-payload secreto, usando o recibo externo `NXKA` já selecionado. Só então um
+O próximo trabalho é testar backup/restauração operacional e entre processos da
+unidade sintética, usando o recibo externo `NXKA` já selecionado. Só então um
 crate de persistência poderá receber uma raiz de sessão por uma interface
 privada, sem tornar seus bytes parte de APIs de endereço, CLI ou transação.

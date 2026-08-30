@@ -2,7 +2,7 @@
 
 ## Estado
 
-**Parser público de ciphertext opaco e cifra exercida somente em testes. Não há API de produção para criar, desbloquear, gravar ou restaurar segredo.**
+**Parser público e ciclo de vida em arquivo para ciphertext opaco; cifra exercida somente em testes. Não há API de produção para criar, desbloquear ou restaurar segredo.**
 
 `NXKP v1` torna verificável a unidade que uma futura política de backup terá de identificar: um payload cifrado associado a um cabeçalho `NXKS v2`, a uma geração monotônica e a um nonce próprio. Ele usa uma raiz sintética de 64 bytes somente dentro dos testes de `noxis-wallet-keystore`; nenhum tipo secreto de wallet cruza esta fronteira.
 
@@ -57,13 +57,37 @@ cargo clippy -p noxis-wallet-keystore --all-targets --locked -- -D warnings
 
 Os testes cobrem round-trip canônico, truncamento, geração/nonce ausentes, senha errada, ciphertext adulterado, cabeçalho substituído, nova geração com nonce distinto e rejeição de uma geração antiga pelo recibo externo mais novo.
 
+## Ciclo de vida sintético em arquivo
+
+`CandidateKeystorePayloadStore` só pode ser aberto a partir do
+`CandidateKeystoreHeaderStore` já bloqueado. Logo, cabeçalho e payload usam o
+mesmo lock de escritor, sem criar um segundo dono concorrente do diretório.
+
+Cada geração é imutável e recebe o nome canônico
+`payload-<generation decimal de 20 dígitos>.nxkp`; por exemplo, a geração 7 é
+`payload-00000000000000000007.nxkp`. A publicação cria primeiro o temporário
+homólogo, sincroniza seus bytes e o renomeia para esse destino inexistente. Não
+há overwrite atômico dependente da plataforma. Na reabertura, um temporário
+canônico e completo é publicado; um temporário truncado, malformado ou ligado
+a outro cabeçalho falha fechado.
+
+O store limita o diretório a 32 gerações sintéticas, exige uma geração acima da
+maior existente e recusa nonce que já apareça em outra geração retida. Para
+leitura, o chamador fornece `NXKA`: o store abre exatamente o nome daquela
+geração e exige coincidência de cabeçalho, geração e identificador de
+ciphertext. Substituir bytes da geração 8 pelos da 7, ou restaurar diretório
+sem a geração ancorada, não satisfaz o recibo externo mais novo.
+
 ## Limites deliberados
 
-- Não existe arquivo `NXKP`, diretório de backup, restauração ou UX de senha.
-- A cifra e a abertura são privadas aos testes; o parser de release manipula somente ciphertext opaco e seus metadados públicos.
-- Não há garantia mecânica de unicidade de nonce entre execuções porque não há armazenamento de geração nem emissor de nonce persistente. Essa garantia é requisito do próximo ciclo de vida de arquivo, não uma alegação desta fixture.
+- Os arquivos `NXKP` carregam somente ciphertext sintético. A cifra e a abertura são privadas aos testes; o parser de release manipula ciphertext opaco e seus metadados públicos.
+- O store aplica unicidade de nonce entre as gerações que ainda estão no diretório. A garantia ainda não cobre restauração a partir de um backup externo, concorrência hostil fora do lock, nem uma futura API de criação de payload real.
+- Não há fluxo de cópia de backup, restauração de segredo ou UX de senha.
 - Não existem seed, chave de gasto, view key, notas, saldo ou nullifier dentro do payload.
 
 ## Próximo gate
 
-Adicionar um ciclo de vida de arquivo **ainda sintético**: publicação atômica de uma geração `NXKP`, recuperação de temporário, comparação obrigatória com um `NXKA` fornecido fora do diretório e testes de interrupção/rollback. Somente depois desses testes e de revisão independente poderá existir uma proposta de container com segredo real.
+Definir e testar o procedimento operacional de cópia/recuperação da unidade
+`NXKS` + `NXKP` + `NXKA` em diretórios distintos, incluindo testes entre
+processos. Somente depois disso, de um inventário de segredos e de revisão
+independente poderá existir uma proposta de container com segredo real.

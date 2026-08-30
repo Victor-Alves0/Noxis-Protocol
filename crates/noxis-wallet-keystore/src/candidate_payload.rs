@@ -138,8 +138,12 @@ impl CandidateKeystorePayloadV1 {
         self.generation
     }
 
+    pub(crate) fn uses_same_nonce_as(self, other: Self) -> bool {
+        self.nonce == other.nonce
+    }
+
     #[cfg(test)]
-    fn seal_synthetic_fixture(
+    pub(crate) fn seal_synthetic_fixture(
         header: KeystoreHeaderV2,
         generation: u64,
         nonce: [u8; XCHACHA20POLY1305_NONCE_LENGTH],
@@ -180,7 +184,7 @@ impl CandidateKeystorePayloadV1 {
     }
 
     #[cfg(test)]
-    fn open_synthetic_fixture(
+    pub(crate) fn open_synthetic_fixture(
         self,
         header: KeystoreHeaderV2,
         password: &[u8],
@@ -304,7 +308,7 @@ fn derive_test_only_key(
 
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum TestOnlyPayloadError {
+pub(crate) enum TestOnlyPayloadError {
     HeaderMismatch,
     InvalidFixtureInput,
     UnlockFailed,

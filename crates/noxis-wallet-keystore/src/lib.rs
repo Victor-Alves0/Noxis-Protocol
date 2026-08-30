@@ -14,6 +14,7 @@ use sha2::{Digest as _, Sha256};
 mod candidate_payload;
 mod external_anchor;
 mod header_store;
+mod payload_store;
 
 pub use candidate_payload::{
     CandidateKeystorePayloadV1, CandidatePayloadCiphertextIdV1, KEYSTORE_PAYLOAD_MAGIC,
@@ -29,6 +30,10 @@ pub use external_anchor::{
 pub use header_store::{
     CandidateKeystoreHeaderStore, HeaderStoreError, HeaderStoreInitializeOutcome,
     KEYSTORE_HEADER_LOCK_FILE_NAME,
+};
+pub use payload_store::{
+    CandidateKeystorePayloadStore, MAX_SYNTHETIC_PAYLOAD_GENERATIONS, PayloadStoreError,
+    PayloadStorePublishOutcome,
 };
 
 /// Candidate keystore-header magic bytes.
