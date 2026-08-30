@@ -87,7 +87,8 @@ sem a geração ancorada, não satisfaz o recibo externo mais novo.
 
 ## Próximo gate
 
-Definir e testar o procedimento operacional de cópia/recuperação da unidade
-`NXKS` + `NXKP` + `NXKA` em diretórios distintos, incluindo testes entre
-processos. Somente depois disso, de um inventário de segredos e de revisão
-independente poderá existir uma proposta de container com segredo real.
+O bundle portátil `NXKB` agora cobre cópia e recuperação entre diretórios, sem
+embutir `NXKA`. O próximo passo é uma demonstração operacional entre processos
+e testes de interrupção da restauração de múltiplos arquivos. Só depois disso,
+de um inventário de segredos e de revisão independente poderá existir uma
+proposta de container com segredo real.

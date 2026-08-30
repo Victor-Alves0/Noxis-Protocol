@@ -1,10 +1,10 @@
 //! Bounded candidate keystore-container boundary.
 //!
-//! This crate persists only the exact public `NXKS` header candidate; it has no
-//! wallet-root import/export API and no release-mode secret container. It
-//! exercises password-based sealing only against a synthetic root in unit
-//! tests. A future reviewed keystore may depend on this crate; wallet, ledger
-//! and public-address crates must not own secret files.
+//! This crate persists public `NXKS` headers plus opaque synthetic `NXKP`
+//! ciphertext only. It has no wallet-root import/export API and no release-mode
+//! secret container. Password-based sealing is exercised only against a
+//! synthetic root in unit tests. A future reviewed keystore may depend on this
+//! crate; wallet, ledger and public-address crates must not own secret files.
 
 use std::fmt;
 
@@ -15,6 +15,7 @@ mod candidate_payload;
 mod external_anchor;
 mod header_store;
 mod payload_store;
+mod recovery_bundle;
 
 pub use candidate_payload::{
     CandidateKeystorePayloadV1, CandidatePayloadCiphertextIdV1, KEYSTORE_PAYLOAD_MAGIC,
@@ -34,6 +35,11 @@ pub use header_store::{
 pub use payload_store::{
     CandidateKeystorePayloadStore, MAX_SYNTHETIC_PAYLOAD_GENERATIONS, PayloadStoreError,
     PayloadStorePublishOutcome,
+};
+pub use recovery_bundle::{
+    CandidateSyntheticRecoveryBundleV1, RecoveryBundleError, RecoveryRestoreOutcome,
+    SYNTHETIC_RECOVERY_BUNDLE_MAGIC, SYNTHETIC_RECOVERY_BUNDLE_V1_LENGTH,
+    SYNTHETIC_RECOVERY_BUNDLE_VERSION,
 };
 
 /// Candidate keystore-header magic bytes.

@@ -13,7 +13,8 @@ This boundary is intentional. Encrypting an arbitrary byte blob with a
 password is not, on its own, a safe wallet keystore. The isolated
 `noxis-wallet-keystore` crate now parses and atomically stores public
 candidate `NXKS` headers plus opaque synthetic `NXKP` ciphertext generations,
-and exercises a synthetic root only in unit tests; it does not accept a real
+and can transport them in `NXKB` only with a separately supplied `NXKA` receipt.
+It exercises a synthetic root only in unit tests; it does not accept a real
 wallet root. See
 [`WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md).
 The candidate backup/rollback policy is documented separately in

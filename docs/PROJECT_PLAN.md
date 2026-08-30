@@ -286,19 +286,22 @@ proibida até existir especificação de KDF/AEAD, formato limitado, inventário
 chaves, política de backup/rollback e testes adversariais. Um crate isolado já
 decodifica o cabeçalho público candidato `NXKS` e testa Argon2id + XChaCha sobre
 uma raiz sintética, mas não recebe segredo de usuário nem seleciona uma
-construção de custódia. Um armazenamento separado já grava apenas o cabeçalho
-público de forma atômica/com lock e recupera um temporário canônico. O payload
-opaco sintético `NXKP` já vincula cabeçalho, geração, nonce e recibo `NXKA` em
-testes e persiste gerações imutáveis com recuperação de temporário, mas não
-existe backup operacional, restauração ou segredo real. Ver
+construção de custódia. O armazenamento de cabeçalho e payload sintético já
+usa lock único, publicação atômica por temporário e recuperação canônica. O
+payload opaco sintético `NXKP` já vincula cabeçalho, geração, nonce e recibo
+`NXKA` em testes e persiste gerações imutáveis. O bundle
+portátil `NXKB` já restaura esses bytes opacos em outro diretório apenas quando
+um `NXKA` externo confere; ainda não existe restauração operacional entre
+processos ou segredo real. Ver
 [`WALLET_KEYSTORE_SECURITY_GATE_V0_1.md`](WALLET_KEYSTORE_SECURITY_GATE_V0_1.md)
 e [`WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md),
-além do [`WALLET_KEYSTORE_PAYLOAD_SYNTHETIC_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_PAYLOAD_SYNTHETIC_CANDIDATE_V0_1.md).
+além do [`WALLET_KEYSTORE_PAYLOAD_SYNTHETIC_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_PAYLOAD_SYNTHETIC_CANDIDATE_V0_1.md)
+e do [`WALLET_SYNTHETIC_RECOVERY_BUNDLE_CANDIDATE_V0_1.md`](WALLET_SYNTHETIC_RECOVERY_BUNDLE_CANDIDATE_V0_1.md).
 O ID público canônico do cabeçalho já pode ser usado como âncora externa, mas a
 política agora seleciona o recibo externo público `NXKA` mantido pelo usuário.
 Rollback ainda exige que ele esteja fora do diretório; não há
-backup/restauração de segredo até os fixtures de payload e recuperação serem
-concluídos. Ver
+backup/restauração de segredo até haver testes operacionais entre processos,
+recuperação de interrupção e revisão. Ver
 [`WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md`](WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md).
 
 ### 6. Adaptadores de ativos e políticas de emissão
