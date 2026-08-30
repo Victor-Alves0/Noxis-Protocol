@@ -7,12 +7,13 @@
 canônica `NXPU v1`, ela executa e verifica, nesta ordem:
 
 1. uma prova local de `H_INTENT` sobre os 640 bytes públicos da intenção;
-2. uma prova privada de `H_NOTE` para o preimage da saída no slot canônico 0;
-3. uma prova privada de `H_NOTE` para o preimage da saída no slot canônico 1.
+2. uma prova privada de `H_NOTE` com vínculo de `asset_id` para a saída no slot canônico 0;
+3. uma prova privada de `H_NOTE` com vínculo de `asset_id` para a saída no slot canônico 1.
 
 Cada resultado `H_NOTE` é convertido de forma estrita para
-`NoteCommitmentV2` e comparado ao commitment já presente no mesmo slot da
-intenção. As três provas opacas são verificadas e descartadas antes de o
+`NoteCommitmentV2`, comparado ao commitment já presente no mesmo slot e tem
+seus bytes públicos de ativo comparados ao único `asset_id` da intenção. As
+três provas opacas são verificadas e descartadas antes de o
 preflight devolver seu recibo público. A revalidação posterior repete todos os
 vínculos públicos e de estado candidato, mas não tenta fingir que pode verificar
 provas que já foram descartadas.
@@ -38,7 +39,7 @@ Este preflight **não** é uma prova de transferência privada, prova agregada,
 prova recursiva, artefato portátil ou autorização do ledger. Em especial, ele
 ainda não prova:
 
-- a semântica interna da abertura (ativo, valor, destinatário, `rho` e `rcm`);
+- a semântica interna restante da abertura (valor, destinatário, `rho` e `rcm`);
 - conservação de valores em zero knowledge;
 - que o digest de ciphertext corresponde a um envelope cifrado da nota;
 - inserção das saídas na árvore de notas ou uma atualização atômica do estado;

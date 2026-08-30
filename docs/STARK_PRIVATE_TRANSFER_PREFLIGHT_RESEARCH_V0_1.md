@@ -11,7 +11,7 @@ privadas de saída. A execução faz, nesta ordem:
 1. revalida a declaração pública, âncora e transição local de nullifiers;
 2. prova e verifica `H_INTENT` **uma única vez**;
 3. prova e verifica posse/Merkle de profundidade 32 para cada input;
-4. prova e verifica `H_NOTE` para cada output;
+4. prova e verifica `H_NOTE` com vínculo do ativo público para cada output;
 5. confere todos os resultados públicos contra os slots canônicos da mesma
    intenção e devolve apenas um recibo de resultados públicos.
 
@@ -39,8 +39,8 @@ Esta execução **não** é uma transação privada submetível. Ainda não há:
 - AIR única que absorva todas as relações;
 - agregação ou recursão das quatro provas;
 - prova privada da transição completa `NXSM` (a witness é local transparente);
-- regras aritmetizadas de valor/ativo, unicidade de `rho`/`rcm` e semântica de
-  abertura no mesmo sistema de prova;
+- regras aritmetizadas de valor, unicidade de `rho`/`rcm` e semântica restante
+  de abertura no mesmo sistema de prova;
 - vínculo entre commitment de saída e envelope cifrado/digest de ciphertext;
 - inserção atômica de outputs, estado privado v2 persistente, verificador
   selecionado, formato de prova ou aceitação pelo consenso/ledger.
@@ -61,8 +61,9 @@ duas saídas privadas ordenadas canonicamente e uma mesma âncora candidata. Em
 seguida executa toda a sequência e testa rejeição ao alterar o commitment de
 intenção retido. Como o backend atual não agrega provas, o teste é
 computacionalmente mais caro que as verificações unitárias isoladas. Na máquina
-de desenvolvimento de referência, a execução release medida em 2026-08-30
-terminou em **440,17 segundos**; durante a execução, o processo observado
+de desenvolvimento de referência, a execução release mais recente, medida em
+2026-08-30 com vínculo de ativo nas duas saídas, terminou em **430,95
+segundos**; durante a execução, o processo observado
 atingiu aproximadamente **4 GB** de memória residente. Esses números são uma
 medição de pesquisa local, não meta de desempenho nem garantia operacional.
 

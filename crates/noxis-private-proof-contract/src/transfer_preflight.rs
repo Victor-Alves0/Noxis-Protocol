@@ -9,7 +9,7 @@ use std::fmt;
 
 use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
 use noxis_stark_experiment::{
-    Poseidon2P24IntentExperimentResult, Poseidon2P24NoteExperimentResult,
+    Poseidon2P24IntentExperimentResult, Poseidon2P24NoteWithAssetExperimentResult,
     Poseidon2P24OwnershipExperimentResult, StarkExperimentError, prove_and_verify_p24_intent,
 };
 
@@ -37,7 +37,7 @@ pub struct CandidatePrivateTransferStarkPreflightResultsV1 {
     /// Public ownership results for canonical input slots zero and one.
     pub inputs: [Poseidon2P24OwnershipExperimentResult; 2],
     /// Public `H_NOTE` results for canonical output slots zero and one.
-    pub outputs: [Poseidon2P24NoteExperimentResult; 2],
+    pub outputs: [Poseidon2P24NoteWithAssetExperimentResult; 2],
 }
 
 /// Receipt from one complete run of the currently available proof relations.
@@ -313,8 +313,10 @@ mod tests {
                 )
             };
 
-        let output_one = note_with_recipient(privacy.hash_addr(&[21; 32]).unwrap(), 13);
-        let output_two = note_with_recipient(privacy.hash_addr(&[37; 32]).unwrap(), 17);
+        let mut output_one = note_with_recipient(privacy.hash_addr(&[21; 32]).unwrap(), 13);
+        let mut output_two = note_with_recipient(privacy.hash_addr(&[37; 32]).unwrap(), 17);
+        output_one[2..34].copy_from_slice(&[5; 32]);
+        output_two[2..34].copy_from_slice(&[5; 32]);
         let mut outputs = [output_one, output_two].map(|note| {
             (
                 NoteCommitmentV2::from_elements(privacy.hash_note(&note).unwrap()).unwrap(),

@@ -4,7 +4,9 @@
 //! range-checks every byte with an eight-bit decomposition, reconstructs its
 //! sixty `BytePack3LE` elements and proves the four absorption permutations
 //! plus the prescribed squeezing permutation. Only the 16-element note
-//! commitment is public.
+//! commitment is public. A second, deliberately separate research entry point
+//! also exposes the canonical 32-byte `asset_id` and constrains it to bytes
+//! 2..34 of that private preimage.
 //!
 //! This is a byte-hash relation, not yet a semantic note-opening or
 //! note-ownership relation. A later composed AIR must bind the recipient field
@@ -38,7 +40,11 @@ const NOTE_BITS_OFFSET: usize = NOTE_BYTES_OFFSET + NOTE_INPUT_BYTES;
 const NOTE_PACKED_OFFSET: usize = NOTE_BITS_OFFSET + (NOTE_INPUT_BYTES * NOTE_BITS_PER_BYTE);
 const NOTE_WITNESS_ELEMENTS: usize = NOTE_PACKED_OFFSET + NOTE_INPUT_ELEMENTS;
 const NOTE_TRACE_WIDTH: usize = NOTE_WITNESS_OFFSET + NOTE_WITNESS_ELEMENTS;
-const NOTE_PUBLIC_VALUES: usize = 16;
+const NOTE_COMMITMENT_PUBLIC_VALUES: usize = 16;
+const NOTE_ASSET_BYTES: usize = 32;
+const NOTE_ASSET_OFFSET: usize = 2;
+const NOTE_PUBLIC_VALUES: usize = NOTE_COMMITMENT_PUBLIC_VALUES;
+const NOTE_WITH_ASSET_PUBLIC_VALUES: usize = NOTE_COMMITMENT_PUBLIC_VALUES + NOTE_ASSET_BYTES;
 
 /// Public result after an independently verified `H_NOTE` candidate proof.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -49,11 +55,24 @@ pub struct Poseidon2P24NoteExperimentResult {
     pub trace_rows: usize,
 }
 
+/// Public result after a private `H_NOTE` proof that also binds the note's
+/// canonical asset bytes to a public asset identifier.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Poseidon2P24NoteWithAssetExperimentResult {
+    /// The public 16-element note commitment.
+    pub note_commitment: BabyBearDigestV2,
+    /// The public `AssetId` bytes constrained inside the AIR.
+    pub asset_id: [u8; NOTE_ASSET_BYTES],
+    /// Number of rows in the fixed private trace.
+    pub trace_rows: usize,
+}
+
 /// AIR for the exact `NXPH v1` `H_NOTE(note_preimage)` relation.
 #[derive(Clone, Debug)]
 struct Poseidon2P24NoteAir {
     permutation: Poseidon2P24Air,
     iv: [u32; 9],
+    bind_asset: bool,
 }
 
 impl Poseidon2P24NoteAir {
@@ -62,6 +81,18 @@ impl Poseidon2P24NoteAir {
             permutation: Poseidon2P24Air::from_reference(reference),
             iv: CandidatePoseidon2P24NoteDomainsManifestV1::new()
                 .iv(Poseidon2P24NoteDomainV1::Note)?,
+            bind_asset: false,
+        })
+    }
+
+    fn from_reference_with_asset(
+        reference: &Poseidon2P24Reference,
+    ) -> Result<Self, StarkExperimentError> {
+        Ok(Self {
+            permutation: Poseidon2P24Air::from_reference(reference),
+            iv: CandidatePoseidon2P24NoteDomainsManifestV1::new()
+                .iv(Poseidon2P24NoteDomainV1::Note)?,
+            bind_asset: true,
         })
     }
 }
@@ -72,7 +103,11 @@ impl<F> BaseAir<F> for Poseidon2P24NoteAir {
     }
 
     fn num_public_values(&self) -> usize {
-        NOTE_PUBLIC_VALUES
+        if self.bind_asset {
+            NOTE_WITH_ASSET_PUBLIC_VALUES
+        } else {
+            NOTE_PUBLIC_VALUES
+        }
     }
 
     fn max_constraint_degree(&self) -> Option<usize> {
@@ -94,6 +129,14 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24NoteAir {
         let next_witness = &next[NOTE_WITNESS_OFFSET..];
 
         self.assert_private_preimage_bytes::<AB>(builder, witness);
+        if self.bind_asset {
+            for asset_byte in 0..NOTE_ASSET_BYTES {
+                builder.assert_eq(
+                    witness[NOTE_BYTES_OFFSET + NOTE_ASSET_OFFSET + asset_byte],
+                    public_values[NOTE_COMMITMENT_PUBLIC_VALUES + asset_byte],
+                );
+            }
+        }
         for lane in 0..NOTE_WITNESS_ELEMENTS {
             builder
                 .when_transition()
@@ -134,7 +177,7 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24NoteAir {
         let round_states: Vec<Vec<AB::Expr>> = (0..P24_ROUNDS)
             .map(|round| self.permutation.round_expression::<AB>(local_state, round))
             .collect();
-        let public_output = public_values
+        let public_output = public_values[..NOTE_COMMITMENT_PUBLIC_VALUES]
             .iter()
             .copied()
             .map(Into::into)
@@ -238,6 +281,36 @@ pub fn prove_and_verify_p24_note(
     })
 }
 
+/// Produces and independently verifies a hiding-FRI `H_NOTE` STARK while also
+/// constraining bytes 2..34 of the private canonical preimage to `asset_id`.
+///
+/// The verifier receives the 16-element note commitment and 32 asset bytes.
+/// Value, recipient commitment, `rho` and `rcm` remain private. This still
+/// does not establish output semantics, value conservation, recipient-key
+/// binding, encryption, state insertion or a transfer authorization.
+pub fn prove_and_verify_p24_note_with_asset(
+    note_preimage: [u8; NOTE_INPUT_BYTES],
+    asset_id: [u8; NOTE_ASSET_BYTES],
+) -> Result<Poseidon2P24NoteWithAssetExperimentResult, StarkExperimentError> {
+    let reference = Poseidon2P24Reference::load_candidate()?;
+    let private_reference = Poseidon2P24PrivacyReference::load_candidate()?;
+    let note_commitment = private_reference.hash_note(&note_preimage)?;
+    let air = Poseidon2P24NoteAir::from_reference_with_asset(&reference)?;
+    let trace = build_p24_note_trace(&air, note_preimage);
+    let mut public_values: Vec<Val> = note_commitment.map(Val::from_u32).into();
+    public_values.extend(asset_id.map(Val::from_u8));
+    debug_assert_eq!(public_values.len(), NOTE_WITH_ASSET_PUBLIC_VALUES);
+    let config = make_hiding_config();
+    let proof = prove(&config, &air, trace, &public_values);
+    verify(&config, &air, &proof, &public_values)
+        .map_err(|_| StarkExperimentError::VerificationFailed)?;
+    Ok(Poseidon2P24NoteWithAssetExperimentResult {
+        note_commitment,
+        asset_id,
+        trace_rows: NOTE_TRACE_ROWS,
+    })
+}
+
 /// Command-friendly fixed preimage demonstration for the private `H_NOTE` proof.
 pub fn run_p24_note_research_smoke()
 -> Result<Poseidon2P24NoteExperimentResult, StarkExperimentError> {
@@ -333,6 +406,47 @@ mod tests {
             reference.hash_note(&preimage).unwrap()
         );
         assert_eq!(result.trace_rows, NOTE_TRACE_ROWS);
+    }
+
+    #[test]
+    fn note_stark_binds_the_public_asset_to_its_private_preimage_bytes() {
+        let asset_id = [0xA5; NOTE_ASSET_BYTES];
+        let mut preimage = core::array::from_fn(|index| (index as u8).wrapping_mul(7));
+        preimage[NOTE_ASSET_OFFSET..NOTE_ASSET_OFFSET + NOTE_ASSET_BYTES]
+            .copy_from_slice(&asset_id);
+        let result = prove_and_verify_p24_note_with_asset(preimage, asset_id).unwrap();
+        let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
+
+        assert_eq!(
+            result.note_commitment,
+            reference.hash_note(&preimage).unwrap()
+        );
+        assert_eq!(result.asset_id, asset_id);
+        assert_eq!(result.trace_rows, NOTE_TRACE_ROWS);
+    }
+
+    #[test]
+    fn note_with_asset_air_rejects_a_different_public_asset() {
+        let asset_id = [0xA5; NOTE_ASSET_BYTES];
+        let mut preimage = core::array::from_fn(|index| (index as u8).wrapping_mul(7));
+        preimage[NOTE_ASSET_OFFSET..NOTE_ASSET_OFFSET + NOTE_ASSET_BYTES]
+            .copy_from_slice(&asset_id);
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let private_reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
+        let air = Poseidon2P24NoteAir::from_reference_with_asset(&reference).unwrap();
+        let trace = build_p24_note_trace(&air, preimage);
+        let mut public_values: Vec<Val> = private_reference
+            .hash_note(&preimage)
+            .unwrap()
+            .map(Val::from_u32)
+            .into();
+        public_values.extend([0x5A; NOTE_ASSET_BYTES].map(Val::from_u8));
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                p3_air::check_constraints(&air, &trace, &public_values);
+            }))
+            .is_err()
+        );
     }
 
     #[test]

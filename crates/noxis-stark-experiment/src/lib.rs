@@ -50,7 +50,8 @@ pub use intent::{
     Poseidon2P24IntentExperimentResult, prove_and_verify_p24_intent, run_p24_intent_research_smoke,
 };
 pub use note::{
-    Poseidon2P24NoteExperimentResult, prove_and_verify_p24_note, run_p24_note_research_smoke,
+    Poseidon2P24NoteExperimentResult, Poseidon2P24NoteWithAssetExperimentResult,
+    prove_and_verify_p24_note, prove_and_verify_p24_note_with_asset, run_p24_note_research_smoke,
 };
 pub use nxsm::{
     Poseidon2P24NxsmPrefix8ExperimentResult, Poseidon2P24NxsmPrefix8Proof,

@@ -12,8 +12,8 @@ use std::fmt;
 use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
 use noxis_privacy_types::{NoteCommitmentV2, PrivacyTypesError};
 use noxis_stark_experiment::{
-    Poseidon2P24IntentExperimentResult, Poseidon2P24NoteExperimentResult, StarkExperimentError,
-    prove_and_verify_p24_intent, prove_and_verify_p24_note,
+    Poseidon2P24IntentExperimentResult, Poseidon2P24NoteWithAssetExperimentResult,
+    StarkExperimentError, prove_and_verify_p24_intent, prove_and_verify_p24_note_with_asset,
 };
 
 use crate::{
@@ -46,8 +46,8 @@ impl CandidateOutputNoteWitnessV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CandidateIntentOutputNotesPreflightV1 {
     intent_result: Poseidon2P24IntentExperimentResult,
-    first_result: Poseidon2P24NoteExperimentResult,
-    second_result: Poseidon2P24NoteExperimentResult,
+    first_result: Poseidon2P24NoteWithAssetExperimentResult,
+    second_result: Poseidon2P24NoteWithAssetExperimentResult,
     statement_id: CandidatePrivateTransferProofPublicStatementIdV1,
 }
 
@@ -59,8 +59,8 @@ pub struct CandidateIntentOutputNotesPreflightV1 {
 /// verification artifact.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CandidateOutputNotesPreflightV1 {
-    first_result: Poseidon2P24NoteExperimentResult,
-    second_result: Poseidon2P24NoteExperimentResult,
+    first_result: Poseidon2P24NoteWithAssetExperimentResult,
+    second_result: Poseidon2P24NoteWithAssetExperimentResult,
     statement_id: CandidatePrivateTransferProofPublicStatementIdV1,
 }
 
@@ -71,12 +71,12 @@ impl CandidateIntentOutputNotesPreflightV1 {
     }
 
     /// Public `H_NOTE` result for canonical output index zero.
-    pub const fn first_result(&self) -> &Poseidon2P24NoteExperimentResult {
+    pub const fn first_result(&self) -> &Poseidon2P24NoteWithAssetExperimentResult {
         &self.first_result
     }
 
     /// Public `H_NOTE` result for canonical output index one.
-    pub const fn second_result(&self) -> &Poseidon2P24NoteExperimentResult {
+    pub const fn second_result(&self) -> &Poseidon2P24NoteWithAssetExperimentResult {
         &self.second_result
     }
 
@@ -88,12 +88,12 @@ impl CandidateIntentOutputNotesPreflightV1 {
 
 impl CandidateOutputNotesPreflightV1 {
     /// Public `H_NOTE` result for canonical output index zero.
-    pub const fn first_result(&self) -> &Poseidon2P24NoteExperimentResult {
+    pub const fn first_result(&self) -> &Poseidon2P24NoteWithAssetExperimentResult {
         &self.first_result
     }
 
     /// Public `H_NOTE` result for canonical output index one.
-    pub const fn second_result(&self) -> &Poseidon2P24NoteExperimentResult {
+    pub const fn second_result(&self) -> &Poseidon2P24NoteWithAssetExperimentResult {
         &self.second_result
     }
 
@@ -136,9 +136,10 @@ pub fn run_candidate_output_notes_preflight(
     witnesses: &[CandidateOutputNoteWitnessV1; 2],
 ) -> Result<CandidateOutputNotesPreflightV1, CandidateOutputNotesError> {
     statement.revalidate(pre_tree)?;
-    let first_result = prove_and_verify_p24_note(witnesses[0].note_preimage)?;
+    let asset_id = statement.air_public_inputs().intent().asset_id().0;
+    let first_result = prove_and_verify_p24_note_with_asset(witnesses[0].note_preimage, asset_id)?;
     validate_output_result(statement, 0, &first_result)?;
-    let second_result = prove_and_verify_p24_note(witnesses[1].note_preimage)?;
+    let second_result = prove_and_verify_p24_note_with_asset(witnesses[1].note_preimage, asset_id)?;
     validate_output_result(statement, 1, &second_result)?;
     Ok(CandidateOutputNotesPreflightV1 {
         first_result,
@@ -153,7 +154,7 @@ pub fn revalidate_candidate_intent_output_notes_preflight(
     preflight: &CandidateIntentOutputNotesPreflightV1,
     statement: &CandidatePrivateTransferProofPublicStatementV1,
     pre_tree: &NullifierSparseTreeStateV1,
-) -> Result<[Poseidon2P24NoteExperimentResult; 2], CandidateOutputNotesError> {
+) -> Result<[Poseidon2P24NoteWithAssetExperimentResult; 2], CandidateOutputNotesError> {
     if preflight.statement_id != statement.statement_id() {
         return Err(CandidateOutputNotesError::StatementIdMismatch);
     }
@@ -172,7 +173,7 @@ pub fn revalidate_candidate_output_notes_preflight(
     preflight: &CandidateOutputNotesPreflightV1,
     statement: &CandidatePrivateTransferProofPublicStatementV1,
     pre_tree: &NullifierSparseTreeStateV1,
-) -> Result<[Poseidon2P24NoteExperimentResult; 2], CandidateOutputNotesError> {
+) -> Result<[Poseidon2P24NoteWithAssetExperimentResult; 2], CandidateOutputNotesError> {
     if preflight.statement_id != statement.statement_id() {
         return Err(CandidateOutputNotesError::StatementIdMismatch);
     }
@@ -198,8 +199,11 @@ fn validate_intent_result(
 fn validate_output_result(
     statement: &CandidatePrivateTransferProofPublicStatementV1,
     output_index: usize,
-    result: &Poseidon2P24NoteExperimentResult,
+    result: &Poseidon2P24NoteWithAssetExperimentResult,
 ) -> Result<(), CandidateOutputNotesError> {
+    if result.asset_id != statement.air_public_inputs().intent().asset_id().0 {
+        return Err(CandidateOutputNotesError::AssetIdMismatch);
+    }
     let actual = NoteCommitmentV2::from_elements(result.note_commitment)?;
     let expected = statement.air_public_inputs().intent().outputs()[output_index].commitment();
     if actual != expected {
@@ -217,6 +221,7 @@ pub enum CandidateOutputNotesError {
     PublicValue(PrivacyTypesError),
     StatementIdMismatch,
     IntentCommitmentMismatch,
+    AssetIdMismatch,
     OutputCommitmentMismatch { output_index: usize },
 }
 
@@ -277,7 +282,9 @@ mod tests {
     ) {
         let privacy = Poseidon2P24PrivacyReference::load_candidate().unwrap();
         let tree_reference = Poseidon2P24Reference::load_candidate().unwrap();
-        let mut outputs = output_notes.map(|note_preimage| {
+        let asset_id = [5; 32];
+        let mut outputs = output_notes.map(|mut note_preimage| {
+            note_preimage[2..34].copy_from_slice(&asset_id);
             let commitment =
                 NoteCommitmentV2::from_elements(privacy.hash_note(&note_preimage).unwrap())
                     .unwrap();
@@ -323,7 +330,7 @@ mod tests {
             anchor.state_id(),
             anchor.note_tree_parameters(),
             anchor.note_root(),
-            AssetId::new([5; 32]),
+            AssetId::new(asset_id),
             [
                 NullifierV2::from_elements(vector(11)).unwrap(),
                 NullifierV2::from_elements(vector(13)).unwrap(),
@@ -384,10 +391,11 @@ mod tests {
     #[test]
     fn rejects_a_retained_result_for_the_wrong_output_slot() {
         let (statement, pre_tree, _) = statement_for_outputs([note(9), note(21)]);
-        let incorrect = Poseidon2P24NoteExperimentResult {
+        let incorrect = Poseidon2P24NoteWithAssetExperimentResult {
             note_commitment: statement.air_public_inputs().intent().outputs()[1]
                 .commitment()
                 .elements(),
+            asset_id: statement.air_public_inputs().intent().asset_id().0,
             trace_rows: 256,
         };
         assert!(matches!(

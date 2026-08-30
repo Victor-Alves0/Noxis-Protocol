@@ -169,6 +169,13 @@ Ainda não há AIR única, agregação, envelope, transição privada `NXSM`, es
 v2 ou aceitação pelo ledger. Ver
 [`STARK_PRIVATE_TRANSFER_PREFLIGHT_RESEARCH_V0_1.md`](STARK_PRIVATE_TRANSFER_PREFLIGHT_RESEARCH_V0_1.md).
 
+**Ativo dentro da AIR de saída:** a variante `H_NOTE` para outputs agora torna
+públicos e restringe os 32 bytes de `asset_id` nos offsets canônicos 2..34 da
+pré-imagem privada. O preflight 2×2 a usa para ambas as saídas e compara o
+resultado com o ativo da intenção; valor, destinatário, aleatoriedades e
+conservação ainda não fazem parte dessa relação. Ver
+[`STARK_H_NOTE_ASSET_BINDING_RESEARCH_V0_1.md`](STARK_H_NOTE_ASSET_BINDING_RESEARCH_V0_1.md).
+
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem
 codec/`Debug`/`Clone`, caminho P24 de 32 níveis e uma declaração executável
