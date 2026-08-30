@@ -8,6 +8,11 @@
 use std::fmt;
 
 use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
+use noxis_private_packet_validation::{
+    CandidatePrivatePacketEnvelopeValidationError,
+    CandidatePrivateTransferPacketEnvelopeValidationV1,
+    validate_candidate_private_transfer_packet_envelopes,
+};
 use noxis_stark_experiment::{
     Poseidon2P24IntentExperimentResult, Poseidon2P24NoteWithAssetExperimentResult,
     Poseidon2P24OwnershipExperimentResult, StarkExperimentError, prove_and_verify_p24_intent,
@@ -53,6 +58,30 @@ pub struct CandidatePrivateTransferStarkPreflightV1 {
     ownership: CandidateAnchoredOwnershipPairPreflightV1,
     outputs: CandidateOutputNotesPreflightV1,
     statement_id: CandidatePrivateTransferProofPublicStatementIdV1,
+}
+
+/// Complete local preflight retaining the validated `NXPT` envelope receipt
+/// beside the sequential STARK-relation receipt.
+///
+/// This proves only that one local process first checked the candidate packet
+/// envelope bindings and then used its same intent for the existing relations.
+/// It is not a portable proof, packet authorization or ledger transition.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CandidatePacketBoundPrivateTransferStarkPreflightV1 {
+    packet_envelopes: CandidatePrivateTransferPacketEnvelopeValidationV1,
+    stark: CandidatePrivateTransferStarkPreflightV1,
+}
+
+impl CandidatePacketBoundPrivateTransferStarkPreflightV1 {
+    /// The receipt proving the two packet envelopes matched the packet intent.
+    pub const fn packet_envelopes(&self) -> &CandidatePrivateTransferPacketEnvelopeValidationV1 {
+        &self.packet_envelopes
+    }
+
+    /// The receipt from the sequential private-transfer relation preflight.
+    pub const fn stark(&self) -> &CandidatePrivateTransferStarkPreflightV1 {
+        &self.stark
+    }
 }
 
 impl CandidatePrivateTransferStarkPreflightV1 {
@@ -112,6 +141,34 @@ pub fn run_candidate_private_transfer_stark_preflight(
     })
 }
 
+/// Runs the candidate preflight only after a separate `NXPT` envelope receipt
+/// has accepted both `NXRE` values, and only if that receipt's intent equals
+/// the statement's intent byte-for-byte.
+pub fn run_candidate_packet_bound_private_transfer_stark_preflight(
+    packet_envelopes: CandidatePrivateTransferPacketEnvelopeValidationV1,
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+    nxsm_witness: &CandidateNxsmNullifierTransitionWitnessV1,
+    input_witnesses: &[CandidateAnchoredOwnershipWitnessV1; 2],
+    output_witnesses: &[CandidateOutputNoteWitnessV1; 2],
+) -> Result<
+    CandidatePacketBoundPrivateTransferStarkPreflightV1,
+    CandidatePrivateTransferStarkPreflightError,
+> {
+    validate_packet_intent(&packet_envelopes, statement)?;
+    let stark = run_candidate_private_transfer_stark_preflight(
+        statement,
+        pre_tree,
+        nxsm_witness,
+        input_witnesses,
+        output_witnesses,
+    )?;
+    Ok(CandidatePacketBoundPrivateTransferStarkPreflightV1 {
+        packet_envelopes,
+        stark,
+    })
+}
+
 /// Rechecks every retained public and transparent-state binding from a
 /// completed complete preflight. It cannot reverify the discarded proofs.
 pub fn revalidate_candidate_private_transfer_stark_preflight(
@@ -142,6 +199,43 @@ pub fn revalidate_candidate_private_transfer_stark_preflight(
     })
 }
 
+/// Revalidates the packet receipt from its retained packet bytes, checks it
+/// against the same statement intent, then revalidates the retained public
+/// STARK-relation bindings. Opaque proofs remain unavailable by design.
+pub fn revalidate_candidate_packet_bound_private_transfer_stark_preflight(
+    preflight: &CandidatePacketBoundPrivateTransferStarkPreflightV1,
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+    nxsm_witness: &CandidateNxsmNullifierTransitionWitnessV1,
+) -> Result<
+    CandidatePrivateTransferStarkPreflightResultsV1,
+    CandidatePrivateTransferStarkPreflightError,
+> {
+    let recomputed_packet = validate_candidate_private_transfer_packet_envelopes(
+        preflight.packet_envelopes.packet().clone(),
+    )?;
+    if recomputed_packet != preflight.packet_envelopes {
+        return Err(CandidatePrivateTransferStarkPreflightError::PacketReceiptMismatch);
+    }
+    validate_packet_intent(&recomputed_packet, statement)?;
+    revalidate_candidate_private_transfer_stark_preflight(
+        &preflight.stark,
+        statement,
+        pre_tree,
+        nxsm_witness,
+    )
+}
+
+fn validate_packet_intent(
+    packet_envelopes: &CandidatePrivateTransferPacketEnvelopeValidationV1,
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+) -> Result<(), CandidatePrivateTransferStarkPreflightError> {
+    if packet_envelopes.packet().intent() != statement.air_public_inputs().intent() {
+        return Err(CandidatePrivateTransferStarkPreflightError::PacketIntentMismatch);
+    }
+    Ok(())
+}
+
 fn validate_intent_result(
     statement: &CandidatePrivateTransferProofPublicStatementV1,
     result: &Poseidon2P24IntentExperimentResult,
@@ -159,9 +253,12 @@ pub enum CandidatePrivateTransferStarkPreflightError {
     NxsmWitness(CandidateNxsmNullifierTransitionWitnessError),
     Ownership(CandidateAnchoredOwnershipError),
     OutputNotes(CandidateOutputNotesError),
+    PacketEnvelope(CandidatePrivatePacketEnvelopeValidationError),
     Stark(StarkExperimentError),
     StatementIdMismatch,
     IntentCommitmentMismatch,
+    PacketIntentMismatch,
+    PacketReceiptMismatch,
 }
 
 impl From<CandidatePrivateTransferProofPublicStatementError>
@@ -192,6 +289,14 @@ impl From<CandidateOutputNotesError> for CandidatePrivateTransferStarkPreflightE
     }
 }
 
+impl From<CandidatePrivatePacketEnvelopeValidationError>
+    for CandidatePrivateTransferStarkPreflightError
+{
+    fn from(value: CandidatePrivatePacketEnvelopeValidationError) -> Self {
+        Self::PacketEnvelope(value)
+    }
+}
+
 impl From<StarkExperimentError> for CandidatePrivateTransferStarkPreflightError {
     fn from(value: StarkExperimentError) -> Self {
         Self::Stark(value)
@@ -211,6 +316,7 @@ impl std::error::Error for CandidatePrivateTransferStarkPreflightError {}
 
 #[cfg(test)]
 mod tests {
+    use noxis_codec::PrivateTransferPacketV2;
     use noxis_poseidon2_privacy_reference::Poseidon2P24PrivacyReference;
     use noxis_poseidon2_reference::Poseidon2P24Reference;
     use noxis_privacy_types::{
@@ -218,9 +324,14 @@ mod tests {
         PrivateTransferIntentCommitmentV2, PrivateTransferIntentV2, PrivateTransferOutputV2,
         TreeParametersId, TreeParametersV2,
     };
+    use noxis_private_packet_validation::validate_candidate_private_transfer_packet_envelopes;
     use noxis_private_state::{CandidatePrivateStateSnapshotV1, PrivateStateAnchorV2};
     use noxis_tree_params::CandidatePoseidon2P24ManifestV2;
     use noxis_types::{AssetId, GenesisId, ValidationContextId};
+    use noxis_wallet_crypto::{
+        CandidatePrivateOutputSlotV1, HybridPaymentAddressEntry, RecipientEnvelopeContext,
+        candidate_ciphertext_digest_v1, encode_hybrid_recipient_envelope,
+    };
 
     use super::*;
 
@@ -356,6 +467,18 @@ mod tests {
             &pre_tree,
         )
         .unwrap();
+        let envelope_context =
+            RecipientEnvelopeContext::new(b"noxis-private-preflight-research", 1).unwrap();
+        let first_recipient = HybridPaymentAddressEntry::generate(1);
+        let second_recipient = HybridPaymentAddressEntry::generate(1);
+        let first_envelope = first_recipient
+            .address()
+            .encrypt_incoming(&envelope_context, &outputs[0].1)
+            .unwrap();
+        let second_envelope = second_recipient
+            .address()
+            .encrypt_incoming(&envelope_context, &outputs[1].1)
+            .unwrap();
         let intent = PrivateTransferIntentV2::new(
             CircuitId::new([4; 32]),
             anchor.genesis_id(),
@@ -368,13 +491,35 @@ mod tests {
             [
                 PrivateTransferOutputV2::new(
                     outputs[0].0,
-                    CiphertextDigestV2::from_elements(vector(12)).unwrap(),
+                    candidate_ciphertext_digest_v1(
+                        CandidatePrivateOutputSlotV1::First,
+                        outputs[0].0,
+                        &first_envelope,
+                    )
+                    .unwrap(),
                 ),
                 PrivateTransferOutputV2::new(
                     outputs[1].0,
-                    CiphertextDigestV2::from_elements(vector(13)).unwrap(),
+                    candidate_ciphertext_digest_v1(
+                        CandidatePrivateOutputSlotV1::Second,
+                        outputs[1].0,
+                        &second_envelope,
+                    )
+                    .unwrap(),
                 ),
             ],
+        )
+        .unwrap();
+        let packet_envelopes = validate_candidate_private_transfer_packet_envelopes(
+            PrivateTransferPacketV2::new(
+                intent.clone(),
+                [
+                    encode_hybrid_recipient_envelope(&first_envelope).unwrap(),
+                    encode_hybrid_recipient_envelope(&second_envelope).unwrap(),
+                ],
+                vec![1],
+            )
+            .unwrap(),
         )
         .unwrap();
         let statement =
@@ -389,7 +534,44 @@ mod tests {
             CandidateOutputNoteWitnessV1::new(outputs[1].1),
         ];
 
-        let preflight = run_candidate_private_transfer_stark_preflight(
+        let source_intent = statement.air_public_inputs().intent();
+        let mut mismatched_outputs = *source_intent.outputs();
+        mismatched_outputs[0] = PrivateTransferOutputV2::new(
+            mismatched_outputs[0].commitment(),
+            CiphertextDigestV2::from_elements(vector(15)).unwrap(),
+        );
+        let mismatched_intent = PrivateTransferIntentV2::new(
+            source_intent.circuit_id(),
+            source_intent.genesis_id(),
+            source_intent.validation_context_id(),
+            source_intent.pre_state_id(),
+            source_intent.tree_parameters(),
+            source_intent.pre_state_root(),
+            source_intent.asset_id(),
+            *source_intent.nullifiers(),
+            mismatched_outputs,
+        )
+        .unwrap();
+        let mismatched_statement = CandidatePrivateTransferProofPublicStatementV1::new(
+            statement.anchor().clone(),
+            &pre_tree,
+            mismatched_intent,
+        )
+        .unwrap();
+        assert!(matches!(
+            run_candidate_packet_bound_private_transfer_stark_preflight(
+                packet_envelopes.clone(),
+                &mismatched_statement,
+                &pre_tree,
+                &nxsm_witness,
+                &input_witnesses,
+                &output_witnesses,
+            ),
+            Err(CandidatePrivateTransferStarkPreflightError::PacketIntentMismatch)
+        ));
+
+        let preflight = run_candidate_packet_bound_private_transfer_stark_preflight(
+            packet_envelopes,
             &statement,
             &pre_tree,
             &nxsm_witness,
@@ -397,7 +579,7 @@ mod tests {
             &output_witnesses,
         )
         .unwrap();
-        let results = revalidate_candidate_private_transfer_stark_preflight(
+        let results = revalidate_candidate_packet_bound_private_transfer_stark_preflight(
             &preflight,
             &statement,
             &pre_tree,
@@ -420,9 +602,9 @@ mod tests {
         assert_eq!(results.inputs[1].root, root);
         assert_eq!(results.outputs[0].note_commitment, outputs[0].0.elements());
         assert_eq!(results.outputs[1].note_commitment, outputs[1].0.elements());
-        assert_eq!(preflight.statement_id(), statement.statement_id());
+        assert_eq!(preflight.stark().statement_id(), statement.statement_id());
 
-        let mut corrupted = preflight.clone();
+        let mut corrupted = preflight.stark().clone();
         let mut changed = corrupted.intent_result.intent_commitment.elements();
         changed[0] = changed[0].wrapping_add(1);
         corrupted.intent_result.intent_commitment =

@@ -252,6 +252,14 @@ ou bytes opacos não-`NXRE` são rejeitados. A fronteira não valida prova, esta
 ledger ou rede; integrar seu recibo ao preflight é o próximo passo. Ver
 [`PRIVATE_PACKET_ENVELOPE_VALIDATION_CANDIDATE_V0_1.md`](PRIVATE_PACKET_ENVELOPE_VALIDATION_CANDIDATE_V0_1.md).
 
+**Preflight STARK ligado ao pacote:** o contrato de prova agora aceita o
+recibo validado de `NXPT`, exige que sua intenção seja a mesma da declaração e
+só então executa `H_INTENT`, duas posses e duas saídas. Uma execução release
+completa passou em 466,64 s; continua composição sequencial local, sem AIR
+única, prova portátil, atualização de estado ou ponte entre `H_ADDR` e a chave
+híbrida do destinatário. Ver
+[`PACKET_BOUND_STARK_PREFLIGHT_RESEARCH_V0_1.md`](PACKET_BOUND_STARK_PREFLIGHT_RESEARCH_V0_1.md).
+
 **Catálogo local de endereços públicos:** a mesma camada já pode abrir um
 diretório com lock exclusivo, gravar bytes `NXPA` canônicos por ID, reabrir e
 validar estritamente o endereço. O catálogo nunca recebe chave privada, seed,

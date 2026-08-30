@@ -53,7 +53,10 @@ protocolo completo.
 
 ## Próximo gate
 
-O próximo passo é deixar o preflight privado consumir este recibo, exigindo que
-o mesmo `NXPT` validado forneça a intenção usada por `H_INTENT` e pelas relações
-de posse/saída. Depois disso ainda serão necessários vetores externos, uma AIR
-única, verificador de prova, estado e uma decisão explícita de ativação.
+O preflight privado já consome este recibo e exige a mesma intenção usada por
+`H_INTENT` e pelas relações de posse/saída. A evidência e os limites estão em
+[`PACKET_BOUND_STARK_PREFLIGHT_RESEARCH_V0_1.md`](PACKET_BOUND_STARK_PREFLIGHT_RESEARCH_V0_1.md).
+
+Depois disso ainda serão necessários a ponte entre commitment de destinatário e
+chave híbrida, vetores externos, AIR única, verificador de prova, estado e uma
+decisão explícita de ativação.

@@ -20,6 +20,12 @@ verificação. O recibo preserva a identidade SHA-256 da declaração exata e po
 revalidar as ligações públicas e de estado local, mas não recupera nem reenvia
 uma prova opaca.
 
+`run_candidate_packet_bound_private_transfer_stark_preflight` acrescenta uma
+entrada mais estrita: ela aceita somente um recibo já validado de `NXPT` e
+falha se a intenção desse pacote não for byte a byte a intenção da declaração
+`NXPU`. O pacote é revalidado ao revalidar o recibo composto. Ver
+[`PACKET_BOUND_STARK_PREFLIGHT_RESEARCH_V0_1.md`](PACKET_BOUND_STARK_PREFLIGHT_RESEARCH_V0_1.md).
+
 ## O que isso significa na prática
 
 Há agora um caminho executável que responde a uma pergunta concreta: “estas
@@ -41,7 +47,9 @@ Esta execução **não** é uma transação privada submetível. Ainda não há:
 - prova privada da transição completa `NXSM` (a witness é local transparente);
 - regras aritmetizadas de valor, unicidade de `rho`/`rcm` e semântica restante
   de abertura no mesmo sistema de prova;
-- vínculo entre commitment de saída e envelope cifrado/digest de ciphertext;
+- AIR que recompute o vínculo já checado localmente entre commitment de saída,
+  slot e envelope cifrado/digest de ciphertext, além da ponte entre `H_ADDR` e
+  a chave híbrida de recebimento;
 - inserção atômica de outputs, estado privado v2 persistente, verificador
   selecionado, formato de prova ou aceitação pelo consenso/ledger.
 
@@ -58,19 +66,21 @@ cargo test -p noxis-private-proof-contract transfer_preflight::tests::executes_e
 
 O teste constrói duas notas de entrada, seus caminhos Merkle e nullifiers,
 duas saídas privadas ordenadas canonicamente e uma mesma âncora candidata. Em
-seguida executa toda a sequência e testa rejeição ao alterar o commitment de
+seguida cifra as duas saídas em `NXRE`, valida o `NXPT` ligado aos digests e
+executa toda a sequência; também testa rejeição ao alterar o commitment de
 intenção retido. Como o backend atual não agrega provas, o teste é
 computacionalmente mais caro que as verificações unitárias isoladas. Na máquina
 de desenvolvimento de referência, a execução release mais recente, medida em
-2026-08-30 com vínculo de ativo nas duas saídas, terminou em **430,95
-segundos**; durante a execução, o processo observado
+2026-08-30 com vínculo de pacote/envelope nas duas saídas, terminou em **466,64
+segundos**; durante uma execução anterior comparável, o processo observado
 atingiu aproximadamente **4 GB** de memória residente. Esses números são uma
 medição de pesquisa local, não meta de desempenho nem garantia operacional.
 
 ## Próximo passo correto
 
 Transformar esta sequência em uma especificação de composição AIR por etapas:
-primeiro compartilhar colunas e vínculos públicos entre `H_INTENT`, uma posse e
-uma saída; depois escalar para 2×2, conservação de valor, envelope e transição
+primeiro compartilhar colunas e vínculos públicos entre `H_INTENT`, uma posse,
+uma saída e o digest de envelope; depois escalar para 2×2, conservação de valor
+e transição
 de estado. Nenhuma etapa deve ativar serviço de privacidade antes de backend,
 formato de prova e revisão independente.

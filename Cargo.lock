@@ -657,15 +657,18 @@ dependencies = [
 name = "noxis-private-proof-contract"
 version = "0.1.0"
 dependencies = [
+ "noxis-codec",
  "noxis-nullifier-tree-reference",
  "noxis-nullifier-tree-state",
  "noxis-poseidon2-privacy-reference",
  "noxis-poseidon2-reference",
  "noxis-privacy-types",
+ "noxis-private-packet-validation",
  "noxis-private-state",
  "noxis-stark-experiment",
  "noxis-tree-params",
  "noxis-types",
+ "noxis-wallet-crypto",
  "sha2",
 ]
 

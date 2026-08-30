@@ -67,9 +67,12 @@ pub use public_statement::{
     CandidatePrivateTransferProofPublicStatementV1,
 };
 pub use transfer_preflight::{
+    CandidatePacketBoundPrivateTransferStarkPreflightV1,
     CandidatePrivateTransferStarkPreflightError, CandidatePrivateTransferStarkPreflightResultsV1,
     CandidatePrivateTransferStarkPreflightV1,
+    revalidate_candidate_packet_bound_private_transfer_stark_preflight,
     revalidate_candidate_private_transfer_stark_preflight,
+    run_candidate_packet_bound_private_transfer_stark_preflight,
     run_candidate_private_transfer_stark_preflight,
 };
 
