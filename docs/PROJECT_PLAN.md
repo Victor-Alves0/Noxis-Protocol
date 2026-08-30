@@ -111,12 +111,13 @@ por terceiros. Os 512 irmãos `NXSM` ainda são testemunha transparente local;
 portanto, isto não é prova privada de ausência, autorização de ledger nem
 transferência privada.
 
-**Prefixo privado `NXSM`:** o experimento STARK agora cobre os primeiros oito
-níveis de uma ausência real da árvore candidata `NXSM`, partindo da folha vazia
-`E0`. Ele usa o domínio de nó, IV e `BytePack3LE` dos 128 bytes reais de cada
-nó, com irmãos e intermediários privados e bits da primeira byte canônica do
-nullifier ligados à saída pública. É um componente mensurável para composição
-futura, não uma ausência de 512 níveis, agregação, prova portátil ou
+**Segmentos privados `NXSM`:** o experimento STARK agora cobre oito níveis de
+qualquer uma das 64 bytes canônicas do nullifier, usando o domínio de nó, IV e
+`BytePack3LE` dos 128 bytes reais de cada nó. Um preflight local já executou os
+64 segmentos em sequência, da folha vazia `E0` até uma raiz candidata real de
+512 níveis, verificando e descartando cada prova; a execução release levou
+1.926,27 s. Irmãos e intermediários permanecem privados em cada traço, mas o
+resultado é somente uma checagem local, não agregação, prova portátil ou
 transferência privada. Ver [`STARK_NXSM_PREFIX_RESEARCH_V0_1.md`](STARK_NXSM_PREFIX_RESEARCH_V0_1.md).
 
 **Abertura e preflight candidatos:** o crate isolado

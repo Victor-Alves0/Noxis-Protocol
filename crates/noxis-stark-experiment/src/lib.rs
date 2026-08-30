@@ -48,8 +48,9 @@ pub use note::{
 };
 pub use nxsm::{
     Poseidon2P24NxsmPrefix8ExperimentResult, Poseidon2P24NxsmPrefix8Proof,
-    prove_and_verify_p24_nxsm_absence_prefix8, prove_p24_nxsm_absence_prefix8,
-    verify_p24_nxsm_absence_prefix8_proof,
+    Poseidon2P24NxsmSequentialAbsencePreflightResult, prove_and_verify_p24_nxsm_absence_prefix8,
+    prove_p24_nxsm_absence_prefix8, prove_p24_nxsm_absence_segment8,
+    run_p24_nxsm_absence_path512_sequential_preflight, verify_p24_nxsm_absence_prefix8_proof,
 };
 pub use ownership::{
     Poseidon2P24OwnershipExperimentResult, Poseidon2P24OwnershipProof,
@@ -1331,6 +1332,8 @@ pub enum StarkExperimentError {
     CandidatePrivateReference(Poseidon2P24PrivacyReferenceError),
     CandidateNullifierSparseDomains(Poseidon2P24NullifierSparseCandidateError),
     CandidateNullifierSparseReference(NullifierTreeReferenceError),
+    InvalidNxsmSegmentByteIndex { actual: usize },
+    NxsmSequentialRootMismatch,
     VerificationFailed,
     ProverThreadFailed,
 }
@@ -1409,6 +1412,15 @@ impl std::fmt::Display for StarkExperimentError {
                     formatter,
                     "could not evaluate the frozen P24 sparse-nullifier reference: {error}"
                 )
+            }
+            Self::InvalidNxsmSegmentByteIndex { actual } => {
+                write!(
+                    formatter,
+                    "NXSM segment byte index {actual} exceeds the 64-byte nullifier"
+                )
+            }
+            Self::NxsmSequentialRootMismatch => {
+                formatter.write_str("verified NXSM segments did not reach the expected root")
             }
             Self::VerificationFailed => {
                 formatter.write_str("Plonky3 rejected the research STARK proof")

@@ -23,6 +23,8 @@ use crate::{
 
 const DIGEST_LANES: usize = 16;
 const PREFIX_DEPTH: usize = 8;
+const NXSM_DEPTH: usize = 512;
+const SEGMENT_COUNT: usize = NXSM_DEPTH / PREFIX_DEPTH;
 const NODE_PHASES_PER_HASH: usize = 4;
 const TOTAL_PHASES: usize = PREFIX_DEPTH * NODE_PHASES_PER_HASH;
 const TOTAL_STEPS: usize = TOTAL_PHASES * P24_ROUNDS;
@@ -55,12 +57,30 @@ const fn phase(level: usize, phase_in_hash: usize) -> usize {
 /// Public result of one exact private eight-level `NXSM` prefix relation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Poseidon2P24NxsmPrefix8ExperimentResult {
-    /// The canonical public nullifier whose first eight bits order the path.
+    /// The canonical public nullifier whose selected byte orders the segment.
     pub nullifier: NullifierV2,
+    /// The byte index in the canonical nullifier encoding used by this segment.
+    pub byte_index: u8,
+    /// The local node from which this eight-level segment starts.
+    pub start: BabyBearDigestV2,
     /// The node reached after applying levels zero through seven to `E0`.
     pub boundary: BabyBearDigestV2,
     /// Fixed trace size for this bounded research component.
     pub trace_rows: usize,
+}
+
+/// Public result of a complete local 512-level sequential `NXSM` preflight.
+///
+/// This is not a proof object: every bounded proof has already been verified
+/// and dropped before this receipt is returned.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Poseidon2P24NxsmSequentialAbsencePreflightResult {
+    /// The canonical nullifier checked from the empty leaf to this root.
+    pub nullifier: NullifierV2,
+    /// The supplied candidate sparse-tree root reached after all 64 segments.
+    pub root: BabyBearDigestV2,
+    /// Number of independently verified and discarded eight-level segments.
+    pub segments_verified: usize,
 }
 
 /// Opaque in-memory proof for the bounded `NXSM` prefix relation.
@@ -91,18 +111,17 @@ struct PrefixWitness {
 struct NxsmPrefix8Air {
     permutation: Poseidon2P24Air,
     node_iv: [u32; 9],
-    empty_leaf: BabyBearDigestV2,
+    start: BabyBearDigestV2,
 }
 
 impl NxsmPrefix8Air {
-    fn load_candidate() -> Result<Self, StarkExperimentError> {
+    fn load_candidate(start: BabyBearDigestV2) -> Result<Self, StarkExperimentError> {
         let reference = Poseidon2P24Reference::load_candidate()?;
         let manifest = CandidatePoseidon2P24NullifierSparseManifestV1::new();
-        let sparse = NullifierSparseTreeReferenceV1::load_candidate()?;
         Ok(Self {
             permutation: Poseidon2P24Air::from_reference(&reference),
             node_iv: manifest.iv(Poseidon2P24NullifierSparseDomainV1::Node)?,
-            empty_leaf: sparse.empty_values()[0],
+            start,
         })
     }
 
@@ -173,7 +192,7 @@ impl NxsmPrefix8Air {
         byte_index: usize,
     ) -> AB::Expr {
         if level == 0 {
-            AB::Expr::from_u32(u32::from(digest_bytes(self.empty_leaf)[byte_index]))
+            AB::Expr::from_u32(u32::from(digest_bytes(self.start)[byte_index]))
         } else {
             witness[INTERMEDIATE_BYTES_OFFSET + ((level - 1) * DIGEST_BYTES) + byte_index].into()
         }
@@ -481,16 +500,18 @@ impl<AB: AirBuilder> Air<AB> for NxsmPrefix8Air {
     }
 }
 
-/// Produces a hiding-FRI proof for the exact first eight levels of an absent
-/// `NXSM` path. It starts from the frozen `E0` empty leaf and keeps all eight
-/// siblings and seven intermediate nodes private.
-pub fn prove_p24_nxsm_absence_prefix8(
+/// Produces a hiding-FRI proof for one exact private eight-level `NXSM`
+/// segment. The caller-selected byte index is bounded to the 64 canonical
+/// nullifier bytes; it determines the eight path-direction bits.
+pub fn prove_p24_nxsm_absence_segment8(
     nullifier: NullifierV2,
+    byte_index: u8,
+    start: BabyBearDigestV2,
     siblings: [BabyBearDigestV2; PREFIX_DEPTH],
 ) -> Result<Poseidon2P24NxsmPrefix8Proof, StarkExperimentError> {
     let sparse = NullifierSparseTreeReferenceV1::load_candidate()?;
-    let directions = prefix_directions(nullifier);
-    let mut current = sparse.empty_values()[0];
+    let directions = segment_directions(nullifier, byte_index)?;
+    let mut current = start;
     let mut intermediates = [[0_u32; DIGEST_LANES]; PREFIX_DEPTH - 1];
     for level in 0..PREFIX_DEPTH {
         current = if directions[level] {
@@ -503,13 +524,13 @@ pub fn prove_p24_nxsm_absence_prefix8(
         }
     }
     let boundary = current;
-    let air = NxsmPrefix8Air::load_candidate()?;
+    let air = NxsmPrefix8Air::load_candidate(start)?;
     let witness = PrefixWitness {
         siblings,
         intermediates,
     };
     let trace = build_trace(&air, &witness, directions);
-    let public_values = public_values(nullifier, boundary, directions);
+    let public_values = public_values(nullifier, byte_index, boundary, directions);
     #[cfg(test)]
     p3_air::check_constraints(&air, &trace, &public_values);
     let prover = std::thread::Builder::new()
@@ -523,6 +544,8 @@ pub fn prove_p24_nxsm_absence_prefix8(
                 proof,
                 public_result: Poseidon2P24NxsmPrefix8ExperimentResult {
                     nullifier,
+                    byte_index,
+                    start,
                     boundary,
                     trace_rows: TRACE_ROWS,
                 },
@@ -534,14 +557,28 @@ pub fn prove_p24_nxsm_absence_prefix8(
         .map_err(|_| StarkExperimentError::ProverThreadFailed)?
 }
 
+/// Produces the fixed first segment of an absent `NXSM` path, starting from
+/// the frozen `E0` empty leaf.
+pub fn prove_p24_nxsm_absence_prefix8(
+    nullifier: NullifierV2,
+    siblings: [BabyBearDigestV2; PREFIX_DEPTH],
+) -> Result<Poseidon2P24NxsmPrefix8Proof, StarkExperimentError> {
+    let sparse = NullifierSparseTreeReferenceV1::load_candidate()?;
+    prove_p24_nxsm_absence_segment8(nullifier, 0, sparse.empty_values()[0], siblings)
+}
+
 /// Verifies one locally held bounded `NXSM` prefix proof.
 pub fn verify_p24_nxsm_absence_prefix8_proof(
     prefix_proof: &Poseidon2P24NxsmPrefix8Proof,
 ) -> Result<Poseidon2P24NxsmPrefix8ExperimentResult, StarkExperimentError> {
-    let air = NxsmPrefix8Air::load_candidate()?;
-    let directions = prefix_directions(prefix_proof.public_result.nullifier);
+    let air = NxsmPrefix8Air::load_candidate(prefix_proof.public_result.start)?;
+    let directions = segment_directions(
+        prefix_proof.public_result.nullifier,
+        prefix_proof.public_result.byte_index,
+    )?;
     let public_values = public_values(
         prefix_proof.public_result.nullifier,
+        prefix_proof.public_result.byte_index,
         prefix_proof.public_result.boundary,
         directions,
     );
@@ -564,19 +601,64 @@ pub fn prove_and_verify_p24_nxsm_absence_prefix8(
     verify_p24_nxsm_absence_prefix8_proof(&proof)
 }
 
-fn prefix_directions(nullifier: NullifierV2) -> [bool; PREFIX_DEPTH] {
-    let bytes = nullifier.as_bytes();
-    core::array::from_fn(|level| ((bytes[0] >> level) & 1) == 1)
+/// Executes the full 512-level candidate absence path as 64 locally verified,
+/// private eight-level proofs. Each opaque proof is dropped before the next
+/// segment begins; this keeps the current research backend's memory bounded.
+///
+/// The returned value is a local preflight receipt, not an aggregate proof or
+/// a portable verifier artifact.
+pub fn run_p24_nxsm_absence_path512_sequential_preflight(
+    nullifier: NullifierV2,
+    siblings: [BabyBearDigestV2; NXSM_DEPTH],
+    expected_root: BabyBearDigestV2,
+) -> Result<Poseidon2P24NxsmSequentialAbsencePreflightResult, StarkExperimentError> {
+    let sparse = NullifierSparseTreeReferenceV1::load_candidate()?;
+    let mut current = sparse.empty_values()[0];
+    for byte_index in 0..SEGMENT_COUNT {
+        let start = byte_index * PREFIX_DEPTH;
+        let segment_siblings: [BabyBearDigestV2; PREFIX_DEPTH] = siblings
+            [start..start + PREFIX_DEPTH]
+            .try_into()
+            .expect("fixed NXSM depth splits into exact eight-level segments");
+        let proof = prove_p24_nxsm_absence_segment8(
+            nullifier,
+            byte_index as u8,
+            current,
+            segment_siblings,
+        )?;
+        current = verify_p24_nxsm_absence_prefix8_proof(&proof)?.boundary;
+    }
+    if current != expected_root {
+        return Err(StarkExperimentError::NxsmSequentialRootMismatch);
+    }
+    Ok(Poseidon2P24NxsmSequentialAbsencePreflightResult {
+        nullifier,
+        root: current,
+        segments_verified: SEGMENT_COUNT,
+    })
+}
+
+fn segment_directions(
+    nullifier: NullifierV2,
+    byte_index: u8,
+) -> Result<[bool; PREFIX_DEPTH], StarkExperimentError> {
+    let byte_index = usize::from(byte_index);
+    let byte = *nullifier
+        .as_bytes()
+        .get(byte_index)
+        .ok_or(StarkExperimentError::InvalidNxsmSegmentByteIndex { actual: byte_index })?;
+    Ok(core::array::from_fn(|bit| ((byte >> bit) & 1) == 1))
 }
 
 fn public_values(
     nullifier: NullifierV2,
+    byte_index: u8,
     boundary: BabyBearDigestV2,
     directions: [bool; PREFIX_DEPTH],
 ) -> Vec<Val> {
     boundary
         .into_iter()
-        .chain([u32::from(nullifier.as_bytes()[0])])
+        .chain([u32::from(nullifier.as_bytes()[usize::from(byte_index)])])
         .chain(directions.map(u32::from))
         .map(Val::from_u32)
         .collect()
@@ -591,7 +673,7 @@ fn build_trace(
     let mut state = initial_node_state_values(
         &air.permutation,
         air.node_iv,
-        air.empty_leaf,
+        air.start,
         witness.siblings[0],
         directions[0],
     );
@@ -657,7 +739,7 @@ fn phase_transition_values(
 
 fn level_current(air: &NxsmPrefix8Air, witness: &PrefixWitness, level: usize) -> BabyBearDigestV2 {
     if level == 0 {
-        air.empty_leaf
+        air.start
     } else {
         witness.intermediates[level - 1]
     }
@@ -789,7 +871,7 @@ mod tests {
         let reference = NullifierSparseTreeReferenceV1::load_candidate().unwrap();
         let mut expected = reference.empty_values()[0];
         for (level, sibling) in siblings.into_iter().enumerate() {
-            expected = if prefix_directions(target)[level] {
+            expected = if segment_directions(target, 0).unwrap()[level] {
                 reference.node(sibling, expected).unwrap()
             } else {
                 reference.node(expected, sibling).unwrap()
@@ -810,5 +892,57 @@ mod tests {
             verify_p24_nxsm_absence_prefix8_proof(&proof),
             Err(StarkExperimentError::VerificationFailed)
         ));
+    }
+
+    #[test]
+    fn private_nxsm_terminal_segment_reaches_an_actual_sparse_tree_root() {
+        let mut tree = NullifierSparseTreeStateV1::new_candidate().unwrap();
+        tree.mark_spent(nullifier(3)).unwrap();
+        tree.mark_spent(nullifier(9)).unwrap();
+        let target = nullifier(10);
+        let path = tree.prove(target);
+        let reference = NullifierSparseTreeReferenceV1::load_candidate().unwrap();
+        let mut start = reference.empty_values()[0];
+        for level in 0..NXSM_DEPTH - PREFIX_DEPTH {
+            let byte = target.as_bytes()[level / BITS_PER_BYTE];
+            start = if ((byte >> (level % BITS_PER_BYTE)) & 1) == 1 {
+                reference.node(path.siblings()[level], start).unwrap()
+            } else {
+                reference.node(start, path.siblings()[level]).unwrap()
+            };
+        }
+        let byte_index = (SEGMENT_COUNT - 1) as u8;
+        let siblings: [BabyBearDigestV2; PREFIX_DEPTH] = path.siblings()
+            [NXSM_DEPTH - PREFIX_DEPTH..]
+            .try_into()
+            .unwrap();
+        let proof = prove_p24_nxsm_absence_segment8(target, byte_index, start, siblings).unwrap();
+        let result = verify_p24_nxsm_absence_prefix8_proof(&proof).unwrap();
+
+        assert_eq!(result.byte_index, byte_index);
+        assert_eq!(result.start, start);
+        assert_eq!(result.boundary, tree.root().unwrap().elements());
+    }
+
+    #[test]
+    #[ignore = "runs 64 private eight-level proofs; execute explicitly in release mode"]
+    fn sequential_private_segments_reach_a_complete_candidate_nxsm_root() {
+        let mut tree = NullifierSparseTreeStateV1::new_candidate().unwrap();
+        tree.mark_spent(nullifier(3)).unwrap();
+        tree.mark_spent(nullifier(9)).unwrap();
+        let target = nullifier(10);
+        let path = tree.prove(target);
+        let siblings: [BabyBearDigestV2; NXSM_DEPTH] = path.siblings().try_into().unwrap();
+
+        let result = run_p24_nxsm_absence_path512_sequential_preflight(
+            target,
+            siblings,
+            tree.root().unwrap().elements(),
+        )
+        .unwrap();
+
+        assert_eq!(result.nullifier, target);
+        assert_eq!(result.root, tree.root().unwrap().elements());
+        assert_eq!(result.segments_verified, SEGMENT_COUNT);
     }
 }
