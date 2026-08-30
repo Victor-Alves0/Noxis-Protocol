@@ -69,6 +69,7 @@ pub use ownership::{
 pub use profile::{RESEARCH_STARK_VERIFIER_PROFILE_VERSION, ResearchStarkVerifierProfileV1};
 pub use value_conservation::{
     Poseidon2P24ValueConservationExperimentResult, prove_and_verify_p24_value_conservation,
+    prove_and_verify_p24_value_conservation_bound_outputs,
 };
 
 const TRACE_WIDTH: usize = 2;
@@ -1351,6 +1352,7 @@ pub enum StarkExperimentError {
     ZeroValueConservationInput { index: usize },
     UnsupportedValueConservationNoteVersion { index: usize },
     ValueConservationAssetMismatch { index: usize },
+    ValueConservationOutputCommitmentMismatch { index: usize },
     ValueConservationInputOverflow,
     ValueConservationOutputOverflow,
     ValueConservationMismatch,
@@ -1482,6 +1484,12 @@ impl std::fmt::Display for StarkExperimentError {
                 write!(
                     formatter,
                     "value-conservation note {index} does not use the public asset"
+                )
+            }
+            Self::ValueConservationOutputCommitmentMismatch { index } => {
+                write!(
+                    formatter,
+                    "value-conservation output note {index} does not match its public commitment"
                 )
             }
             Self::ValueConservationInputOverflow => {

@@ -10,8 +10,9 @@ privadas de saída. A execução faz, nesta ordem:
 
 1. revalida a declaração pública, âncora e transição local de nullifiers;
 2. rejeita localmente versão, ativo, zero, overflow ou desequilíbrio com erros
-   precisos e então prova/verifica, no mesmo AIR, quatro `H_NOTE`, ativo comum
-   e conservação privada `u128` por bytes/carries;
+   precisos e então prova/verifica, no mesmo AIR, quatro `H_NOTE`, ativo comum,
+   conservação privada `u128` por bytes/carries e os dois slots públicos de
+   commitment de saída da `NXPU`;
 3. prova e verifica `H_INTENT` **uma única vez**;
 4. prova e verifica posse/Merkle de profundidade 32 para cada input;
 5. prova e verifica `H_NOTE` com vínculo do ativo público para cada output;
@@ -48,8 +49,8 @@ Esta execução **não** é uma transação privada submetível. Ainda não há:
 - AIR única que absorva todas as relações;
 - agregação ou recursão das quatro provas;
 - prova privada da transição completa `NXSM` (a witness é local transparente);
-- uma AIR única que vincule a conservação já aritmetizada às relações de posse,
-  nullifier, slots de saída e semântica restante de abertura;
+- uma AIR única que vincule a conservação já aritmetizada às relações de
+  `H_INTENT`, posse, nullifier e semântica restante de abertura;
 - AIR que recompute o vínculo já checado localmente entre commitment de saída,
   slot e envelope cifrado/digest de ciphertext, além da ponte entre `H_ADDR` e
   a chave híbrida de recebimento;
@@ -63,10 +64,12 @@ crates em ciclo.
 
 A conservação `u128` agora também é imposta pela relação STARK de quatro
 `H_NOTE`, com bytes range-checked e carries Booleanos, e não retém valores no
-recibo. O preflight continua a fazer a checagem local antes do provador para
-produzir rejeições claras. A relação isolada ainda não é uma prova transferível
-nem está ligada dentro de uma única AIR aos nullifiers, à posse ou aos outputs;
-ver [`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
+recibo. A variante usada pelo preflight também vincula os `H_NOTE` de saída aos
+slots públicos da `NXPU`. O preflight continua a fazer a checagem local antes
+do provador para produzir rejeições claras. A relação isolada ainda não é uma
+prova transferível nem está ligada dentro de uma única AIR ao `H_INTENT`, aos
+nullifiers ou à posse; ver
+[`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
 
 ## Como reproduzir
 

@@ -9,7 +9,9 @@
 use std::fmt;
 
 use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
-use noxis_stark_experiment::{StarkExperimentError, prove_and_verify_p24_value_conservation};
+use noxis_stark_experiment::{
+    StarkExperimentError, prove_and_verify_p24_value_conservation_bound_outputs,
+};
 
 use crate::{
     CandidateAnchoredOwnershipWitnessV1, CandidateOutputNoteWitnessV1,
@@ -95,7 +97,7 @@ pub fn run_candidate_value_conservation_preflight(
     // Keep the exact witness openings inside the prover. The experimental
     // result and opaque proof are deliberately dropped after verification;
     // neither becomes a public transaction field.
-    let _stark_result = prove_and_verify_p24_value_conservation(
+    let _stark_result = prove_and_verify_p24_value_conservation_bound_outputs(
         [
             *input_witnesses[0].note_preimage(),
             *input_witnesses[1].note_preimage(),
@@ -103,6 +105,11 @@ pub fn run_candidate_value_conservation_preflight(
             *output_witnesses[1].note_preimage(),
         ],
         expected_asset,
+        statement
+            .air_public_inputs()
+            .intent()
+            .output_commitments()
+            .map(|commitment| commitment.elements()),
     )?;
 
     Ok(CandidateValueConservationPreflightV1 {
@@ -258,6 +265,7 @@ impl CandidateValueNoteRoleV1 {
 #[cfg(test)]
 mod tests {
     use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
+    use noxis_poseidon2_privacy_reference::Poseidon2P24PrivacyReference;
     use noxis_poseidon2_reference::Poseidon2P24Reference;
     use noxis_privacy_types::{
         CiphertextDigestV2, CircuitId, NoteCommitmentV2, NullifierV2, PrivateTransferIntentV2,
@@ -277,7 +285,9 @@ mod tests {
         note
     }
 
-    fn fixture() -> (
+    fn fixture_with_output_commitments(
+        output_commitments: [NoteCommitmentV2; 2],
+    ) -> (
         CandidatePrivateTransferProofPublicStatementV1,
         NullifierSparseTreeStateV1,
     ) {
@@ -312,11 +322,11 @@ mod tests {
             ],
             [
                 PrivateTransferOutputV2::new(
-                    NoteCommitmentV2::from_elements([7; 16]).unwrap(),
+                    output_commitments[0],
                     CiphertextDigestV2::from_elements([8; 16]).unwrap(),
                 ),
                 PrivateTransferOutputV2::new(
-                    NoteCommitmentV2::from_elements([9; 16]).unwrap(),
+                    output_commitments[1],
                     CiphertextDigestV2::from_elements([10; 16]).unwrap(),
                 ),
             ],
@@ -326,6 +336,16 @@ mod tests {
             CandidatePrivateTransferProofPublicStatementV1::new(anchor, &tree, intent).unwrap(),
             tree,
         )
+    }
+
+    fn fixture() -> (
+        CandidatePrivateTransferProofPublicStatementV1,
+        NullifierSparseTreeStateV1,
+    ) {
+        fixture_with_output_commitments([
+            NoteCommitmentV2::from_elements([7; 16]).unwrap(),
+            NoteCommitmentV2::from_elements([9; 16]).unwrap(),
+        ])
     }
 
     fn inputs(
@@ -345,21 +365,29 @@ mod tests {
     }
 
     fn outputs(asset: [u8; 32], first: u128, second: u128) -> [CandidateOutputNoteWitnessV1; 2] {
+        let mut second_note = note(asset, second);
+        second_note[VALUE_OFFSET + VALUE_LENGTH] = 1;
         [
             CandidateOutputNoteWitnessV1::new(note(asset, first)),
-            CandidateOutputNoteWitnessV1::new(note(asset, second)),
+            CandidateOutputNoteWitnessV1::new(second_note),
         ]
     }
 
     #[test]
     fn accepts_fixed_width_conserved_values_without_retaining_them() {
-        let (statement, tree) = fixture();
-        let asset = statement.air_public_inputs().intent().asset_id().0;
+        let asset = [4; 32];
+        let output_witnesses = outputs(asset, 20, 20);
+        let privacy = Poseidon2P24PrivacyReference::load_candidate().unwrap();
+        let output_commitments = output_witnesses.clone().map(|witness| {
+            NoteCommitmentV2::from_elements(privacy.hash_note(witness.note_preimage()).unwrap())
+                .unwrap()
+        });
+        let (statement, tree) = fixture_with_output_commitments(output_commitments);
         let receipt = run_candidate_value_conservation_preflight(
             &statement,
             &tree,
             &inputs(asset, 17, 23),
-            &outputs(asset, 20, 20),
+            &output_witnesses,
         )
         .unwrap();
         assert_eq!(receipt.statement_id(), statement.statement_id());
@@ -422,6 +450,23 @@ mod tests {
                 role: CandidateValueNoteRoleV1::Input,
                 index: 0,
             })
+        ));
+    }
+
+    #[test]
+    fn rejects_output_witnesses_that_do_not_match_nxpu_slots() {
+        let (statement, tree) = fixture();
+        let asset = statement.air_public_inputs().intent().asset_id().0;
+        assert!(matches!(
+            run_candidate_value_conservation_preflight(
+                &statement,
+                &tree,
+                &inputs(asset, 17, 23),
+                &outputs(asset, 20, 20),
+            ),
+            Err(CandidateValueConservationError::Stark(
+                StarkExperimentError::ValueConservationOutputCommitmentMismatch { index: 0 }
+            ))
         ));
     }
 }

@@ -31,8 +31,10 @@ conservação inválida. A relação STARK de conservação agora também impõe
 regras usando os bytes privados das quatro pré-imagens `H_NOTE`, carries
 Booleanos e commitments de pesquisa; ver
 [`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
-Ela ainda não se liga às relações de posse, nullifier, saída ou envelope na
-mesma prova e, por isso, não é a AIR única da transferência.
+Na variante usada pelo preflight, os `H_NOTE` de saída também são igualados aos
+dois slots públicos da `NXPU`; a relação ainda não se liga ao `H_INTENT`, à
+posse, ao nullifier ou ao envelope na mesma prova e, por isso, não é a AIR
+única da transferência.
 
 ## Testemunha privada e restrições
 

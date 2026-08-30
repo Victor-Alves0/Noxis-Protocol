@@ -10,8 +10,8 @@
 //! Publishing input commitments would undermine transaction privacy, so this
 //! relation is currently used only as a local, opaque proof experiment. A
 //! later complete AIR must bind its input notes to membership/nullifier
-//! relations, its outputs to the transaction intent and envelopes, and retain
-//! only the protocol-approved public statement.
+//! relations and its outputs to the transaction intent and envelopes, while
+//! retaining only the protocol-approved public statement.
 
 use noxis_poseidon2_privacy_reference::Poseidon2P24PrivacyReference;
 use noxis_poseidon2_reference::{BabyBearDigestV2, P24_WIDTH, Poseidon2P24Reference};
@@ -57,6 +57,10 @@ const ARITHMETIC_OFFSET: usize = NOTE_COUNT * NOTE_TRACE_WIDTH;
 const TRACE_WIDTH: usize = ARITHMETIC_OFFSET + ARITHMETIC_WIDTH;
 const COMMITMENT_PUBLIC_VALUES: usize = NOTE_COUNT * NOTE_COMMITMENT_PUBLIC_VALUES;
 const PUBLIC_VALUES: usize = COMMITMENT_PUBLIC_VALUES + ASSET_BYTES;
+const OUTPUT_COMMITMENT_PUBLIC_VALUES: usize =
+    (NOTE_COUNT - INPUT_NOTE_COUNT) * NOTE_COMMITMENT_PUBLIC_VALUES;
+const OUTPUT_COMMITMENT_BINDINGS_OFFSET: usize = PUBLIC_VALUES;
+const PUBLIC_VALUES_WITH_OUTPUT_BINDINGS: usize = PUBLIC_VALUES + OUTPUT_COMMITMENT_PUBLIC_VALUES;
 
 /// Public result after one independently verified 2x2 value-conservation
 /// experiment. Values and all other note fields remain private.
@@ -76,14 +80,19 @@ pub struct Poseidon2P24ValueConservationExperimentResult {
 struct Poseidon2P24ValueConservationAir {
     permutation: Poseidon2P24Air,
     note_iv: [u32; 9],
+    bind_output_commitments: bool,
 }
 
 impl Poseidon2P24ValueConservationAir {
-    fn from_reference(reference: &Poseidon2P24Reference) -> Result<Self, StarkExperimentError> {
+    fn from_reference(
+        reference: &Poseidon2P24Reference,
+        bind_output_commitments: bool,
+    ) -> Result<Self, StarkExperimentError> {
         Ok(Self {
             permutation: Poseidon2P24Air::from_reference(reference),
             note_iv: CandidatePoseidon2P24NoteDomainsManifestV1::new()
                 .iv(Poseidon2P24NoteDomainV1::Note)?,
+            bind_output_commitments,
         })
     }
 
@@ -316,7 +325,11 @@ impl<F> BaseAir<F> for Poseidon2P24ValueConservationAir {
     }
 
     fn num_public_values(&self) -> usize {
-        PUBLIC_VALUES
+        if self.bind_output_commitments {
+            PUBLIC_VALUES_WITH_OUTPUT_BINDINGS
+        } else {
+            PUBLIC_VALUES
+        }
     }
 
     fn max_constraint_degree(&self) -> Option<usize> {
@@ -341,6 +354,20 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24ValueConservationAir {
                 note_index * NOTE_COMMITMENT_PUBLIC_VALUES,
             );
             note_witnesses.push(&local[start + NOTE_WITNESS_OFFSET..start + NOTE_TRACE_WIDTH]);
+        }
+        if self.bind_output_commitments {
+            for output_index in 0..NOTE_COUNT - INPUT_NOTE_COUNT {
+                for lane in 0..NOTE_COMMITMENT_PUBLIC_VALUES {
+                    builder.assert_eq(
+                        public_values[(INPUT_NOTE_COUNT + output_index)
+                            * NOTE_COMMITMENT_PUBLIC_VALUES
+                            + lane],
+                        public_values[OUTPUT_COMMITMENT_BINDINGS_OFFSET
+                            + (output_index * NOTE_COMMITMENT_PUBLIC_VALUES)
+                            + lane],
+                    );
+                }
+            }
         }
         let arithmetic = &local[ARITHMETIC_OFFSET..];
         let next_arithmetic = &next[ARITHMETIC_OFFSET..];
@@ -367,7 +394,31 @@ pub fn prove_and_verify_p24_value_conservation(
     note_preimages: [[u8; NOTE_INPUT_BYTES]; NOTE_COUNT],
     asset_id: [u8; ASSET_BYTES],
 ) -> Result<Poseidon2P24ValueConservationExperimentResult, StarkExperimentError> {
-    validate_witness_values(&note_preimages, asset_id)?;
+    prove_and_verify_value_conservation(note_preimages, asset_id, None)
+}
+
+/// Produces and independently verifies the four-note conservation relation
+/// while also constraining both output `H_NOTE` commitments to the two public
+/// output slots supplied by the caller.
+///
+/// The slots are public research inputs only. A caller must still prove that
+/// they belong to the exact canonical `H_INTENT` statement before treating
+/// this as any part of a transfer relation.
+pub fn prove_and_verify_p24_value_conservation_bound_outputs(
+    note_preimages: [[u8; NOTE_INPUT_BYTES]; NOTE_COUNT],
+    asset_id: [u8; ASSET_BYTES],
+    output_commitments: [BabyBearDigestV2; NOTE_COUNT - INPUT_NOTE_COUNT],
+) -> Result<Poseidon2P24ValueConservationExperimentResult, StarkExperimentError> {
+    prove_and_verify_value_conservation(note_preimages, asset_id, Some(output_commitments))
+}
+
+fn prove_and_verify_value_conservation(
+    note_preimages: [[u8; NOTE_INPUT_BYTES]; NOTE_COUNT],
+    asset_id: [u8; ASSET_BYTES],
+    output_commitments: Option<[BabyBearDigestV2; NOTE_COUNT - INPUT_NOTE_COUNT]>,
+) -> Result<Poseidon2P24ValueConservationExperimentResult, StarkExperimentError> {
+    validate_witness_values(&note_preimages, asset_id, output_commitments)?;
+    let bind_output_commitments = output_commitments.is_some();
     let reference = Poseidon2P24Reference::load_candidate()?;
     let private_reference = Poseidon2P24PrivacyReference::load_candidate()?;
     let note_commitments: [BabyBearDigestV2; NOTE_COUNT] = note_preimages
@@ -376,14 +427,27 @@ pub fn prove_and_verify_p24_value_conservation(
         .collect::<Result<Vec<_>, _>>()?
         .try_into()
         .expect("fixed four-note conservation relation");
-    let air = Poseidon2P24ValueConservationAir::from_reference(&reference)?;
+    let air =
+        Poseidon2P24ValueConservationAir::from_reference(&reference, bind_output_commitments)?;
     let trace = build_trace(&air, note_preimages);
     let mut public_values = Vec::with_capacity(PUBLIC_VALUES);
     for commitment in note_commitments {
         public_values.extend(commitment.map(Val::from_u32));
     }
     public_values.extend(asset_id.map(Val::from_u8));
-    debug_assert_eq!(public_values.len(), PUBLIC_VALUES);
+    if let Some(output_commitments) = output_commitments {
+        for commitment in output_commitments {
+            public_values.extend(commitment.map(Val::from_u32));
+        }
+    }
+    debug_assert_eq!(
+        public_values.len(),
+        if bind_output_commitments {
+            PUBLIC_VALUES_WITH_OUTPUT_BINDINGS
+        } else {
+            PUBLIC_VALUES
+        }
+    );
     let config = make_hiding_config();
     let proof = prove(&config, &air, trace, &public_values);
     verify(&config, &air, &proof, &public_values)
@@ -398,6 +462,7 @@ pub fn prove_and_verify_p24_value_conservation(
 fn validate_witness_values(
     note_preimages: &[[u8; NOTE_INPUT_BYTES]; NOTE_COUNT],
     asset_id: [u8; ASSET_BYTES],
+    output_commitments: Option<[BabyBearDigestV2; NOTE_COUNT - INPUT_NOTE_COUNT]>,
 ) -> Result<(), StarkExperimentError> {
     for (index, note) in note_preimages.iter().enumerate() {
         if note[NOTE_VERSION_OFFSET..NOTE_VERSION_OFFSET + 2] != 1_u16.to_be_bytes() {
@@ -424,6 +489,20 @@ fn validate_witness_values(
         .ok_or(StarkExperimentError::ValueConservationOutputOverflow)?;
     if input_sum != output_sum {
         return Err(StarkExperimentError::ValueConservationMismatch);
+    }
+    if let Some(output_commitments) = output_commitments {
+        let reference = Poseidon2P24PrivacyReference::load_candidate()?;
+        for output_index in 0..NOTE_COUNT - INPUT_NOTE_COUNT {
+            if reference.hash_note(&note_preimages[INPUT_NOTE_COUNT + output_index])?
+                != output_commitments[output_index]
+            {
+                return Err(
+                    StarkExperimentError::ValueConservationOutputCommitmentMismatch {
+                        index: output_index,
+                    },
+                );
+            }
+        }
     }
     Ok(())
 }
@@ -577,8 +656,18 @@ mod tests {
     fn conservation_stark_binds_four_private_notes_and_private_balanced_values() {
         let asset = [0xA5; ASSET_BYTES];
         let note_preimages = notes(asset);
-        let result = prove_and_verify_p24_value_conservation(note_preimages, asset).unwrap();
         let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
+        let output_commitments = core::array::from_fn(|output_index| {
+            reference
+                .hash_note(&note_preimages[INPUT_NOTE_COUNT + output_index])
+                .unwrap()
+        });
+        let result = prove_and_verify_p24_value_conservation_bound_outputs(
+            note_preimages,
+            asset,
+            output_commitments,
+        )
+        .unwrap();
 
         assert_eq!(
             result.note_commitments,
@@ -613,6 +702,23 @@ mod tests {
             prove_and_verify_p24_value_conservation(wrong_asset, asset),
             Err(StarkExperimentError::ValueConservationAssetMismatch { index: 2 })
         ));
+
+        let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
+        let invalid_notes = notes(asset);
+        let mut wrong_output_commitments = core::array::from_fn(|output_index| {
+            reference
+                .hash_note(&invalid_notes[INPUT_NOTE_COUNT + output_index])
+                .unwrap()
+        });
+        wrong_output_commitments[0][0] += 1;
+        assert!(matches!(
+            prove_and_verify_p24_value_conservation_bound_outputs(
+                notes(asset),
+                asset,
+                wrong_output_commitments,
+            ),
+            Err(StarkExperimentError::ValueConservationOutputCommitmentMismatch { index: 0 })
+        ));
     }
 
     #[test]
@@ -621,7 +727,7 @@ mod tests {
         let note_preimages = notes(asset);
         let reference = Poseidon2P24Reference::load_candidate().unwrap();
         let private_reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
-        let air = Poseidon2P24ValueConservationAir::from_reference(&reference).unwrap();
+        let air = Poseidon2P24ValueConservationAir::from_reference(&reference, false).unwrap();
         let trace = build_trace(&air, note_preimages);
         let mut public_values = Vec::with_capacity(PUBLIC_VALUES);
         for note in note_preimages {
@@ -663,5 +769,35 @@ mod tests {
                 + NOTE_ASSET_OFFSET] += Val::ONE;
         }
         assert_rejected(&changed_asset);
+    }
+
+    #[test]
+    fn conservation_air_rejects_wrong_public_output_slot_binding() {
+        let asset = [0xA5; ASSET_BYTES];
+        let note_preimages = notes(asset);
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let private_reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
+        let air = Poseidon2P24ValueConservationAir::from_reference(&reference, true).unwrap();
+        let trace = build_trace(&air, note_preimages);
+        let mut public_values = Vec::with_capacity(PUBLIC_VALUES_WITH_OUTPUT_BINDINGS);
+        let note_commitments =
+            note_preimages.map(|note| private_reference.hash_note(&note).unwrap());
+        for commitment in note_commitments {
+            public_values.extend(commitment.map(Val::from_u32));
+        }
+        public_values.extend(asset.map(Val::from_u8));
+        for commitment in &note_commitments[INPUT_NOTE_COUNT..] {
+            public_values.extend((*commitment).map(Val::from_u32));
+        }
+        p3_air::check_constraints(&air, &trace, &public_values);
+
+        let mut wrong_output_slot = public_values;
+        wrong_output_slot[OUTPUT_COMMITMENT_BINDINGS_OFFSET] += Val::ONE;
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                p3_air::check_constraints(&air, &trace, &wrong_output_slot);
+            }))
+            .is_err()
+        );
     }
 }

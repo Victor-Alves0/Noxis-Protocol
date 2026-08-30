@@ -179,10 +179,11 @@ conservação ainda não fazem parte dessa relação. Ver
 **Conservação de valor dentro da AIR:** uma relação P3 separada agora abre
 quatro `H_NOTE` privados no mesmo traço, prende todos ao ativo público e prova
 que as duas entradas não nulas conservam valor `u128` sem overflow, usando os
-16 bytes canônicos e carries Booleanos. A prova e os quatro commitments de
-pesquisa são verificados e descartados localmente; ela ainda não se une, numa
-única AIR, à posse, nullifier, slots de saída ou envelope e não ativa
-privacidade. Ver
+16 bytes canônicos e carries Booleanos. A variante do preflight também prende
+os dois `H_NOTE` de saída aos slots públicos de commitment da `NXPU`. A prova e
+os quatro commitments de pesquisa são verificados e descartados localmente;
+ela ainda não se une, numa única AIR, ao `H_INTENT`, à posse, nullifier ou
+envelope e não ativa privacidade. Ver
 [`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
 
 **Transição local de estado privado:** `noxis-private-state` agora deriva,
