@@ -27,7 +27,7 @@ pub const KEYSTORE_PAYLOAD_V1_LENGTH: usize = PAYLOAD_PREFIX_LENGTH + SYNTHETIC_
 /// SHA-256 domain for the external identifier of exact canonical payload bytes.
 pub const KEYSTORE_PAYLOAD_CIPHERTEXT_ID_DOMAIN: &[u8] =
     b"NOXIS/KEYSTORE-PAYLOAD-CIPHERTEXT-ID/V1\0";
-#[cfg(test)]
+#[cfg(any(test, feature = "research-testing"))]
 const KEYSTORE_PAYLOAD_AAD_DOMAIN: &[u8] = b"NOXIS/KEYSTORE-PAYLOAD-AAD/V1\0";
 
 /// Opaque public identifier of one canonical candidate encrypted payload.
@@ -142,18 +142,18 @@ impl CandidateKeystorePayloadV1 {
         self.nonce == other.nonce
     }
 
-    #[cfg(test)]
-    pub(crate) fn seal_synthetic_fixture(
+    #[cfg(any(test, feature = "research-testing"))]
+    pub fn seal_research_synthetic_fixture(
         header: KeystoreHeaderV2,
         generation: u64,
         nonce: [u8; XCHACHA20POLY1305_NONCE_LENGTH],
         password: &[u8],
         root: &[u8; SYNTHETIC_ROOT_FIXTURE_LENGTH],
-    ) -> Result<Self, TestOnlyPayloadError> {
+    ) -> Result<Self, ResearchSyntheticPayloadError> {
         use chacha20poly1305::aead::{Aead as _, KeyInit as _};
 
         if generation == 0 || is_all_zero(&nonce) {
-            return Err(TestOnlyPayloadError::InvalidFixtureInput);
+            return Err(ResearchSyntheticPayloadError::InvalidFixtureInput);
         }
         let payload_prefix = Self {
             header_id: header.id(),
@@ -174,9 +174,9 @@ impl CandidateKeystorePayloadV1 {
         );
         zeroize::Zeroize::zeroize(&mut key);
         let ciphertext = ciphertext
-            .map_err(|_| TestOnlyPayloadError::UnlockFailed)?
+            .map_err(|_| ResearchSyntheticPayloadError::UnlockFailed)?
             .try_into()
-            .map_err(|_| TestOnlyPayloadError::UnlockFailed)?;
+            .map_err(|_| ResearchSyntheticPayloadError::UnlockFailed)?;
         Ok(Self {
             ciphertext,
             ..payload_prefix
@@ -184,15 +184,26 @@ impl CandidateKeystorePayloadV1 {
     }
 
     #[cfg(test)]
+    pub(crate) fn seal_synthetic_fixture(
+        header: KeystoreHeaderV2,
+        generation: u64,
+        nonce: [u8; XCHACHA20POLY1305_NONCE_LENGTH],
+        password: &[u8],
+        root: &[u8; SYNTHETIC_ROOT_FIXTURE_LENGTH],
+    ) -> Result<Self, ResearchSyntheticPayloadError> {
+        Self::seal_research_synthetic_fixture(header, generation, nonce, password, root)
+    }
+
+    #[cfg(test)]
     pub(crate) fn open_synthetic_fixture(
         self,
         header: KeystoreHeaderV2,
         password: &[u8],
-    ) -> Result<[u8; SYNTHETIC_ROOT_FIXTURE_LENGTH], TestOnlyPayloadError> {
+    ) -> Result<[u8; SYNTHETIC_ROOT_FIXTURE_LENGTH], ResearchSyntheticPayloadError> {
         use chacha20poly1305::aead::{Aead as _, KeyInit as _};
 
         self.verify_header(header)
-            .map_err(|_| TestOnlyPayloadError::HeaderMismatch)?;
+            .map_err(|_| ResearchSyntheticPayloadError::HeaderMismatch)?;
         let aad = self.test_only_aad(header);
         let mut key = derive_test_only_key(header, password)?;
         let cipher = chacha20poly1305::XChaCha20Poly1305::new_from_slice(&key)
@@ -205,10 +216,10 @@ impl CandidateKeystorePayloadV1 {
             },
         );
         zeroize::Zeroize::zeroize(&mut key);
-        let mut plaintext = plaintext.map_err(|_| TestOnlyPayloadError::UnlockFailed)?;
+        let mut plaintext = plaintext.map_err(|_| ResearchSyntheticPayloadError::UnlockFailed)?;
         if plaintext.len() != SYNTHETIC_ROOT_FIXTURE_LENGTH {
             zeroize::Zeroize::zeroize(&mut plaintext);
-            return Err(TestOnlyPayloadError::UnlockFailed);
+            return Err(ResearchSyntheticPayloadError::UnlockFailed);
         }
         let root = plaintext
             .as_slice()
@@ -218,7 +229,7 @@ impl CandidateKeystorePayloadV1 {
         Ok(root)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "research-testing"))]
     fn test_only_aad(self, header: KeystoreHeaderV2) -> Vec<u8> {
         let payload_bytes = self.encode();
         let mut aad = Vec::with_capacity(
@@ -284,11 +295,11 @@ const fn is_all_zero<const LENGTH: usize>(bytes: &[u8; LENGTH]) -> bool {
     value == 0
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "research-testing"))]
 fn derive_test_only_key(
     header: KeystoreHeaderV2,
     password: &[u8],
-) -> Result<[u8; 32], TestOnlyPayloadError> {
+) -> Result<[u8; 32], ResearchSyntheticPayloadError> {
     use argon2::{Algorithm, Argon2, Params, Version};
 
     let parameters = Params::new(
@@ -297,22 +308,39 @@ fn derive_test_only_key(
         crate::CANDIDATE_ARGON2_LANES,
         Some(32),
     )
-    .map_err(|_| TestOnlyPayloadError::UnlockFailed)?;
+    .map_err(|_| ResearchSyntheticPayloadError::UnlockFailed)?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, parameters);
     let mut key = [0_u8; 32];
     argon2
         .hash_password_into(password, &header.salt_for_test_only_crypto(), &mut key)
-        .map_err(|_| TestOnlyPayloadError::UnlockFailed)?;
+        .map_err(|_| ResearchSyntheticPayloadError::UnlockFailed)?;
     Ok(key)
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "research-testing"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum TestOnlyPayloadError {
+pub enum ResearchSyntheticPayloadError {
     HeaderMismatch,
     InvalidFixtureInput,
     UnlockFailed,
 }
+
+#[cfg(any(test, feature = "research-testing"))]
+impl fmt::Display for ResearchSyntheticPayloadError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::HeaderMismatch => "synthetic research payload belongs to another header",
+            Self::InvalidFixtureInput => "synthetic research payload has invalid fixture input",
+            Self::UnlockFailed => "synthetic research payload could not be opened",
+        })
+    }
+}
+
+#[cfg(any(test, feature = "research-testing"))]
+impl std::error::Error for ResearchSyntheticPayloadError {}
+
+#[cfg(test)]
+type TestOnlyPayloadError = ResearchSyntheticPayloadError;
 
 #[cfg(test)]
 mod tests {

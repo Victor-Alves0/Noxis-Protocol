@@ -47,6 +47,7 @@ novo.
 ```powershell
 cargo test -p noxis-wallet-keystore --locked
 cargo clippy -p noxis-wallet-keystore --all-targets --locked -- -D warnings
+cargo test -p noxis-wallet-keystore --features research-testing --locked
 ```
 
 Os testes verificam que `NXKB` é codificado/decodificado e restaurado entre dois
@@ -55,6 +56,30 @@ forma independente. Eles também verificam que recibo incompatível falha antes
 de escrever sequer o cabeçalho de destino, e que truncamento ou substituição de
 cabeçalho é rejeitado. Uma restauração interrompida após o cabeçalho e antes do
 payload é retomada pelo mesmo bundle/recibo sem sobrescrever bytes.
+
+## Demonstração entre processos
+
+O binário exige explicitamente a feature `research-testing` e usa uma raiz e
+senha fixas **sem valor de usuário**. Crie uma pasta externa aos dois diretórios
+de wallet e execute os dois comandos separadamente:
+
+```powershell
+New-Item -ItemType Directory -Force .\target\noxis-keystore-synthetic-demo | Out-Null
+
+cargo run -p noxis-wallet-keystore --features research-testing --bin noxis-keystore-synthetic-demo -- create `
+  --wallet-dir .\target\noxis-keystore-synthetic-demo\source-wallet `
+  --bundle .\target\noxis-keystore-synthetic-demo\backup.nxkb `
+  --anchor .\target\noxis-keystore-synthetic-demo\anchor.nxka
+
+cargo run -p noxis-wallet-keystore --features research-testing --bin noxis-keystore-synthetic-demo -- restore `
+  --wallet-dir .\target\noxis-keystore-synthetic-demo\restored-wallet `
+  --bundle .\target\noxis-keystore-synthetic-demo\backup.nxkb `
+  --anchor .\target\noxis-keystore-synthetic-demo\anchor.nxka
+```
+
+O binário recusa colocar `NXKB` ou `NXKA` dentro do diretório da wallet. O teste
+de integração executa exatamente `create` e `restore` como processos separados
+e confirma os tamanhos canônicos dos dois artefatos e os arquivos do destino.
 
 ## Limites deliberados
 
@@ -65,13 +90,13 @@ payload é retomada pelo mesmo bundle/recibo sem sobrescrever bytes.
   mesmo bundle após a primeira publicação é testada e idempotente, mas ainda
   faltam testes de término real de processo e de todos os pontos de falha do
   sistema de arquivos.
-- Não há teste entre processos, cópia para mídia externa, sincronização remota
-  ou garantia de que o usuário guardou `NXKA` em local independente.
+- Há um teste entre processos locais; ainda não há cópia para mídia externa,
+  sincronização remota ou garantia de que o usuário guardou `NXKA` em local
+  independente.
 
 ## Próximo gate
 
-Criar uma demonstração operacional sintética que execute captura, cópia e
-restauração em processos separados e testar término real de processo nos
-pontos de recuperação. Só depois de resolver essa atomicidade operacional,
-inventariar os segredos de uma wallet e passar por revisão independente será
-aceitável propor um container real.
+Testar término real de processo nos pontos de recuperação e os demais pontos de
+falha do sistema de arquivos. Só depois de resolver essa atomicidade
+operacional, inventariar os segredos de uma wallet e passar por revisão
+independente será aceitável propor um container real.

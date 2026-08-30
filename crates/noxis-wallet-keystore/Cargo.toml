@@ -6,14 +6,25 @@ license.workspace = true
 rust-version.workspace = true
 description = "Bounded candidate wallet-keystore container boundary for Noxis research."
 
+[features]
+research-testing = ["dep:argon2", "dep:chacha20poly1305", "dep:zeroize"]
+
 [dependencies]
+argon2 = { version = "0.5.3", optional = true }
+chacha20poly1305 = { version = "0.10.1", optional = true }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 sha2 = "0.10.9"
+zeroize = { version = "1.8.1", optional = true }
 
 [dev-dependencies]
 argon2 = "0.5.3"
 chacha20poly1305 = "0.10.1"
 zeroize = "1.8.1"
+
+[[bin]]
+name = "noxis-keystore-synthetic-demo"
+path = "src/bin/noxis-keystore-synthetic-demo.rs"
+required-features = ["research-testing"]
 
 [lints]
 workspace = true

@@ -27,7 +27,7 @@ O decoder exige tamanho e EOF exatos, magic e versão exatos, geração não nul
 
 ## Vínculos criptográficos exercidos
 
-Nos testes, a chave é derivada com o perfil Argon2id fixado pelo `NXKS v2`. O associated data é exatamente:
+Nos testes e no demo explicitamente compilado com `research-testing`, a chave é derivada com o perfil Argon2id fixado pelo `NXKS v2`. O associated data é exatamente:
 
 ```text
 "NOXIS/KEYSTORE-PAYLOAD-AAD/V1\0"

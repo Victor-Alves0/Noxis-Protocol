@@ -220,6 +220,21 @@ cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo -- address-book 
 The address book stores canonical `NXPA` files with a single-writer lock. It
 cannot store a private key, decrypt a payload, restore a wallet or spend funds.
 
+To reproduce a **synthetic-only** keystore backup and restoration in two local
+processes, run:
+
+```powershell
+New-Item -ItemType Directory -Force .\target\noxis-keystore-synthetic-demo | Out-Null
+
+cargo run -p noxis-wallet-keystore --features research-testing --bin noxis-keystore-synthetic-demo -- create --wallet-dir .\target\noxis-keystore-synthetic-demo\source-wallet --bundle .\target\noxis-keystore-synthetic-demo\backup.nxkb --anchor .\target\noxis-keystore-synthetic-demo\anchor.nxka
+
+cargo run -p noxis-wallet-keystore --features research-testing --bin noxis-keystore-synthetic-demo -- restore --wallet-dir .\target\noxis-keystore-synthetic-demo\restored-wallet --bundle .\target\noxis-keystore-synthetic-demo\backup.nxkb --anchor .\target\noxis-keystore-synthetic-demo\anchor.nxka
+```
+
+The commands prove canonical `NXKB` transport with a separately retained
+`NXKA` receipt, not a user wallet backup. They generate no user seed, spend key
+or view key; see [`docs/WALLET_SYNTHETIC_RECOVERY_BUNDLE_CANDIDATE_V0_1.md`](docs/WALLET_SYNTHETIC_RECOVERY_BUNDLE_CANDIDATE_V0_1.md).
+
 This deliberately does **not** start CometBFT or claim consensus, custody or
 privacy: the displayed `AppHash` is explicitly unavailable in local-admission
 mode, and the transfer uses a research fixture rather than a private proof.

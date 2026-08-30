@@ -291,8 +291,8 @@ usa lock único, publicação atômica por temporário e recuperação canônica
 payload opaco sintético `NXKP` já vincula cabeçalho, geração, nonce e recibo
 `NXKA` em testes e persiste gerações imutáveis. O bundle
 portátil `NXKB` já restaura esses bytes opacos em outro diretório apenas quando
-um `NXKA` externo confere; ainda não existe restauração operacional entre
-processos ou segredo real. Ver
+um `NXKA` externo confere, inclusive em demo/teste de processos separados;
+ainda não existe restauração de segredo real. Ver
 [`WALLET_KEYSTORE_SECURITY_GATE_V0_1.md`](WALLET_KEYSTORE_SECURITY_GATE_V0_1.md)
 e [`WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md),
 além do [`WALLET_KEYSTORE_PAYLOAD_SYNTHETIC_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_PAYLOAD_SYNTHETIC_CANDIDATE_V0_1.md)
@@ -301,7 +301,7 @@ O ID público canônico do cabeçalho já pode ser usado como âncora externa, m
 política agora seleciona o recibo externo público `NXKA` mantido pelo usuário.
 Rollback ainda exige que ele esteja fora do diretório; não há
 backup/restauração de segredo até haver testes operacionais entre processos,
-recuperação de interrupção e revisão. Ver
+recuperação de término real de processo e revisão. Ver
 [`WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md`](WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md).
 
 ### 6. Adaptadores de ativos e políticas de emissão

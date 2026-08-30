@@ -17,6 +17,8 @@ mod header_store;
 mod payload_store;
 mod recovery_bundle;
 
+#[cfg(any(test, feature = "research-testing"))]
+pub use candidate_payload::ResearchSyntheticPayloadError;
 pub use candidate_payload::{
     CandidateKeystorePayloadV1, CandidatePayloadCiphertextIdV1, KEYSTORE_PAYLOAD_MAGIC,
     KEYSTORE_PAYLOAD_V1_LENGTH, KEYSTORE_PAYLOAD_VERSION, KeystorePayloadBindingError,
@@ -206,7 +208,7 @@ impl KeystoreHeaderV2 {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "research-testing"))]
     pub(crate) const fn salt_for_test_only_crypto(self) -> [u8; CANDIDATE_SALT_LENGTH] {
         self.salt
     }

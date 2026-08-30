@@ -92,7 +92,7 @@ A política explícita de backup e rollback foi publicada em
 [`WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md`](WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md).
 O bundle sintético `NXKB` já restaura em outro diretório sem levar o recibo
 externo e retoma de forma idempotente após publicar só o cabeçalho. O próximo
-trabalho é testar backup/restauração operacional entre processos e término real
-de processo. Só então um crate de persistência poderá receber uma raiz de sessão
+trabalho é testar término real de processo e outros pontos de falha do sistema
+de arquivos. Só então um crate de persistência poderá receber uma raiz de sessão
 por uma interface privada, sem tornar seus bytes parte de APIs de endereço, CLI
 ou transação.
