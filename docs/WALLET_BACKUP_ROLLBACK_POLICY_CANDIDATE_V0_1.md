@@ -110,6 +110,7 @@ restauração ou rollback de segredo.
 O bundle `NXKB` agora transporta `NXKS + NXKP` entre diretórios, mantendo
 `NXKA` externo; a repetição após publicar somente o cabeçalho já é idempotente.
 O demo/teste já executa backup/restauração sintéticos em processos separados.
-Testar término real de processo e outros pontos de falha do sistema de arquivos.
-Só após esses testes, inventário de segredo e revisão independente a raiz de
-wallet poderá atravessar a fronteira do keystore.
+O término real depois do cabeçalho também retoma de forma idempotente. Testar
+término durante a publicação de `NXKP` e outros pontos de falha do sistema de
+arquivos. Só após esses testes, inventário de segredo e revisão independente a
+raiz de wallet poderá atravessar a fronteira do keystore.

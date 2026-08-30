@@ -72,10 +72,13 @@ Os testes cobrem:
 ## Limites de segurança e operação
 
 - A fixture não grava arquivos e não recebe uma raiz de wallet real.
-- O ciclo de vida do cabeçalho público e da fixture de ciphertext já tem lock
-  exclusivo, criação de temporário, `sync_all`, rename e recuperação somente
-  de temporário completo/canônico. Um temporário truncado falha fechado. Isso
-  não persiste segredo nem prova a durabilidade de um payload real.
+- O ciclo de vida do cabeçalho público e da fixture de ciphertext usa lock
+  exclusivo consultado pelo sistema operacional (mais guarda contra segunda
+  abertura no mesmo processo), criação de temporário, `sync_all`, rename e
+  recuperação somente de temporário completo/canônico. Um marcador de lock
+  deixado por processo morto não bloqueia reabertura; um temporário truncado
+  falha fechado. Isso não persiste segredo nem prova a durabilidade de um
+  payload real.
 - Ainda não existe backup, recuperação de segredo, UX de senha ou suporte a
   dispositivos. A âncora externa `NXKA` define a política candidata de
   rollback, mas ainda não há payload secreto para protegê-la na prática.
@@ -91,8 +94,9 @@ Os testes cobrem:
 A política explícita de backup e rollback foi publicada em
 [`WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md`](WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md).
 O bundle sintético `NXKB` já restaura em outro diretório sem levar o recibo
-externo e retoma de forma idempotente após publicar só o cabeçalho. O próximo
-trabalho é testar término real de processo e outros pontos de falha do sistema
-de arquivos. Só então um crate de persistência poderá receber uma raiz de sessão
-por uma interface privada, sem tornar seus bytes parte de APIs de endereço, CLI
-ou transação.
+externo e retoma de forma idempotente após publicar só o cabeçalho, inclusive
+depois de término real do processo. O próximo trabalho é testar término durante
+a publicação de `NXKP` e outros pontos de falha do sistema de arquivos. Só
+então um crate de persistência poderá receber uma raiz de sessão por uma
+interface privada, sem tornar seus bytes parte de APIs de endereço, CLI ou
+transação.

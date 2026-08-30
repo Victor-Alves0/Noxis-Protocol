@@ -5,18 +5,22 @@
 //! to persist a real wallet secret.
 
 use std::{
+    collections::HashSet,
     fmt,
     fs::{self, File, OpenOptions},
     io::{self, Write},
     path::{Path, PathBuf},
+    sync::{Mutex, OnceLock},
 };
+
+use fs2::FileExt as _;
 
 use crate::{
     CandidateKeystorePayloadStore, KEYSTORE_HEADER_V2_LENGTH, KeystoreHeaderError,
     KeystoreHeaderV2, PayloadStoreError,
 };
 
-/// Process-lifetime lock file for the public candidate-header directory.
+/// OS-advisory exclusive writer-lock file for the candidate-header directory.
 pub const KEYSTORE_HEADER_LOCK_FILE_NAME: &str = ".noxis-wallet-keystore.lock";
 const HEADER_FILE_NAME: &str = "wallet-header.nxks";
 const TEMPORARY_HEADER_FILE_NAME: &str = ".wallet-header.nxks.tmp";
@@ -256,8 +260,8 @@ impl CandidateKeystoreHeaderStore {
 
 #[derive(Debug)]
 struct HeaderStoreLock {
-    file: Option<File>,
-    path: PathBuf,
+    file: File,
+    process_key: PathBuf,
 }
 
 impl HeaderStoreLock {
@@ -265,31 +269,59 @@ impl HeaderStoreLock {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
-            .create_new(true)
+            .create(true)
+            .truncate(false)
             .open(&path)
-            .map_err(|source| {
-                if source.kind() == io::ErrorKind::AlreadyExists {
-                    HeaderStoreError::DirectoryAlreadyLocked(path.clone())
-                } else {
-                    HeaderStoreError::Io {
-                        operation: "create candidate keystore-header lock",
-                        path: path.clone(),
-                        source,
-                    }
-                }
+            .map_err(|source| HeaderStoreError::Io {
+                operation: "open candidate keystore-header lock",
+                path: path.clone(),
+                source,
             })?;
-        Ok(Self {
-            file: Some(file),
-            path,
-        })
+        let process_key = fs::canonicalize(&path).map_err(|source| HeaderStoreError::Io {
+            operation: "canonicalize candidate keystore-header lock",
+            path: path.clone(),
+            source,
+        })?;
+        {
+            let mut locks = process_lock_registry()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            if !locks.insert(process_key.clone()) {
+                return Err(HeaderStoreError::DirectoryAlreadyLocked(path));
+            }
+        }
+        if let Err(source) = file.try_lock_exclusive() {
+            let mut locks = process_lock_registry()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            locks.remove(&process_key);
+            if source.kind() == io::ErrorKind::WouldBlock {
+                return Err(HeaderStoreError::DirectoryAlreadyLocked(path));
+            } else {
+                return Err(HeaderStoreError::Io {
+                    operation: "acquire candidate keystore-header lock",
+                    path,
+                    source,
+                });
+            }
+        }
+        Ok(Self { file, process_key })
     }
 }
 
 impl Drop for HeaderStoreLock {
     fn drop(&mut self) {
-        drop(self.file.take());
-        let _ = fs::remove_file(&self.path);
+        let _ = self.file.unlock();
+        let mut locks = process_lock_registry()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        locks.remove(&self.process_key);
     }
+}
+
+fn process_lock_registry() -> &'static Mutex<HashSet<PathBuf>> {
+    static LOCKS: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
+    LOCKS.get_or_init(|| Mutex::new(HashSet::new()))
 }
 
 #[cfg(test)]
@@ -350,6 +382,16 @@ mod tests {
             Err(HeaderStoreError::DirectoryAlreadyLocked(_))
         ));
         drop(first);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn stale_lock_file_without_an_os_lock_does_not_block_reopen() {
+        let root = test_directory("stale-lock");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join(super::KEYSTORE_HEADER_LOCK_FILE_NAME), []).unwrap();
+        let store = CandidateKeystoreHeaderStore::open(&root).unwrap();
+        drop(store);
         std::fs::remove_dir_all(root).unwrap();
     }
 

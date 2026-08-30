@@ -34,7 +34,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             wallet_dir,
             bundle,
             anchor,
-        } => restore(wallet_dir, bundle, anchor),
+            stop_after_header,
+        } => restore(wallet_dir, bundle, anchor, stop_after_header),
     }
 }
 
@@ -48,18 +49,19 @@ enum Command {
         wallet_dir: PathBuf,
         bundle: PathBuf,
         anchor: PathBuf,
+        stop_after_header: bool,
     },
 }
 
 fn parse_command(args: &[String]) -> Result<Command, Box<dyn Error>> {
-    if args.len() != 7 {
+    if args.len() != 7 && args.len() != 8 {
         return Err(usage().into());
     }
     let wallet_dir = value_after(args, "--wallet-dir")?;
     let bundle = value_after(args, "--bundle")?;
     let anchor = value_after(args, "--anchor")?;
     match args[0].as_str() {
-        "create" => Ok(Command::Create {
+        "create" if args.len() == 7 => Ok(Command::Create {
             wallet_dir,
             bundle,
             anchor,
@@ -68,7 +70,16 @@ fn parse_command(args: &[String]) -> Result<Command, Box<dyn Error>> {
             wallet_dir,
             bundle,
             anchor,
+            stop_after_header: optional_stop_after_header(args)?,
         }),
+        _ => Err(usage().into()),
+    }
+}
+
+fn optional_stop_after_header(args: &[String]) -> Result<bool, Box<dyn Error>> {
+    match args.len() {
+        7 => Ok(false),
+        8 if args[7] == "--stop-after-header" => Ok(true),
         _ => Err(usage().into()),
     }
 }
@@ -118,7 +129,12 @@ fn create(wallet_dir: PathBuf, bundle: PathBuf, anchor: PathBuf) -> Result<(), B
     Ok(())
 }
 
-fn restore(wallet_dir: PathBuf, bundle: PathBuf, anchor: PathBuf) -> Result<(), Box<dyn Error>> {
+fn restore(
+    wallet_dir: PathBuf,
+    bundle: PathBuf,
+    anchor: PathBuf,
+    stop_after_header: bool,
+) -> Result<(), Box<dyn Error>> {
     let store = CandidateKeystoreHeaderStore::open(&wallet_dir)?;
     ensure_external_to_wallet(&bundle, store.path())?;
     ensure_external_to_wallet(&anchor, store.path())?;
@@ -130,6 +146,14 @@ fn restore(wallet_dir: PathBuf, bundle: PathBuf, anchor: PathBuf) -> Result<(), 
         &anchor,
         EXTERNAL_ROLLBACK_ANCHOR_V1_LENGTH,
     )?)?;
+    if stop_after_header {
+        recovery_bundle.verify_external_anchor(external_anchor)?;
+        let header = store.initialize(recovery_bundle.header())?;
+        println!("Noxis synthetic restore failpoint reached");
+        println!("Header publication: {:?}", header);
+        println!("process intentionally stopped before payload publication");
+        std::process::exit(86);
+    }
     let outcome = recovery_bundle.restore(&store, external_anchor)?;
 
     println!("Noxis synthetic keystore restore accepted");
@@ -191,5 +215,5 @@ fn read_exact(path: &Path, expected_length: usize) -> Result<Vec<u8>, Box<dyn Er
 }
 
 fn usage() -> String {
-    "usage:\n  noxis-keystore-synthetic-demo create --wallet-dir <dir> --bundle <external.nxkb> --anchor <external.nxka>\n  noxis-keystore-synthetic-demo restore --wallet-dir <new-dir> --bundle <external.nxkb> --anchor <external.nxka>".to_owned()
+    "usage:\n  noxis-keystore-synthetic-demo create --wallet-dir <dir> --bundle <external.nxkb> --anchor <external.nxka>\n  noxis-keystore-synthetic-demo restore --wallet-dir <new-dir> --bundle <external.nxkb> --anchor <external.nxka> [--stop-after-header]".to_owned()
 }

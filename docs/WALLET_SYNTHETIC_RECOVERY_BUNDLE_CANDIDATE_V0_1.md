@@ -55,7 +55,9 @@ diretórios temporários distintos, com `NXKA` também codificado/decodificado d
 forma independente. Eles também verificam que recibo incompatível falha antes
 de escrever sequer o cabeçalho de destino, e que truncamento ou substituição de
 cabeçalho é rejeitado. Uma restauração interrompida após o cabeçalho e antes do
-payload é retomada pelo mesmo bundle/recibo sem sobrescrever bytes.
+payload é retomada pelo mesmo bundle/recibo sem sobrescrever bytes. O teste de
+integração também termina de fato o processo nesse ponto e um segundo processo
+conclui a restauração.
 
 ## Demonstração entre processos
 
@@ -77,6 +79,12 @@ cargo run -p noxis-wallet-keystore --features research-testing --bin noxis-keyst
   --anchor .\target\noxis-keystore-synthetic-demo\anchor.nxka
 ```
 
+Para reproduzir a retomada após encerramento real, acrescente
+`--stop-after-header` ao primeiro `restore`. Ele encerra intencionalmente com
+código 86 depois de tornar `NXKS` durável; execute o mesmo `restore` sem a
+flag para publicar `NXKP`. O teste de integração cobre essa sequência com dois
+processos filhos.
+
 O binário recusa colocar `NXKB` ou `NXKA` dentro do diretório da wallet. O teste
 de integração executa exatamente `create` e `restore` como processos separados
 e confirma os tamanhos canônicos dos dois artefatos e os arquivos do destino.
@@ -87,16 +95,16 @@ e confirma os tamanhos canônicos dos dois artefatos e os arquivos do destino.
 - O bundle é um formato de transporte, não uma UX de backup, um arquivo de
   recuperação de senha ou um mecanismo de custódia.
 - A restauração possui duas publicações (cabeçalho e payload). A repetição do
-  mesmo bundle após a primeira publicação é testada e idempotente, mas ainda
-  faltam testes de término real de processo e de todos os pontos de falha do
-  sistema de arquivos.
+  mesmo bundle após a primeira publicação é testada e idempotente, inclusive
+  após término real do processo. Ainda faltam término real durante publicação
+  de `NXKP` e outros pontos de falha do sistema de arquivos.
 - Há um teste entre processos locais; ainda não há cópia para mídia externa,
   sincronização remota ou garantia de que o usuário guardou `NXKA` em local
   independente.
 
 ## Próximo gate
 
-Testar término real de processo nos pontos de recuperação e os demais pontos de
-falha do sistema de arquivos. Só depois de resolver essa atomicidade
-operacional, inventariar os segredos de uma wallet e passar por revisão
-independente será aceitável propor um container real.
+Testar término real durante a publicação de `NXKP` e os demais pontos de falha
+do sistema de arquivos. Só depois de resolver essa atomicidade operacional,
+inventariar os segredos de uma wallet e passar por revisão independente será
+aceitável propor um container real.

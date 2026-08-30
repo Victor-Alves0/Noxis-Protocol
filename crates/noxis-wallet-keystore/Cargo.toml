@@ -12,6 +12,7 @@ research-testing = ["dep:argon2", "dep:chacha20poly1305", "dep:zeroize"]
 [dependencies]
 argon2 = { version = "0.5.3", optional = true }
 chacha20poly1305 = { version = "0.10.1", optional = true }
+fs2 = "0.4.3"
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 sha2 = "0.10.9"
 zeroize = { version = "1.8.1", optional = true }
