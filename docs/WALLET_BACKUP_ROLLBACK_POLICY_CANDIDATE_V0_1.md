@@ -11,7 +11,7 @@ canônico agora tem um `KeystoreHeaderIdV1`:
 ```text
 SHA-256(
   "NOXIS/KEYSTORE-HEADER-ID/V1\0"
-  || encode(NXKS v1)
+  || encode(NXKS v2)
 )
 ```
 
@@ -57,8 +57,8 @@ o chamador deve escolher um meio de armazenamento genuinamente externo.
 ## Contrato para o futuro payload secreto
 
 Quando um payload criptografado for permitido, cada atualização deverá criar
-uma nova geração monotônica e produzir um recibo de backup externo contendo no
-mínimo:
+uma nova geração monotônica, gerar um nonce XChaCha20-Poly1305 novo e único
+para aquele payload, e produzir um recibo de backup externo contendo no mínimo:
 
 ```text
 header_id:32
@@ -66,8 +66,9 @@ payload_generation:u64be
 payload_ciphertext_id:32
 ```
 
-O `payload_ciphertext_id` será um hash com domínio próprio sobre os bytes
-canônicos completos do payload cifrado, e **não** sobre plaintext. O recibo
+O nonce fará parte dos bytes canônicos autenticados do payload — nunca do
+cabeçalho imutável `NXKS`. O `payload_ciphertext_id` será um hash com domínio
+próprio sobre os bytes canônicos completos do payload cifrado, e **não** sobre plaintext. O recibo
 deve ser registrado fora do diretório antes de a interface chamar a wallet de
 “backup confirmado”. Na abertura/restauração:
 

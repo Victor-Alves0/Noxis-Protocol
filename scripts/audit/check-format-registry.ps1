@@ -30,7 +30,7 @@ $formatVersionEvidence = @(
     @{ Identity = 'legacy checkpoint / NXCP / v1'; Source = 'crates/noxis-checkpoint/src/lib.rs'; Pattern = 'CHECKPOINT_FORMAT_VERSION:\s*u16\s*=\s*1' }
     @{ Identity = 'wallet experimental wire / NXPA / v1'; Source = 'crates/noxis-wallet-crypto/src/wire.rs'; Pattern = 'PAYMENT_ADDRESS_FORMAT_VERSION:\s*u16\s*=\s*1' }
     @{ Identity = 'wallet experimental wire / NXRE / v1'; Source = 'crates/noxis-wallet-crypto/src/wire.rs'; Pattern = 'HYBRID_RECIPIENT_ENVELOPE_FORMAT_VERSION:\s*u16\s*=\s*1' }
-    @{ Identity = 'wallet keystore candidate header / NXKS / v1'; Source = 'crates/noxis-wallet-keystore/src/lib.rs'; Pattern = 'KEYSTORE_HEADER_VERSION:\s*u16\s*=\s*1' }
+    @{ Identity = 'wallet keystore candidate header / NXKS / v2'; Source = 'crates/noxis-wallet-keystore/src/lib.rs'; Pattern = 'KEYSTORE_HEADER_VERSION:\s*u16\s*=\s*2' }
     @{ Identity = 'wallet external rollback anchor / NXKA / v1'; Source = 'crates/noxis-wallet-keystore/src/external_anchor.rs'; Pattern = 'EXTERNAL_ROLLBACK_ANCHOR_VERSION:\s*u16\s*=\s*1' }
     @{ Identity = 'candidate manifest / NXTM / v1'; Source = 'crates/noxis-tree-params/src/lib.rs'; Pattern = 'DRAFT_TREE_MANIFEST_VERSION:\s*u16\s*=\s*1' }
     @{ Identity = 'candidate manifest / NXTM / v2'; Source = 'crates/noxis-tree-params/src/p24.rs'; Pattern = 'P24_CANDIDATE_MANIFEST_VERSION:\s*u16\s*=\s*2' }

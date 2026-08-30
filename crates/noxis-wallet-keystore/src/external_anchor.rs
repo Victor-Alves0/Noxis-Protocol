@@ -191,12 +191,12 @@ const fn is_all_zero(bytes: &[u8; 32]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::KeystoreHeaderV1;
+    use crate::KeystoreHeaderV2;
 
     use super::*;
 
     fn header_id() -> KeystoreHeaderIdV1 {
-        KeystoreHeaderV1::generate([7; 32], 42).unwrap().id()
+        KeystoreHeaderV2::generate([7; 32], 42).unwrap().id()
     }
 
     fn ciphertext_id(byte: u8) -> CandidatePayloadCiphertextIdV1 {
@@ -245,7 +245,7 @@ mod tests {
         );
         assert_eq!(
             anchor.verify(
-                KeystoreHeaderV1::generate([8; 32], 42).unwrap().id(),
+                KeystoreHeaderV2::generate([8; 32], 42).unwrap().id(),
                 7,
                 ciphertext_id(9)
             ),

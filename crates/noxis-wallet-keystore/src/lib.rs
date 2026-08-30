@@ -28,9 +28,9 @@ pub use header_store::{
 /// Candidate keystore-header magic bytes.
 pub const KEYSTORE_HEADER_MAGIC: [u8; 4] = *b"NXKS";
 /// Only candidate header layout accepted by this crate.
-pub const KEYSTORE_HEADER_VERSION: u16 = 1;
-/// Exact v1 serialized header size.
-pub const KEYSTORE_HEADER_V1_LENGTH: usize = 100;
+pub const KEYSTORE_HEADER_VERSION: u16 = 2;
+/// Exact v2 serialized header size.
+pub const KEYSTORE_HEADER_V2_LENGTH: usize = 76;
 /// Fixed Argon2id candidate memory cost in KiB (64 MiB).
 pub const CANDIDATE_ARGON2_MEMORY_KIB: u32 = 65_536;
 /// Fixed Argon2id candidate time cost.
@@ -38,12 +38,12 @@ pub const CANDIDATE_ARGON2_TIME_COST: u32 = 3;
 /// Fixed Argon2id candidate lane count.
 pub const CANDIDATE_ARGON2_LANES: u32 = 4;
 pub const CANDIDATE_SALT_LENGTH: usize = 16;
-pub const CANDIDATE_NONCE_LENGTH: usize = 24;
-/// SHA-256 domain for the public identity of one exact `NXKS v1` header.
+/// SHA-256 domain for the public identity of one exact `NXKS v2` header.
 pub const KEYSTORE_HEADER_ID_DOMAIN: &[u8] = b"NOXIS/KEYSTORE-HEADER-ID/V1\0";
 
 const ARGON2ID_KDF_ID: u8 = 1;
 const XCHACHA20POLY1305_AEAD_ID: u8 = 1;
+const REVOKED_KEYSTORE_HEADER_V1: u16 = 1;
 #[cfg(test)]
 const ROOT_FIXTURE_LENGTH: usize = 64;
 #[cfg(test)]
@@ -55,9 +55,8 @@ const SEALED_ROOT_FIXTURE_LENGTH: usize = ROOT_FIXTURE_LENGTH + AEAD_TAG_LENGTH;
 /// future keystore payload. Its constructor always selects the one candidate
 /// profile; a decoder rejects every different algorithm or cost value.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct KeystoreHeaderV1 {
+pub struct KeystoreHeaderV2 {
     salt: [u8; CANDIDATE_SALT_LENGTH],
-    nonce: [u8; CANDIDATE_NONCE_LENGTH],
     wallet_id: [u8; 32],
     key_epoch: u64,
 }
@@ -78,8 +77,9 @@ impl KeystoreHeaderIdV1 {
     }
 }
 
-impl KeystoreHeaderV1 {
-    /// Creates fresh public salt and nonce for one candidate header. The
+impl KeystoreHeaderV2 {
+    /// Creates a fresh public salt for one candidate header. Every encrypted
+    /// payload generation must instead carry its own unique AEAD nonce. The
     /// caller supplies a stable, nonzero public wallet identifier and epoch;
     /// neither is a secret, but both are authenticated later.
     pub fn generate(wallet_id: [u8; 32], key_epoch: u64) -> Result<Self, KeystoreHeaderError> {
@@ -87,12 +87,9 @@ impl KeystoreHeaderV1 {
             return Err(KeystoreHeaderError::ZeroWalletId);
         }
         let mut salt = [0_u8; CANDIDATE_SALT_LENGTH];
-        let mut nonce = [0_u8; CANDIDATE_NONCE_LENGTH];
         OsRng.fill_bytes(&mut salt);
-        OsRng.fill_bytes(&mut nonce);
         Ok(Self {
             salt,
-            nonce,
             wallet_id,
             key_epoch,
         })
@@ -101,7 +98,7 @@ impl KeystoreHeaderV1 {
     /// Strictly decodes the fixed candidate header and rejects malformed,
     /// unsupported, downgraded and trailing data before exposing metadata.
     pub fn decode(bytes: &[u8]) -> Result<Self, KeystoreHeaderError> {
-        if bytes.len() != KEYSTORE_HEADER_V1_LENGTH {
+        if bytes.len() < 6 {
             return Err(KeystoreHeaderError::InvalidLength {
                 actual: bytes.len(),
             });
@@ -109,10 +106,17 @@ impl KeystoreHeaderV1 {
         if bytes[..4] != KEYSTORE_HEADER_MAGIC {
             return Err(KeystoreHeaderError::InvalidMagic);
         }
-        if u16::from_be_bytes(bytes[4..6].try_into().expect("fixed version slice"))
-            != KEYSTORE_HEADER_VERSION
-        {
+        let version = u16::from_be_bytes(bytes[4..6].try_into().expect("fixed version slice"));
+        if version == REVOKED_KEYSTORE_HEADER_V1 {
+            return Err(KeystoreHeaderError::RevokedVersionV1);
+        }
+        if version != KEYSTORE_HEADER_VERSION {
             return Err(KeystoreHeaderError::UnsupportedVersion);
+        }
+        if bytes.len() != KEYSTORE_HEADER_V2_LENGTH {
+            return Err(KeystoreHeaderError::InvalidLength {
+                actual: bytes.len(),
+            });
         }
         if bytes[6] != ARGON2ID_KDF_ID || bytes[7] != XCHACHA20POLY1305_AEAD_ID {
             return Err(KeystoreHeaderError::UnsupportedAlgorithm);
@@ -127,21 +131,16 @@ impl KeystoreHeaderV1 {
             return Err(KeystoreHeaderError::UnsupportedCostProfile);
         }
         let salt = bytes[20..36].try_into().expect("fixed salt slice");
-        let nonce = bytes[36..60].try_into().expect("fixed nonce slice");
         if is_all_zero(&salt) {
             return Err(KeystoreHeaderError::ZeroSalt);
         }
-        if is_all_zero(&nonce) {
-            return Err(KeystoreHeaderError::ZeroNonce);
-        }
-        let wallet_id = bytes[60..92].try_into().expect("fixed wallet ID slice");
+        let wallet_id = bytes[36..68].try_into().expect("fixed wallet ID slice");
         if is_all_zero(&wallet_id) {
             return Err(KeystoreHeaderError::ZeroWalletId);
         }
-        let key_epoch = u64::from_be_bytes(bytes[92..100].try_into().expect("fixed epoch slice"));
+        let key_epoch = u64::from_be_bytes(bytes[68..76].try_into().expect("fixed epoch slice"));
         Ok(Self {
             salt,
-            nonce,
             wallet_id,
             key_epoch,
         })
@@ -150,8 +149,8 @@ impl KeystoreHeaderV1 {
     /// Canonical header bytes. These exact bytes are the associated data for
     /// the test-only sealing path, so substitution of profile/wallet/epoch
     /// fails authentication.
-    pub fn encode(self) -> [u8; KEYSTORE_HEADER_V1_LENGTH] {
-        let mut bytes = [0_u8; KEYSTORE_HEADER_V1_LENGTH];
+    pub fn encode(self) -> [u8; KEYSTORE_HEADER_V2_LENGTH] {
+        let mut bytes = [0_u8; KEYSTORE_HEADER_V2_LENGTH];
         bytes[..4].copy_from_slice(&KEYSTORE_HEADER_MAGIC);
         bytes[4..6].copy_from_slice(&KEYSTORE_HEADER_VERSION.to_be_bytes());
         bytes[6] = ARGON2ID_KDF_ID;
@@ -160,9 +159,8 @@ impl KeystoreHeaderV1 {
         bytes[12..16].copy_from_slice(&CANDIDATE_ARGON2_TIME_COST.to_be_bytes());
         bytes[16..20].copy_from_slice(&CANDIDATE_ARGON2_LANES.to_be_bytes());
         bytes[20..36].copy_from_slice(&self.salt);
-        bytes[36..60].copy_from_slice(&self.nonce);
-        bytes[60..92].copy_from_slice(&self.wallet_id);
-        bytes[92..100].copy_from_slice(&self.key_epoch.to_be_bytes());
+        bytes[36..68].copy_from_slice(&self.wallet_id);
+        bytes[68..76].copy_from_slice(&self.key_epoch.to_be_bytes());
         bytes
     }
 
@@ -189,11 +187,9 @@ impl KeystoreHeaderV1 {
         wallet_id: [u8; 32],
         key_epoch: u64,
         salt: [u8; CANDIDATE_SALT_LENGTH],
-        nonce: [u8; CANDIDATE_NONCE_LENGTH],
     ) -> Self {
         Self {
             salt,
-            nonce,
             wallet_id,
             key_epoch,
         }
@@ -206,11 +202,11 @@ impl KeystoreHeaderV1 {
 pub enum KeystoreHeaderError {
     InvalidLength { actual: usize },
     InvalidMagic,
+    RevokedVersionV1,
     UnsupportedVersion,
     UnsupportedAlgorithm,
     UnsupportedCostProfile,
     ZeroSalt,
-    ZeroNonce,
     ZeroWalletId,
 }
 
@@ -219,13 +215,13 @@ impl fmt::Display for KeystoreHeaderError {
         formatter.write_str(match self {
             Self::InvalidLength { .. } => "candidate keystore header has invalid length",
             Self::InvalidMagic => "candidate keystore header has invalid magic",
+            Self::RevokedVersionV1 => "candidate keystore header version 1 is revoked",
             Self::UnsupportedVersion => "candidate keystore header has unsupported version",
             Self::UnsupportedAlgorithm => "candidate keystore header has unsupported algorithm",
             Self::UnsupportedCostProfile => {
                 "candidate keystore header has unsupported cost profile"
             }
             Self::ZeroSalt => "candidate keystore header has zero salt",
-            Self::ZeroNonce => "candidate keystore header has zero nonce",
             Self::ZeroWalletId => "candidate keystore header has zero wallet ID",
         })
     }
@@ -256,60 +252,63 @@ mod tests {
 
     #[test]
     fn header_round_trips_and_rejects_all_structural_mutations() {
-        let header = KeystoreHeaderV1::with_test_entropy([7; 32], 42, [8; 16], [9; 24]);
+        let header = KeystoreHeaderV2::with_test_entropy([7; 32], 42, [8; 16]);
         let bytes = header.encode();
-        assert_eq!(KeystoreHeaderV1::decode(&bytes).unwrap(), header);
-        assert_eq!(header.id(), KeystoreHeaderV1::decode(&bytes).unwrap().id());
+        assert_eq!(KeystoreHeaderV2::decode(&bytes).unwrap(), header);
+        assert_eq!(header.id(), KeystoreHeaderV2::decode(&bytes).unwrap().id());
         assert_eq!(
-            KeystoreHeaderV1::decode(&bytes[..99]),
-            Err(KeystoreHeaderError::InvalidLength { actual: 99 })
+            KeystoreHeaderV2::decode(&bytes[..75]),
+            Err(KeystoreHeaderError::InvalidLength { actual: 75 })
         );
         let mut wrong_magic = bytes;
         wrong_magic[0] ^= 1;
         assert_eq!(
-            KeystoreHeaderV1::decode(&wrong_magic),
+            KeystoreHeaderV2::decode(&wrong_magic),
             Err(KeystoreHeaderError::InvalidMagic)
         );
         let mut wrong_profile = bytes;
         wrong_profile[8] ^= 1;
         assert_eq!(
-            KeystoreHeaderV1::decode(&wrong_profile),
+            KeystoreHeaderV2::decode(&wrong_profile),
             Err(KeystoreHeaderError::UnsupportedCostProfile)
         );
         let mut zero_salt = bytes;
         zero_salt[20..36].fill(0);
         assert_eq!(
-            KeystoreHeaderV1::decode(&zero_salt),
+            KeystoreHeaderV2::decode(&zero_salt),
             Err(KeystoreHeaderError::ZeroSalt)
         );
-        let mut zero_nonce = bytes;
-        zero_nonce[36..60].fill(0);
         assert_eq!(
-            KeystoreHeaderV1::decode(&zero_nonce),
-            Err(KeystoreHeaderError::ZeroNonce)
+            KeystoreHeaderV2::decode(b"NXKS\0\x01"),
+            Err(KeystoreHeaderError::RevokedVersionV1)
         );
-        let changed_epoch = KeystoreHeaderV1::with_test_entropy([7; 32], 43, [8; 16], [9; 24]);
+        let changed_epoch = KeystoreHeaderV2::with_test_entropy([7; 32], 43, [8; 16]);
         assert_ne!(header.id(), changed_epoch.id());
     }
 
     #[test]
     fn test_only_root_fixture_requires_exact_password_and_header() {
-        let header = KeystoreHeaderV1::with_test_entropy([7; 32], 42, [8; 16], [9; 24]);
+        let header = KeystoreHeaderV2::with_test_entropy([7; 32], 42, [8; 16]);
+        let nonce = [9; 24];
         let mut root = [0xA5; ROOT_FIXTURE_LENGTH];
         let sealed =
-            seal_test_only_root_fixture(&header, b"correct horse battery staple", &root).unwrap();
+            seal_test_only_root_fixture(&header, &nonce, b"correct horse battery staple", &root)
+                .unwrap();
         root.zeroize();
         let mut recovered =
-            open_test_only_root_fixture(&header, b"correct horse battery staple", &sealed).unwrap();
+            open_test_only_root_fixture(&header, &nonce, b"correct horse battery staple", &sealed)
+                .unwrap();
         assert_eq!(recovered, [0xA5; ROOT_FIXTURE_LENGTH]);
         recovered.zeroize();
-        let wrong_password = open_test_only_root_fixture(&header, b"wrong password", &sealed);
+        let wrong_password =
+            open_test_only_root_fixture(&header, &nonce, b"wrong password", &sealed);
         assert_eq!(wrong_password, Err(TestOnlyFixtureError::UnlockFailed));
         let mut tampered_ciphertext = sealed;
         tampered_ciphertext[0] ^= 1;
         assert_eq!(
             open_test_only_root_fixture(
                 &header,
+                &nonce,
                 b"correct horse battery staple",
                 &tampered_ciphertext,
             ),
@@ -317,13 +316,42 @@ mod tests {
         );
         let mut substituted = header;
         substituted.key_epoch = 43;
-        let substituted_header =
-            open_test_only_root_fixture(&substituted, b"correct horse battery staple", &sealed);
+        let substituted_header = open_test_only_root_fixture(
+            &substituted,
+            &nonce,
+            b"correct horse battery staple",
+            &sealed,
+        );
         assert_eq!(substituted_header, Err(TestOnlyFixtureError::UnlockFailed));
+
+        // A later encrypted payload is required to use a different nonce under
+        // the same password-derived key. The nonce belongs to that payload,
+        // never to the immutable header.
+        let next_nonce = [10; 24];
+        let mut next_root = [0xA5; ROOT_FIXTURE_LENGTH];
+        let next_sealed = seal_test_only_root_fixture(
+            &header,
+            &next_nonce,
+            b"correct horse battery staple",
+            &next_root,
+        )
+        .unwrap();
+        next_root.zeroize();
+        assert_ne!(sealed, next_sealed);
+        let mut next_recovered = open_test_only_root_fixture(
+            &header,
+            &next_nonce,
+            b"correct horse battery staple",
+            &next_sealed,
+        )
+        .unwrap();
+        assert_eq!(next_recovered, [0xA5; ROOT_FIXTURE_LENGTH]);
+        next_recovered.zeroize();
     }
 
     fn seal_test_only_root_fixture(
-        header: &KeystoreHeaderV1,
+        header: &KeystoreHeaderV2,
+        nonce: &[u8; 24],
         password: &[u8],
         root: &[u8; ROOT_FIXTURE_LENGTH],
     ) -> Result<[u8; SEALED_ROOT_FIXTURE_LENGTH], TestOnlyFixtureError> {
@@ -331,7 +359,7 @@ mod tests {
         let cipher = XChaCha20Poly1305::new_from_slice(&key)
             .expect("fixed 32-byte Argon2 output is a valid XChaCha20 key");
         let ciphertext = cipher.encrypt(
-            XNonce::from_slice(&header.nonce),
+            XNonce::from_slice(nonce),
             Payload {
                 msg: root,
                 aad: &header.encode(),
@@ -345,7 +373,8 @@ mod tests {
     }
 
     fn open_test_only_root_fixture(
-        header: &KeystoreHeaderV1,
+        header: &KeystoreHeaderV2,
+        nonce: &[u8; 24],
         password: &[u8],
         sealed: &[u8; SEALED_ROOT_FIXTURE_LENGTH],
     ) -> Result<[u8; ROOT_FIXTURE_LENGTH], TestOnlyFixtureError> {
@@ -353,7 +382,7 @@ mod tests {
         let cipher = XChaCha20Poly1305::new_from_slice(&key)
             .expect("fixed 32-byte Argon2 output is a valid XChaCha20 key");
         let plaintext = cipher.decrypt(
-            XNonce::from_slice(&header.nonce),
+            XNonce::from_slice(nonce),
             Payload {
                 msg: sealed,
                 aad: &header.encode(),
@@ -374,7 +403,7 @@ mod tests {
     }
 
     fn derive_test_only_key(
-        header: &KeystoreHeaderV1,
+        header: &KeystoreHeaderV2,
         password: &[u8],
     ) -> Result<[u8; 32], TestOnlyFixtureError> {
         let parameters = Params::new(

@@ -11,12 +11,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{KEYSTORE_HEADER_V1_LENGTH, KeystoreHeaderError, KeystoreHeaderV1};
+use crate::{KEYSTORE_HEADER_V2_LENGTH, KeystoreHeaderError, KeystoreHeaderV2};
 
 /// Process-lifetime lock file for the public candidate-header directory.
 pub const KEYSTORE_HEADER_LOCK_FILE_NAME: &str = ".noxis-wallet-keystore.lock";
 const HEADER_FILE_NAME: &str = "wallet-header.nxks";
 const TEMPORARY_HEADER_FILE_NAME: &str = ".wallet-header.nxks.tmp";
+// The old experimental v1 header was 100 bytes. Keep the read cap high enough
+// to let its decoder report the explicit revocation, while retaining a strict,
+// tiny allocation bound for this public metadata file.
+const MAX_RECOGNIZABLE_HEADER_FILE_BYTES: u64 = 100;
 
 /// Opened directory that owns one public candidate `NXKS` header.
 #[derive(Debug)]
@@ -75,7 +79,7 @@ impl fmt::Display for HeaderStoreError {
                 formatter,
                 "candidate keystore header {} is {actual} bytes, above the {}-byte limit",
                 path.display(),
-                KEYSTORE_HEADER_V1_LENGTH
+                MAX_RECOGNIZABLE_HEADER_FILE_BYTES
             ),
             Self::InvalidHeaderFile { path, source } => {
                 write!(
@@ -133,7 +137,7 @@ impl CandidateKeystoreHeaderStore {
     /// silently replacing wallet identity or key epoch.
     pub fn initialize(
         &self,
-        header: KeystoreHeaderV1,
+        header: KeystoreHeaderV2,
     ) -> Result<HeaderStoreInitializeOutcome, HeaderStoreError> {
         let destination = self.header_path();
         if destination.exists() {
@@ -148,7 +152,7 @@ impl CandidateKeystoreHeaderStore {
 
     /// Loads the bounded, canonical public header. It never opens a secret
     /// payload because none exists in this candidate store.
-    pub fn load(&self) -> Result<KeystoreHeaderV1, HeaderStoreError> {
+    pub fn load(&self) -> Result<KeystoreHeaderV2, HeaderStoreError> {
         self.load_header_file(&self.header_path())
     }
 
@@ -182,13 +186,13 @@ impl CandidateKeystoreHeaderStore {
         })
     }
 
-    fn load_header_file(&self, path: &Path) -> Result<KeystoreHeaderV1, HeaderStoreError> {
+    fn load_header_file(&self, path: &Path) -> Result<KeystoreHeaderV2, HeaderStoreError> {
         let metadata = fs::metadata(path).map_err(|source| HeaderStoreError::Io {
             operation: "inspect candidate keystore-header file",
             path: path.to_path_buf(),
             source,
         })?;
-        if metadata.len() > KEYSTORE_HEADER_V1_LENGTH as u64 {
+        if metadata.len() > MAX_RECOGNIZABLE_HEADER_FILE_BYTES {
             return Err(HeaderStoreError::HeaderFileTooLarge {
                 path: path.to_path_buf(),
                 actual: metadata.len(),
@@ -199,7 +203,7 @@ impl CandidateKeystoreHeaderStore {
             path: path.to_path_buf(),
             source,
         })?;
-        KeystoreHeaderV1::decode(&bytes).map_err(|source| HeaderStoreError::InvalidHeaderFile {
+        KeystoreHeaderV2::decode(&bytes).map_err(|source| HeaderStoreError::InvalidHeaderFile {
             path: path.to_path_buf(),
             source,
         })
@@ -207,7 +211,7 @@ impl CandidateKeystoreHeaderStore {
 
     fn write_new_header(
         &self,
-        bytes: &[u8; KEYSTORE_HEADER_V1_LENGTH],
+        bytes: &[u8; KEYSTORE_HEADER_V2_LENGTH],
     ) -> Result<(), HeaderStoreError> {
         let temporary = self.temporary_header_path();
         let destination = self.header_path();
@@ -285,11 +289,11 @@ mod tests {
         sync::atomic::{AtomicU64, Ordering},
     };
 
-    use crate::KeystoreHeaderV1;
+    use crate::KeystoreHeaderV2;
 
     use super::{
-        CandidateKeystoreHeaderStore, HeaderStoreError, HeaderStoreInitializeOutcome,
-        TEMPORARY_HEADER_FILE_NAME,
+        CandidateKeystoreHeaderStore, HEADER_FILE_NAME, HeaderStoreError,
+        HeaderStoreInitializeOutcome, TEMPORARY_HEADER_FILE_NAME,
     };
 
     static TEST_DIRECTORY_SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -302,8 +306,8 @@ mod tests {
         ))
     }
 
-    fn header() -> KeystoreHeaderV1 {
-        KeystoreHeaderV1::generate([7; 32], 42).unwrap()
+    fn header() -> KeystoreHeaderV2 {
+        KeystoreHeaderV2::generate([7; 32], 42).unwrap()
     }
 
     #[test]
@@ -371,6 +375,26 @@ mod tests {
         assert!(matches!(
             CandidateKeystoreHeaderStore::open(&root),
             Err(HeaderStoreError::InvalidHeaderFile { .. })
+        ));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn revoked_v1_header_fails_with_its_explicit_revocation_error() {
+        let root = test_directory("revoked-v1");
+        {
+            let store = CandidateKeystoreHeaderStore::open(&root).unwrap();
+            let mut old_header = [0_u8; 100];
+            old_header[..4].copy_from_slice(b"NXKS");
+            old_header[4..6].copy_from_slice(&1_u16.to_be_bytes());
+            std::fs::write(store.path().join(HEADER_FILE_NAME), old_header).unwrap();
+        }
+        assert!(matches!(
+            CandidateKeystoreHeaderStore::open(&root).unwrap().load(),
+            Err(HeaderStoreError::InvalidHeaderFile {
+                source: crate::KeystoreHeaderError::RevokedVersionV1,
+                ..
+            })
         ));
         std::fs::remove_dir_all(root).unwrap();
     }

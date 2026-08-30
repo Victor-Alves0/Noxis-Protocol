@@ -7,7 +7,7 @@ segredo de usuário é persistido ou exportado.**
 
 O crate isolado `noxis-wallet-keystore` não depende de ledger, consenso,
 endereços públicos ou `noxis-wallet-crypto`. Ele define o cabeçalho canônico
-`NXKS v1` de uma futura raiz de wallet e testa internamente a combinação
+`NXKS v2` de uma futura raiz de wallet e testa internamente a combinação
 Argon2id + XChaCha20-Poly1305 contra uma raiz sintética de 64 bytes.
 
 Há somente um armazenamento de arquivo para o cabeçalho público, com lock e
@@ -16,30 +16,36 @@ publicação atômica. Não há API de importação/exportação de raiz, integr
 Consequentemente, este trabalho não cria uma carteira persistente ou
 custodiante.
 
-## Cabeçalho `NXKS v1`
+## Cabeçalho `NXKS v2`
 
-O cabeçalho tem exatamente 100 bytes, sempre em big-endian:
+O cabeçalho tem exatamente 76 bytes, sempre em big-endian:
 
 ```text
 magic:4 = "NXKS"
-version:u16be = 1
+version:u16be = 2
 kdf_id:u8 = 1 (Argon2id)
 aead_id:u8 = 1 (XChaCha20-Poly1305)
 memory_kib:u32be = 65536
 time_cost:u32be = 3
 lanes:u32be = 4
 salt:16
-nonce:24
 wallet_id:32
 key_epoch:u64be
 ```
 
 O decoder aceita apenas esse perfil; não aceita algoritmo, versão, custo,
-tamanho, magic, salt/nonce ou `wallet_id` nulos diferentes. Essa escolha evita que um arquivo
+tamanho, magic, salt ou `wallet_id` nulos diferentes. Essa escolha evita que um arquivo
 controle o custo da KDF e cause consumo de recursos arbitrário ou downgrade.
-Os 100 bytes canônicos são o associated data obrigatório da cifra exercida no
-fixture de teste: alterar época, ID da wallet, perfil, salt ou nonce impede a
+Os 76 bytes canônicos são o associated data obrigatório da cifra exercida no
+fixture de teste: alterar época, ID da wallet, perfil ou salt impede a
 autenticação.
+
+O nonce de 24 bytes do XChaCha20-Poly1305 **não** pertence ao cabeçalho. Cada
+payload cifrado futuro deverá carregar e autenticar seu próprio nonce único.
+Isso impede reutilizar nonce com a mesma chave quando uma wallet for atualizada.
+O layout experimental `NXKS v1` foi revogado por manter esse nonce no cabeçalho;
+o parser o reconhece e o rejeita explicitamente. Como nunca houve payload de
+segredo suportado, não existe migração automática de v1 para v2.
 
 O perfil de 64 MiB, 3 passagens e 4 lanes segue a segunda recomendação de
 Argon2id para contextos com menos memória do RFC 9106. Ele é um **perfil
@@ -67,8 +73,9 @@ Os testes cobrem:
   arquivo temporário, `sync_all`, rename e recuperação somente de temporário
   completo/canônico. Um temporário truncado falha fechado. Isso não persiste
   segredo nem prova durabilidade de um payload futuro.
-- Ainda não existe rollback protection, backup, recuperação de segredo, UX de
-  senha ou suporte a dispositivos.
+- Ainda não existe backup, recuperação de segredo, UX de senha ou suporte a
+  dispositivos. A âncora externa `NXKA` define a política candidata de
+  rollback, mas ainda não há payload secreto para protegê-la na prática.
 - A senha nunca aparece nos erros, mas o modelo de memória do processo ainda
   precisa de revisão de plataforma.
 - Os parâmetros não foram calibrados nos sistemas suportados; por isso não há

@@ -44,8 +44,11 @@ is already used for the experimental recipient envelope. Reusing a primitive
 does not select it for a keystore. Parameters, associated-data layout,
 container format, password UX, platform support and backup model remain open.
 
-The public header candidate fixes Argon2id / XChaCha20-Poly1305 and a 64 MiB,
-3-pass, 4-lane profile only for bounded parser and synthetic-fixture review.
+The public `NXKS v2` header candidate fixes Argon2id / XChaCha20-Poly1305 and a
+64 MiB, 3-pass, 4-lane profile only for bounded parser and synthetic-fixture
+review. Its AEAD nonce deliberately belongs to each future encrypted payload,
+not to the immutable header; the earlier experimental `NXKS v1` layout is
+explicitly revoked for getting that nonce lifecycle wrong.
 It does not select a user keystore construction, key hierarchy, recovery phrase
 or hardware-backed integration. Consequently, no secret-bearing file must be
 written yet.
@@ -100,7 +103,7 @@ confidentiality, inventory and key recovery among the management concerns; see
 1. Choose the supported operating systems and password/unlock UX.
 2. Publish a narrow keystore-container candidate and its parser limits for
    review; do not put private-key bytes in it initially. **Completed for the
-   public `NXKS v1` header only.**
+   public `NXKS v2` header only. `NXKS v1` is revoked.**
 3. Define private-key export/import ownership inside a dedicated secret-type
    boundary.
 4. Add a test-only encrypted fixture with no real user wallet, then test
