@@ -1,14 +1,21 @@
 //! Bounded candidate keystore-container boundary.
 //!
-//! This crate intentionally has no filesystem API, no wallet-root import or
-//! export API, and no release-mode secret container. It owns the exact public
-//! `NXKS` header candidate and exercises password-based sealing only against a
-//! synthetic root in unit tests. A future reviewed keystore may depend on this
-//! crate; wallet, ledger and public-address crates must not own secret files.
+//! This crate persists only the exact public `NXKS` header candidate; it has no
+//! wallet-root import/export API and no release-mode secret container. It
+//! exercises password-based sealing only against a synthetic root in unit
+//! tests. A future reviewed keystore may depend on this crate; wallet, ledger
+//! and public-address crates must not own secret files.
 
 use std::fmt;
 
 use rand_core::{OsRng, RngCore as _};
+
+mod header_store;
+
+pub use header_store::{
+    CandidateKeystoreHeaderStore, HeaderStoreError, HeaderStoreInitializeOutcome,
+    KEYSTORE_HEADER_LOCK_FILE_NAME,
+};
 
 /// Candidate keystore-header magic bytes.
 pub const KEYSTORE_HEADER_MAGIC: [u8; 4] = *b"NXKS";

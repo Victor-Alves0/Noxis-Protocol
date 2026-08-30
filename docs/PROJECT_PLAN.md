@@ -285,8 +285,10 @@ outro projeto de keystore e não foram iniciadas aqui.
 proibida até existir especificação de KDF/AEAD, formato limitado, inventário de
 chaves, política de backup/rollback e testes adversariais. Um crate isolado já
 decodifica o cabeçalho público candidato `NXKS` e testa Argon2id + XChaCha sobre
-uma raiz sintética, mas não recebe segredo de usuário, não grava arquivo e não
-seleciona uma construção de custódia. Ver
+uma raiz sintética, mas não recebe segredo de usuário nem seleciona uma
+construção de custódia. Um armazenamento separado já grava apenas o cabeçalho
+público de forma atômica/com lock e recupera um temporário canônico; a política
+de rollback e qualquer payload secreto continuam bloqueados. Ver
 [`WALLET_KEYSTORE_SECURITY_GATE_V0_1.md`](WALLET_KEYSTORE_SECURITY_GATE_V0_1.md)
 e [`WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md).
 

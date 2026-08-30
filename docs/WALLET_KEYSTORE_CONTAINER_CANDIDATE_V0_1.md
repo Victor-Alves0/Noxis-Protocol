@@ -10,7 +10,8 @@ endereços públicos ou `noxis-wallet-crypto`. Ele define o cabeçalho canônico
 `NXKS v1` de uma futura raiz de wallet e testa internamente a combinação
 Argon2id + XChaCha20-Poly1305 contra uma raiz sintética de 64 bytes.
 
-Não há API de arquivo, API de importação/exportação de raiz, integração com
+Há somente um armazenamento de arquivo para o cabeçalho público, com lock e
+publicação atômica. Não há API de importação/exportação de raiz, integração com
 `CandidateWalletRootV1` nem container de segredo liberado em build normal.
 Consequentemente, este trabalho não cria uma carteira persistente ou
 custodiante.
@@ -62,8 +63,12 @@ Os testes cobrem:
 ## Limites de segurança e operação
 
 - A fixture não grava arquivos e não recebe uma raiz de wallet real.
-- Ainda não existe rollback protection, backup, recuperação, lock entre
-  processos, escrita atômica, UX de senha ou suporte a dispositivos.
+- O ciclo de vida **do cabeçalho público** já tem lock exclusivo, criação de
+  arquivo temporário, `sync_all`, rename e recuperação somente de temporário
+  completo/canônico. Um temporário truncado falha fechado. Isso não persiste
+  segredo nem prova durabilidade de um payload futuro.
+- Ainda não existe rollback protection, backup, recuperação de segredo, UX de
+  senha ou suporte a dispositivos.
 - A senha nunca aparece nos erros, mas o modelo de memória do processo ainda
   precisa de revisão de plataforma.
 - Os parâmetros não foram calibrados nos sistemas suportados; por isso não há
@@ -73,7 +78,7 @@ Os testes cobrem:
 
 ## Próximo gate
 
-Construir testes de interrupção/recuperação e uma política explícita de backup
-e rollback para um diretório de keystore. Só então um crate de persistência
-poderá receber uma raiz de sessão por uma interface privada, sem tornar seus
-bytes parte de APIs de endereço, CLI ou transação.
+Definir a política explícita de backup e rollback, e estender os testes de
+interrupção ao futuro arquivo de payload secreto. Só então um crate de
+persistência poderá receber uma raiz de sessão por uma interface privada, sem
+tornar seus bytes parte de APIs de endereço, CLI ou transação.

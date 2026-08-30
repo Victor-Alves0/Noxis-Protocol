@@ -11,9 +11,9 @@ shared secret, note, balance or proof.
 
 This boundary is intentional. Encrypting an arbitrary byte blob with a
 password is not, on its own, a safe wallet keystore. The isolated
-`noxis-wallet-keystore` crate now parses only public candidate `NXKS` headers
-and exercises a synthetic root in unit tests; it writes no file and does not
-accept a real wallet root. See
+`noxis-wallet-keystore` crate now parses and atomically stores only public
+candidate `NXKS` headers, and exercises a synthetic root in unit tests; it does
+not accept a real wallet root. See
 [`WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md).
 
 ## Security objective and attacker model
@@ -102,7 +102,10 @@ confidentiality, inventory and key recovery among the management concerns; see
 4. Add a test-only encrypted fixture with no real user wallet, then test
    unlock, wrong-password, tampering, rollback and interruption behavior.
    **The synthetic unlock, wrong-password and header-substitution portions are
-   complete; rollback and interruption still require a file lifecycle design.**
+   complete. The public-header lifecycle also covers exclusive locking,
+   synchronized temporary publication and fail-closed temporary recovery;
+   rollback and secret-payload interruption still require a file lifecycle
+   design.**
 5. Only after review, make a persistent private recipient entry available to a
    non-spending local wallet session.
 
