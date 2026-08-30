@@ -1,0 +1,15 @@
+[package]
+name = "noxis-private-packet-validation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+noxis-codec = { path = "../noxis-codec" }
+noxis-privacy-types = { path = "../noxis-privacy-types" }
+noxis-types = { path = "../noxis-types" }
+noxis-wallet-crypto = { path = "../noxis-wallet-crypto" }
+
+[lints]
+workspace = true

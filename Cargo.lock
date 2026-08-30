@@ -644,6 +644,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "noxis-private-packet-validation"
+version = "0.1.0"
+dependencies = [
+ "noxis-codec",
+ "noxis-privacy-types",
+ "noxis-types",
+ "noxis-wallet-crypto",
+]
+
+[[package]]
 name = "noxis-private-proof-contract"
 version = "0.1.0"
 dependencies = [

@@ -10,6 +10,8 @@ noxis-node ──> noxis-comet-abci ──> noxis-storage ──> noxis-executio
      └────────────> noxis-runtime ──────> noxis-config ────> noxis-consensus
 
 noxis-consensus ────────────────────────> noxis-record-chain / noxis-types
+
+noxis-private-packet-validation ───────> noxis-codec + noxis-wallet-crypto
 ```
 
 Dependencies point inward. Domain types never depend on storage, transport, cryptographic providers or application wiring.
@@ -20,6 +22,7 @@ Dependencies point inward. Domain types never depend on storage, transport, cryp
 | --- | --- | --- |
 | `noxis-types` | stable IDs, amounts, asset taxonomy | state, I/O, cryptography |
 | `noxis-crypto` | suite versioning, proof-verifier contract | ledger mutation, keys, network clients |
+| `noxis-private-packet-validation` | candidate local `NXPT` → strict `NXRE` → `H_ENVELOPE` integrity boundary | proof verification, decryption, wallet storage, ledger mutation, mempool/network service |
 | `noxis-nullifier-tree-state` | isolated mutable state and immutable proof paths for the unselected `NXSM` candidate | ledger mutation, persistence, proof packets, network or settlement |
 | `noxis-ledger` | transaction shape, transition validation, state | concrete cryptography, databases, P2P |
 | `noxis-record-chain` | canonical record encoding, sequence and state-link validation | ledger mutation, filesystem I/O, consensus |

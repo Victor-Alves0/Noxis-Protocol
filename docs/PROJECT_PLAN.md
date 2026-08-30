@@ -233,17 +233,24 @@ verifica assinatura Ed25519 + ML-DSA-65. Nenhuma chave é persistida e isso não
 **Recebimento local de nota candidata:** a mesma camada pode cifrar uma
 pré-imagem canônica de nota de 178 bytes em `NXRE`, recuperar somente no dono e
 recomputar `H_NOTE` antes de aceitar o commitment público da saída. Isso não
-persiste nota ou saldo, nem vincula os bytes do envelope ao
-`CiphertextDigestV2` da intenção; portanto não é transação, wallet ou
+persiste nota ou saldo; o digest candidato de envelope é uma fronteira separada
+e ainda não cria transação, wallet ou
 privacidade ativada. Ver
 [`WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md`](WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md).
 
 **Digest candidato de envelope:** `noxis-wallet-crypto` agora recompõe o
 `NXRE` canônico e calcula `H_ENVELOPE` P24 sobre versão, slot, commitment e
 comprimento/bytes do envelope. Alterar qualquer um desses itens muda o digest;
-contudo `NXPT`, AIR e ledger ainda não o recomputam nem o aceitam. Vetores
-externos e uma fronteira de verificação de pacote são os próximos gates. Ver
+uma fronteira local de pacote já o recomputa, porém AIR e ledger ainda não o
+aceitam. Vetores externos e integração ao preflight são os próximos gates. Ver
 [`RECIPIENT_ENVELOPE_DIGEST_CANDIDATE_V0_1.md`](RECIPIENT_ENVELOPE_DIGEST_CANDIDATE_V0_1.md).
+
+**Validação local de pacote privado:** `noxis-private-packet-validation` agora
+redecodifica os dois `NXRE` de um `NXPT`, exige round-trip canônico e compara os
+digests candidatos ao intento antes de qualquer prova. Envelope trocado de slot
+ou bytes opacos não-`NXRE` são rejeitados. A fronteira não valida prova, estado,
+ledger ou rede; integrar seu recibo ao preflight é o próximo passo. Ver
+[`PRIVATE_PACKET_ENVELOPE_VALIDATION_CANDIDATE_V0_1.md`](PRIVATE_PACKET_ENVELOPE_VALIDATION_CANDIDATE_V0_1.md).
 
 **Catálogo local de endereços públicos:** a mesma camada já pode abrir um
 diretório com lock exclusivo, gravar bytes `NXPA` canônicos por ID, reabrir e

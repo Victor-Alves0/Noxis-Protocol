@@ -7,9 +7,10 @@ define e calcula um `CiphertextDigestV2` candidato para um envelope híbrido
 `NXRE v1`. O valor é uma saída Poseidon2 P24 de 16 elementos BabyBear
 canônicos e pode preencher o campo público já existente em `PrivateTransferOutputV2`.
 
-Nenhum decoder de `NXPT`, AIR, prova, ledger ou nó ainda recompõe esse digest
-para aceitar uma transação. Portanto esta peça não autoriza liquidação nem
-prova que uma intenção recebida contém envelopes corretos.
+Uma fronteira local separada já redecodifica `NXPT` e compara os dois digests,
+mas AIR, prova, ledger e nó ainda não o consomem. Portanto esta peça não
+autoriza liquidação nem torna uma intenção recebida válida para consenso.
+Ver [`PRIVATE_PACKET_ENVELOPE_VALIDATION_CANDIDATE_V0_1.md`](PRIVATE_PACKET_ENVELOPE_VALIDATION_CANDIDATE_V0_1.md).
 
 ## Frame canônica
 
@@ -63,8 +64,8 @@ commitment ou envelope.
 
 - Vetores produzidos por uma implementação externa independente do P24 e uma
   revisão do transcript/IV/frame.
-- Um verificador de pacote que redecodifique os dois `NXRE`, recompute os dois
-  digests e os compare aos dois campos da intenção **antes** de qualquer AIR.
+- Integração do verificador de pacote já local ao preflight que consome
+  `H_INTENT`, às relações de posse/saída e, depois, à AIR única.
 - Vínculo dessa verificação ao `NXPT`, à intenção `H_INTENT`, à AIR de
   transferência e a uma política de AAD de transação selecionada.
 - Fuzzing direcionado ao limite de 3.311 bytes, à canonicidade do envelope e a
