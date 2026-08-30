@@ -17,6 +17,7 @@ mod air_profile;
 mod anchored_ownership;
 mod nxsm_transition;
 mod nxsm_witness;
+mod output_notes;
 mod public_inputs;
 mod public_statement;
 
@@ -47,6 +48,11 @@ pub use nxsm_transition::{
 };
 pub use nxsm_witness::{
     CandidateNxsmNullifierTransitionWitnessError, CandidateNxsmNullifierTransitionWitnessV1,
+};
+pub use output_notes::{
+    CandidateIntentOutputNotesPreflightV1, CandidateOutputNoteWitnessV1, CandidateOutputNotesError,
+    revalidate_candidate_intent_output_notes_preflight,
+    run_candidate_intent_output_notes_preflight,
 };
 pub use public_inputs::{
     CandidatePrivateTransferAirPublicInputsError, CandidatePrivateTransferAirPublicInputsV1,

@@ -152,6 +152,14 @@ vínculo entre os componentes, não agregação, recursão ou prova de transfer�
 ver
 [`STARK_ANCHORED_OWNERSHIP_PREFLIGHT_RESEARCH_V0_1.md`](STARK_ANCHORED_OWNERSHIP_PREFLIGHT_RESEARCH_V0_1.md).
 
+**Preflight de intenção e saídas:** o mesmo contrato agora também executa
+`H_INTENT` uma vez e duas provas privadas `H_NOTE` em sequência, vinculando
+cada commitment resultante ao respectivo slot canônico de saída em `NXPU`.
+As witnesses de 178 bytes não têm codec e as provas opacas são descartadas;
+isso não é agregação, não valida envelopes, valores ou inserção de saídas e não
+autoriza o ledger. Ver
+[`STARK_OUTPUT_NOTES_PREFLIGHT_RESEARCH_V0_1.md`](STARK_OUTPUT_NOTES_PREFLIGHT_RESEARCH_V0_1.md).
+
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem
 codec/`Debug`/`Clone`, caminho P24 de 32 níveis e uma declaração executável
