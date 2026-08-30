@@ -2,7 +2,7 @@
 
 ## Limite de status
 
-Este documento define direção de interoperabilidade e critérios de implementação. Não habilita ML-KEM, ML-DSA, assinatura híbrida, cifragem de notas ou transporte seguro no código atual. O perfil só poderá entrar em uma gênese nova após implementação, vetores, análise de canais laterais e auditoria independente.
+Este documento define direção de interoperabilidade e critérios de implementação. O crate local `noxis-wallet-crypto` já exercita, como pesquisa, pares Ed25519 + ML-DSA-65, endereços diversificados X25519 + ML-KEM-768, envelope autenticado e codecs estritos `NXPA`/`NXRE`. Isso não habilita cifra de notas de protocolo, transporte seguro, wallet persistente, transação ou liquidação. O perfil só poderá entrar em uma gênese nova após especificação completa, vetores, análise de canais laterais e auditoria independente. Veja o [demo local](WALLET_CRYPTO_LOCAL_DEMO_V0_1.md).
 
 ## Separação de responsabilidades
 

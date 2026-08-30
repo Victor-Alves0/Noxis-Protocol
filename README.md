@@ -197,6 +197,18 @@ For an explicit persistent research-node lifecycle, use
 `research init --data-dir PATH` and `research status --data-dir PATH`; see
 [`docs/LOCAL_OPERATIONAL_DEMO_V0_1.md`](docs/LOCAL_OPERATIONAL_DEMO_V0_1.md).
 
+Run the separate local hybrid recipient demonstration with:
+
+```powershell
+cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo
+```
+
+It creates fresh non-persistent keys, round-trips a public diversified address
+and recipient envelope through their strict codecs, decrypts only as the
+address owner, rejects an unrelated recipient and verifies a hybrid identity
+signature. It is not a wallet, private transfer or production cryptography;
+see [`docs/WALLET_CRYPTO_LOCAL_DEMO_V0_1.md`](docs/WALLET_CRYPTO_LOCAL_DEMO_V0_1.md).
+
 This deliberately does **not** start CometBFT or claim consensus, custody or
 privacy: the displayed `AppHash` is explicitly unavailable in local-admission
 mode, and the transfer uses a research fixture rather than a private proof.

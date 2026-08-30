@@ -18,8 +18,11 @@ tests and independent review.
   state anchor, and nullifier absence remains unproved.
 - The proof direction is transparent STARK/AIR. A complete private-transfer
   statement and production verifier do not yet exist.
-- The hybrid wallet profile is experimental. It does not enable active
-  post-quantum protection or establish a sound combiner by itself.
+- The hybrid wallet profile is experimental. Local recipient keys, strict
+  `NXPA`/`NXRE` codecs, an X25519 + ML-KEM-768 encrypted envelope and
+  Ed25519 + ML-DSA-65 identity signatures are executable research components,
+  but they do not enable active post-quantum protection or establish a sound
+  combiner by themselves. See the [local wallet-crypto demo](WALLET_CRYPTO_LOCAL_DEMO_V0_1.md).
 
 Read [CRYPTOGRAPHY_DECISION_V0_1.md](CRYPTOGRAPHY_DECISION_V0_1.md) for the
 decision record and [CRYPTO_SERVICE_GATE_V0_1.md](CRYPTO_SERVICE_GATE_V0_1.md)

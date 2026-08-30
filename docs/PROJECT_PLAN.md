@@ -183,10 +183,19 @@ tamanho, checksum, ordem e canonicidade. Ver
 bytes e valores públicos BabyBear; `NXPT` apenas enquadra intenção, envelopes
 e uma prova opaca fora do ledger v1. `noxis-tree-params`, `NXTV` e `NXNV`
 congelam a candidata P24 e seus vetores completos, e as referências isoladas
-reproduzem as evidências externas. Ainda faltam o compromisso aritmetizado dos
-640 bytes da intenção, AIR, provas, política de chaves/envelopes e revisão
-independente. Ver [`PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md`](PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md)
+reproduzem as evidências externas. A AIR já aritmetiza o compromisso da
+intenção e há provas P24 separadas para os primeiros componentes, mas ainda
+faltam a composição completa da transferência, política de ciclo de vida de
+chaves/envelopes, formato de prova selecionado e revisão independente. Ver
+[`PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md`](PRIVATE_TRANSFER_ARCHITECTURE_DRAFT_V0_1.md)
 e [`TREE_BACKEND_SELECTION_GATE_V0_1.md`](TREE_BACKEND_SELECTION_GATE_V0_1.md).
+
+**Recebimento híbrido executável:** `noxis-wallet-crypto` agora possui um demo
+local que gera um endereço diversificado, faz round-trip estrito de `NXPA` e
+`NXRE`, cifra com X25519 + ML-KEM-768, permite decriptação apenas pelo dono e
+verifica assinatura Ed25519 + ML-DSA-65. Nenhuma chave é persistida e isso não
+é wallet, stealth address, nota privada nem liquidação. Ver
+[`WALLET_CRYPTO_LOCAL_DEMO_V0_1.md`](WALLET_CRYPTO_LOCAL_DEMO_V0_1.md).
 
 ### 6. Adaptadores de ativos e políticas de emissão
 
