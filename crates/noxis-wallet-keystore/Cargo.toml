@@ -10,6 +10,7 @@ description = "Bounded candidate wallet-keystore container boundary for Noxis re
 argon2 = "0.5.3"
 chacha20poly1305 = "0.10.1"
 rand_core = { version = "0.6.4", features = ["getrandom"] }
+sha2 = "0.10.9"
 zeroize = "1.8.1"
 
 [lints]

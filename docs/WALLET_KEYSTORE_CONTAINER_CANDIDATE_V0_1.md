@@ -78,7 +78,9 @@ Os testes cobrem:
 
 ## Próximo gate
 
-Definir a política explícita de backup e rollback, e estender os testes de
+A política explícita de backup e rollback foi publicada em
+[`WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md`](WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md).
+O próximo trabalho é selecionar uma âncora externa e estender os testes de
 interrupção ao futuro arquivo de payload secreto. Só então um crate de
 persistência poderá receber uma raiz de sessão por uma interface privada, sem
 tornar seus bytes parte de APIs de endereço, CLI ou transação.

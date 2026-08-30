@@ -15,6 +15,8 @@ password is not, on its own, a safe wallet keystore. The isolated
 candidate `NXKS` headers, and exercises a synthetic root in unit tests; it does
 not accept a real wallet root. See
 [`WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md).
+The candidate backup/rollback policy is documented separately in
+[`WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md`](WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md).
 
 ## Security objective and attacker model
 
@@ -69,6 +71,8 @@ CLI or public-address module.
 Before code may persist any secret, all of the following must exist:
 
 1. A reviewable threat model with an explicit rollback and backup policy.
+   **A candidate policy exists, but no external anchor or secret-payload test
+   has been selected.**
 2. A selected KDF and calibrated bounds for each supported platform, including
    safe rejection of attacker-controlled cost parameters.
 3. A versioned, bounded canonical secret-container specification entered in

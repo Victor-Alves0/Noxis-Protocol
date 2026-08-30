@@ -9,6 +9,7 @@
 use std::fmt;
 
 use rand_core::{OsRng, RngCore as _};
+use sha2::{Digest as _, Sha256};
 
 mod header_store;
 
@@ -31,6 +32,8 @@ pub const CANDIDATE_ARGON2_TIME_COST: u32 = 3;
 pub const CANDIDATE_ARGON2_LANES: u32 = 4;
 pub const CANDIDATE_SALT_LENGTH: usize = 16;
 pub const CANDIDATE_NONCE_LENGTH: usize = 24;
+/// SHA-256 domain for the public identity of one exact `NXKS v1` header.
+pub const KEYSTORE_HEADER_ID_DOMAIN: &[u8] = b"NOXIS/KEYSTORE-HEADER-ID/V1\0";
 
 const ARGON2ID_KDF_ID: u8 = 1;
 const XCHACHA20POLY1305_AEAD_ID: u8 = 1;
@@ -50,6 +53,18 @@ pub struct KeystoreHeaderV1 {
     nonce: [u8; CANDIDATE_NONCE_LENGTH],
     wallet_id: [u8; 32],
     key_epoch: u64,
+}
+
+/// Public SHA-256 identifier of one complete canonical candidate header. It
+/// is safe to record outside the keystore directory as an external anchor; it
+/// is not a password verifier, signature, recovery secret or rollback proof.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct KeystoreHeaderIdV1([u8; 32]);
+
+impl KeystoreHeaderIdV1 {
+    pub const fn as_bytes(self) -> [u8; 32] {
+        self.0
+    }
 }
 
 impl KeystoreHeaderV1 {
@@ -140,6 +155,16 @@ impl KeystoreHeaderV1 {
         bytes
     }
 
+    /// Computes the domain-separated public identity of these exact canonical
+    /// header bytes. A future backup receipt will bind this value together
+    /// with an encrypted-payload generation and ciphertext identifier.
+    pub fn id(self) -> KeystoreHeaderIdV1 {
+        let mut hash = Sha256::new();
+        hash.update(KEYSTORE_HEADER_ID_DOMAIN);
+        hash.update(self.encode());
+        KeystoreHeaderIdV1(hash.finalize().into())
+    }
+
     pub const fn wallet_id(self) -> [u8; 32] {
         self.wallet_id
     }
@@ -223,6 +248,7 @@ mod tests {
         let header = KeystoreHeaderV1::with_test_entropy([7; 32], 42, [8; 16], [9; 24]);
         let bytes = header.encode();
         assert_eq!(KeystoreHeaderV1::decode(&bytes).unwrap(), header);
+        assert_eq!(header.id(), KeystoreHeaderV1::decode(&bytes).unwrap().id());
         assert_eq!(
             KeystoreHeaderV1::decode(&bytes[..99]),
             Err(KeystoreHeaderError::InvalidLength { actual: 99 })
@@ -251,6 +277,8 @@ mod tests {
             KeystoreHeaderV1::decode(&zero_nonce),
             Err(KeystoreHeaderError::ZeroNonce)
         );
+        let changed_epoch = KeystoreHeaderV1::with_test_entropy([7; 32], 43, [8; 16], [9; 24]);
+        assert_ne!(header.id(), changed_epoch.id());
     }
 
     #[test]

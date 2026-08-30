@@ -291,6 +291,10 @@ público de forma atômica/com lock e recupera um temporário canônico; a polí
 de rollback e qualquer payload secreto continuam bloqueados. Ver
 [`WALLET_KEYSTORE_SECURITY_GATE_V0_1.md`](WALLET_KEYSTORE_SECURITY_GATE_V0_1.md)
 e [`WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md`](WALLET_KEYSTORE_CONTAINER_CANDIDATE_V0_1.md).
+O ID público canônico do cabeçalho já pode ser usado como âncora externa, mas a
+política registra que rollback exige estado independente do diretório; não há
+backup/restauração de segredo até uma estratégia ser selecionada. Ver
+[`WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md`](WALLET_BACKUP_ROLLBACK_POLICY_CANDIDATE_V0_1.md).
 
 ### 6. Adaptadores de ativos e políticas de emissão
 
