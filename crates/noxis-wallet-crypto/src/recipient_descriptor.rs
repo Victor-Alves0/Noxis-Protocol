@@ -46,10 +46,17 @@ const ML_KEM_768_LABEL: &[u8] = b"ML-KEM-768\0";
 /// root is erased immediately after construction; recovery/backup is not
 /// implemented and the public descriptor cannot prove this relationship.
 pub struct CandidatePrivateRecipientKeysetV1 {
-    payment_address: HybridPaymentAddressEntry,
+    incoming_view_key: Option<CandidateIncomingViewKeyV1>,
     nullifier_key: [u8; 32],
     recipient_commitment: RecipientCommitmentV2,
     descriptor_identity: HybridIdentityKeypair,
+}
+
+/// Local, non-exportable authority to scan candidate incoming notes for one
+/// recipient address. It intentionally holds no nullifier or spend material.
+pub struct CandidateIncomingViewKeyV1 {
+    payment_address: HybridPaymentAddressEntry,
+    recipient_commitment: RecipientCommitmentV2,
 }
 
 /// Public, signed view of a candidate recipient keyset.
@@ -121,7 +128,10 @@ impl CandidatePrivateRecipientKeysetV1 {
             }
         };
         Ok(Self {
-            payment_address,
+            incoming_view_key: Some(CandidateIncomingViewKeyV1 {
+                payment_address,
+                recipient_commitment,
+            }),
             nullifier_key,
             recipient_commitment,
             descriptor_identity: HybridIdentityKeypair::generate(),
@@ -138,7 +148,7 @@ impl CandidatePrivateRecipientKeysetV1 {
 
     /// The public receiving material that a sender may verify and use.
     pub fn public_descriptor(&self) -> CandidatePrivateRecipientDescriptorV1 {
-        let payment_address = self.payment_address.address().clone();
+        let payment_address = self.incoming_view_key().payment_address().clone();
         let recipient_commitment = self.recipient_commitment;
         let payload = descriptor_payload(&payment_address, recipient_commitment);
         CandidatePrivateRecipientDescriptorV1 {
@@ -154,19 +164,50 @@ impl CandidatePrivateRecipientKeysetV1 {
         self.recipient_commitment
     }
 
-    /// Decrypts only envelopes sent to this local incoming address.
-    pub(crate) fn decrypt_incoming(
-        &self,
-        context: &RecipientEnvelopeContext,
-        envelope: &HybridRecipientEnvelope,
-    ) -> Result<Vec<u8>, PaymentAddressError> {
-        self.payment_address.decrypt_incoming(context, envelope)
+    /// Consumes the full local recipient keyset and retains only incoming
+    /// scanning authority. The returned view key cannot access the nullifier
+    /// material that was erased before this conversion.
+    pub fn into_incoming_view_key(mut self) -> CandidateIncomingViewKeyV1 {
+        self.nullifier_key.zeroize();
+        self.incoming_view_key
+            .take()
+            .expect("candidate keyset always owns one incoming view key")
+    }
+
+    pub(crate) fn incoming_view_key(&self) -> &CandidateIncomingViewKeyV1 {
+        self.incoming_view_key
+            .as_ref()
+            .expect("candidate keyset always owns one incoming view key")
     }
 }
 
 impl Drop for CandidatePrivateRecipientKeysetV1 {
     fn drop(&mut self) {
         self.nullifier_key.zeroize();
+    }
+}
+
+impl CandidateIncomingViewKeyV1 {
+    /// Public incoming address associated with this local scanner. Sharing this
+    /// value grants no ability to decrypt or spend.
+    pub const fn payment_address(&self) -> &HybridPaymentAddress {
+        self.payment_address.address()
+    }
+
+    /// Public `H_ADDR` value that an incoming candidate note must carry.
+    pub const fn recipient_commitment(&self) -> RecipientCommitmentV2 {
+        self.recipient_commitment
+    }
+
+    /// Opens only envelopes addressed to this local view key. This is crate
+    /// private because candidate-note validation owns the public commitment
+    /// check and must not be bypassed by a scanner caller.
+    pub(crate) fn decrypt_incoming(
+        &self,
+        context: &RecipientEnvelopeContext,
+        envelope: &HybridRecipientEnvelope,
+    ) -> Result<Vec<u8>, PaymentAddressError> {
+        self.payment_address.decrypt_incoming(context, envelope)
     }
 }
 

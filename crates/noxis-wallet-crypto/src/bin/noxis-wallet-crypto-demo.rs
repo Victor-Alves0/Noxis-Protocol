@@ -6,7 +6,7 @@ use noxis_wallet_crypto::{
     CandidatePrivateOutputSlotV1, CandidatePrivateRecipientKeysetV1, HybridIdentityKeypair,
     HybridPaymentAddressEntry, PaymentAddressError, PublicAddressBook, RecipientEnvelopeContext,
     decode_hybrid_recipient_envelope, decode_payment_address,
-    decrypt_candidate_private_note_for_recipient, encode_hybrid_recipient_envelope,
+    decrypt_candidate_private_note_for_incoming_view_key, encode_hybrid_recipient_envelope,
     encode_payment_address, encrypt_candidate_private_note_to_descriptor,
 };
 
@@ -77,8 +77,9 @@ fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
         output.candidate_ciphertext_digest(CandidatePrivateOutputSlotV1::First)?;
     let envelope_bytes = encode_hybrid_recipient_envelope(output.envelope())?;
     let decoded_envelope = decode_hybrid_recipient_envelope(&envelope_bytes)?;
-    let received = decrypt_candidate_private_note_for_recipient(
-        &recipient,
+    let view_key = recipient.into_incoming_view_key();
+    let received = decrypt_candidate_private_note_for_incoming_view_key(
+        &view_key,
         &context,
         &CandidatePrivateNoteEnvelopeV1::from_parts(commitment, decoded_envelope),
     )?;
@@ -94,10 +95,11 @@ fn run_private_note_demo() -> Result<(), Box<dyn std::error::Error>> {
         "strict NXRE envelope round trip ... accepted ({} bytes)",
         envelope_bytes.len()
     );
-    println!("recipient authenticated, decrypted and recomputed H_NOTE ... accepted");
+    println!("incoming view key authenticated, decrypted and recomputed H_NOTE ... accepted");
     println!("public output commitment: {commitment}");
     println!("candidate envelope digest bound to slot 0 and commitment: {ciphertext_digest}");
     println!("No note bytes, asset, value, secret key, balance or envelope bytes are printed.");
+    println!("The local view key has no nullifier or spend authority.");
     println!("This is not a wallet, spend flow, ledger transaction or privacy activation.");
     println!("This candidate digest is only used by local research preflight, never the ledger.");
     Ok(())

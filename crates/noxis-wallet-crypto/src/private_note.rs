@@ -181,11 +181,39 @@ pub fn decrypt_candidate_private_note_for_recipient(
     context: &RecipientEnvelopeContext,
     output: &CandidatePrivateNoteEnvelopeV1,
 ) -> Result<ReceivedCandidatePrivateNoteV1, CandidatePrivateNoteError> {
-    let received = decrypt_candidate_private_note_for_owner(
-        |envelope| owner.decrypt_incoming(context, envelope),
+    decrypt_candidate_private_note_for_expected_recipient(
+        |envelope| {
+            owner
+                .incoming_view_key()
+                .decrypt_incoming(context, envelope)
+        },
+        owner.recipient_commitment(),
         output,
-    )?;
-    if received.recipient_commitment()? != owner.recipient_commitment() {
+    )
+}
+
+/// Decrypts one candidate note using only local incoming view authority. The
+/// view key can authenticate/decrypt and verify `H_NOTE`/`H_ADDR`, but contains
+/// no nullifier material and cannot become a spend capability through this API.
+pub fn decrypt_candidate_private_note_for_incoming_view_key(
+    owner: &crate::CandidateIncomingViewKeyV1,
+    context: &RecipientEnvelopeContext,
+    output: &CandidatePrivateNoteEnvelopeV1,
+) -> Result<ReceivedCandidatePrivateNoteV1, CandidatePrivateNoteError> {
+    decrypt_candidate_private_note_for_expected_recipient(
+        |envelope| owner.decrypt_incoming(context, envelope),
+        owner.recipient_commitment(),
+        output,
+    )
+}
+
+fn decrypt_candidate_private_note_for_expected_recipient(
+    decrypt: impl FnOnce(&HybridRecipientEnvelope) -> Result<Vec<u8>, PaymentAddressError>,
+    expected_recipient_commitment: RecipientCommitmentV2,
+    output: &CandidatePrivateNoteEnvelopeV1,
+) -> Result<ReceivedCandidatePrivateNoteV1, CandidatePrivateNoteError> {
+    let received = decrypt_candidate_private_note_for_owner(decrypt, output)?;
+    if received.recipient_commitment()? != expected_recipient_commitment {
         return Err(CandidatePrivateNoteError::RecipientCommitmentMismatch);
     }
     Ok(received)
@@ -362,5 +390,34 @@ mod tests {
             decrypt_candidate_private_note_for_recipient(&owner, &context, &output),
             Err(CandidatePrivateNoteError::RecipientCommitmentMismatch)
         ));
+    }
+
+    #[test]
+    fn incoming_view_key_scans_its_note_after_full_keyset_is_consumed() {
+        let recipient = CandidatePrivateRecipientKeysetV1::generate(11).unwrap();
+        let descriptor = recipient.public_descriptor();
+        let context =
+            RecipientEnvelopeContext::new(b"noxis-private-recipient-research", 11).unwrap();
+        let mut expected_note = note([9; 32], 42);
+        expected_note[RECIPIENT_COMMITMENT_OFFSET
+            ..RECIPIENT_COMMITMENT_OFFSET + RECIPIENT_COMMITMENT_LENGTH]
+            .copy_from_slice(&descriptor.recipient_commitment().as_bytes());
+        let output =
+            encrypt_candidate_private_note_to_descriptor(&descriptor, &context, expected_note)
+                .unwrap();
+
+        let view_key = recipient.into_incoming_view_key();
+        let received =
+            decrypt_candidate_private_note_for_incoming_view_key(&view_key, &context, &output)
+                .unwrap();
+
+        assert_eq!(
+            received.recipient_commitment().unwrap(),
+            view_key.recipient_commitment()
+        );
+        assert_eq!(
+            view_key.payment_address().address_id(),
+            descriptor.payment_address().address_id()
+        );
     }
 }

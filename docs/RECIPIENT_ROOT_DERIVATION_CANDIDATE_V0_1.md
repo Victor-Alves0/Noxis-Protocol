@@ -15,8 +15,8 @@ em memória e, a partir dela, deriva:
 
 Assim, no processo local que construiu o keyset, o endereço que recebe uma
 nota e o commitment exigido na relação privada de posse têm uma origem secreta
-única. A raiz é apagada depois da construção. A identidade híbrida que assina o descriptor
-continua separada: ela autentica uma declaração pública; ela não é autoridade
+única. A raiz é apagada depois da construção. A identidade híbrida que assina
+o descriptor continua separada: ela autentica uma declaração pública; ela não é autoridade
 de gasto.
 
 ## Derivação exata
@@ -62,17 +62,18 @@ uma nota cujo `H_ADDR` não é o do destinatário local.
 - O descriptor público não revela nem prova a derivação. Um nó, remetente ou
   verificador STARK só vê o endereço e `H_ADDR` assinados.
 - A relação raiz→chaves ainda não aparece no AIR nem na prova de transferência.
-- Não há chave de visualização (*view key*) separada e exportável. A capacidade
-  de abrir `NXRE` fica junto do keyset local em memória, mas não pode ser
-  entregue com segurança a um scanner externo.
+- Há uma chave de visualização de entrada local, separada e não exportável.
+  Ela abre `NXRE` e valida `H_NOTE`/`H_ADDR`, mas não contém a chave de
+  nullifier. Ver
+  [`INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md`](INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md).
 - Não há chave de gasto, derivação de mudança, visão de saída, rotação,
   revogação, stealth address, carteira persistente ou transação privada.
 - Este candidato não recebe aprovação para custódia, rede pública ou ativação
   de privacidade.
 
-## Próximo gate: view keys e keystore
+## Próximo gate: exportação de view key e keystore
 
-Antes de expor uma view key, o projeto precisa especificar três autoridades
+Antes de exportar uma view key, o projeto precisa especificar três autoridades
 distintas e testá-las isoladamente:
 
 | Material | Pode fazer | Não pode fazer |

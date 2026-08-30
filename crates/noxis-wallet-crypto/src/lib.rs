@@ -52,12 +52,14 @@ pub use ciphertext_digest::{
 pub use private_note::{
     CANDIDATE_PRIVATE_NOTE_PREIMAGE_LENGTH, CandidatePrivateNoteEnvelopeV1,
     CandidatePrivateNoteError, ReceivedCandidatePrivateNoteV1, decrypt_candidate_private_note,
+    decrypt_candidate_private_note_for_incoming_view_key,
     decrypt_candidate_private_note_for_recipient, encrypt_candidate_private_note,
     encrypt_candidate_private_note_to_descriptor,
 };
 pub use recipient_descriptor::{
-    CANDIDATE_RECIPIENT_DESCRIPTOR_DOMAIN, CandidatePrivateRecipientDescriptorV1,
-    CandidatePrivateRecipientError, CandidatePrivateRecipientKeysetV1,
+    CANDIDATE_RECIPIENT_DESCRIPTOR_DOMAIN, CandidateIncomingViewKeyV1,
+    CandidatePrivateRecipientDescriptorV1, CandidatePrivateRecipientError,
+    CandidatePrivateRecipientKeysetV1,
 };
 pub use wire::{
     HYBRID_RECIPIENT_ENVELOPE_MAGIC, PAYMENT_ADDRESS_MAGIC, PaymentAddressCodecError,

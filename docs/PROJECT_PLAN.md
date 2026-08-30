@@ -264,11 +264,13 @@ híbrida do destinatário. Ver
 endereço `NXPA`, uma chave de nullifier/`H_ADDR` e uma identidade que assina o
 par endereço+commitment. As chaves de recebimento e nullifier derivam, no
 processo local, de uma raiz aleatória única e apagada; remetente e destinatário
-recusam nota cujo commitment não seja o do descriptor. Isto não prova a relação
-para terceiros, não oferece view key exportável, formato público, diretório ou
-wallet persistente. Ver
+recusam nota cujo commitment não seja o do descriptor. O keyset pode virar uma
+view key de entrada local, sem nullifier e sem autoridade de gasto. Isto não
+prova a relação para terceiros, não oferece view key exportável, formato
+público, diretório ou wallet persistente. Ver
 [`RECIPIENT_DESCRIPTOR_LOCAL_CANDIDATE_V0_1.md`](RECIPIENT_DESCRIPTOR_LOCAL_CANDIDATE_V0_1.md)
-e [`RECIPIENT_ROOT_DERIVATION_CANDIDATE_V0_1.md`](RECIPIENT_ROOT_DERIVATION_CANDIDATE_V0_1.md).
+e [`RECIPIENT_ROOT_DERIVATION_CANDIDATE_V0_1.md`](RECIPIENT_ROOT_DERIVATION_CANDIDATE_V0_1.md),
+além de [`INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md`](INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md).
 
 **Catálogo local de endereços públicos:** a mesma camada já pode abrir um
 diretório com lock exclusivo, gravar bytes `NXPA` canônicos por ID, reabrir e

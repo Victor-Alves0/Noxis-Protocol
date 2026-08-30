@@ -26,9 +26,11 @@ private note:
 cargo run -p noxis-wallet-crypto --bin noxis-wallet-crypto-demo -- private-note
 ```
 
-That command recovers the note only after recomputing `H_NOTE` and matching its
-public output commitment. Its precise boundary is documented in
-[`WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md`](WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md).
+That command converts the complete local recipient keyset into an incoming view
+key, then recovers the note only after recomputing `H_NOTE` and matching its
+public output commitment and `H_ADDR`. Its precise boundaries are documented in
+[`WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md`](WALLET_PRIVATE_NOTE_RECEIPT_LOCAL_V0_1.md)
+and [`INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md`](INCOMING_VIEW_KEY_LOCAL_CANDIDATE_V0_1.md).
 
 List and revalidate every managed public address in that directory with:
 
@@ -78,8 +80,8 @@ both signature algorithms.
 
 - It is not a wallet keystore, seed backup or key-rotation implementation.
 - It is not a stealth-address or anonymous-payment protocol.
-- It is not proof generation, note scanning, transaction construction or
-  private settlement.
+- It is not a persisted/exportable view key, block scanner, transaction
+  construction or private settlement.
 - It does not bind `NXRE` bytes to an `NXPU` `CiphertextDigestV2`; the local
   candidate-note receipt is intentionally below that protocol gate.
 - It does not make CometBFT transport, consensus, the node, or the protocol
