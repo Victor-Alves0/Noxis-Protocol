@@ -22,6 +22,11 @@ representation in the pinned dependency set. It is intentionally a test-only
 round trip: no bytes are emitted by a Noxis public API, persisted, accepted by
 the ledger, or sent over the network.
 
+A second test writes those raw test bytes to a temporary file and starts a
+fresh child test process to deserialize and verify them. It establishes a
+same-host, same-build process boundary only; the temporary bytes are removed
+after the test and are not a Noxis artifact.
+
 ## What this clarifies
 
 The current hiding-FRI configuration is created with fresh operating-system
@@ -32,13 +37,14 @@ the same code-level parameters.
 ## Crucial limitation: this is still not portable verification
 
 The configuration is implicit in Rust code and pinned library versions; it is
-not a public, versioned Noxis verifier descriptor. The test also executes in
-one process and does not establish a cross-process, cross-version or
-independent-implementation compatibility guarantee.
+not a public, versioned Noxis verifier descriptor. The process-boundary test
+uses the same test executable and pinned dependency set, so it does not
+establish cross-version, cross-machine or independent-implementation
+compatibility.
 
 Consequently, these claims remain false:
 
-- a proof can be verified by an independently started Noxis process;
+- a proof can be verified by an independently started Noxis node build;
 - a serialized proof is a stable, canonical Noxis wire or storage format;
 - the configuration, field encoding, trace-hiding behavior and FRI parameters
   are selected protocol parameters;

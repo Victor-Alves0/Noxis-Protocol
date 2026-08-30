@@ -1983,6 +1983,75 @@ mod tests {
     }
 
     #[test]
+    fn p24_research_proof_verifies_in_a_child_process() {
+        let input = core::array::from_fn(|index| index as u32 + 1);
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let output = reference.permutation(input).unwrap();
+        let air = Poseidon2P24Air::from_reference(&reference);
+        let trace = build_p24_trace(&air, input);
+        let public_values = input
+            .into_iter()
+            .chain(output)
+            .map(Val::from_u32)
+            .collect::<Vec<_>>();
+        let config = make_hiding_config();
+        let proof = prove(&config, &air, trace, &public_values);
+        let encoded = postcard::to_allocvec(&proof)
+            .expect("the experimental Plonky3 proof should serialize for this local test");
+        let path = std::env::temp_dir().join(format!(
+            "noxis-stark-research-proof-{}-{}.bin",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("the system clock should be after the Unix epoch")
+                .as_nanos()
+        ));
+        std::fs::write(&path, encoded).expect("the child-process test proof should be writable");
+
+        let child = std::process::Command::new(
+            std::env::current_exe().expect("the current test executable should be discoverable"),
+        )
+        .arg("--exact")
+        .arg("tests::p24_research_proof_child_process_verifier")
+        .arg("--nocapture")
+        .env("NOXIS_STARK_RESEARCH_PROOF_PATH", &path)
+        .output()
+        .expect("the child-process verifier should start");
+        let _ = std::fs::remove_file(&path);
+
+        assert!(
+            child.status.success(),
+            "the child-process verifier failed:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&child.stdout),
+            String::from_utf8_lossy(&child.stderr)
+        );
+    }
+
+    #[test]
+    fn p24_research_proof_child_process_verifier() {
+        let Ok(path) = std::env::var("NOXIS_STARK_RESEARCH_PROOF_PATH") else {
+            return;
+        };
+        let encoded = std::fs::read(path).expect("the parent test should provide proof bytes");
+        let decoded = postcard::from_bytes(&encoded)
+            .expect("the child process should deserialize the supplied proof bytes");
+        let input = core::array::from_fn(|index| index as u32 + 1);
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let output = reference.permutation(input).unwrap();
+        let air = Poseidon2P24Air::from_reference(&reference);
+        let public_values = input
+            .into_iter()
+            .chain(output)
+            .map(Val::from_u32)
+            .collect::<Vec<_>>();
+        let verifier_config = make_hiding_config();
+
+        verify(&verifier_config, &air, &decoded, &public_values).expect(
+            "the child process should verify the supplied proof with a fresh configuration",
+        );
+    }
+
+    #[test]
     fn leaf_hash_stark_matches_the_frozen_candidate_reference() {
         let commitment = core::array::from_fn(|index| index as u32 + 1);
         let result = prove_and_verify_p24_leaf(commitment).unwrap();

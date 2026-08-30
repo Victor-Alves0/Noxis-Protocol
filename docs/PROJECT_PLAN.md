@@ -130,9 +130,11 @@ nullifiers. Ver [`STARK_INTENT_COMMITMENT_RESEARCH_V0_1.md`](STARK_INTENT_COMMIT
 **Limite de portabilidade do backend:** um teste serializa e desserializa uma
 prova P24 de pesquisa com `postcard` e a verifica novamente usando uma
 configuração nova com o mesmo perfil de código fixado. Isso prova que a
-aleatoriedade local usada para gerar a prova não é necessária ao verificador,
-mas ainda não existe descritor Noxis versionado, formato de prova, verificação
-entre processos ou perfil selecionado. Ver
+aleatoriedade local usada para gerar a prova não é necessária ao verificador.
+Outro teste leva esses bytes temporários a um processo-filho novo do mesmo
+build fixado e também os verifica. Ainda não existe descritor Noxis versionado,
+formato de prova, compatibilidade entre versões/máquinas ou perfil selecionado.
+Ver
 [`STARK_VERIFIER_PROFILE_RESEARCH_V0_1.md`](STARK_VERIFIER_PROFILE_RESEARCH_V0_1.md).
 
 **Preflight de intenção e posse:** para uma entrada da declaração `NXPU`, o
