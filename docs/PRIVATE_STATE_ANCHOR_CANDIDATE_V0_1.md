@@ -47,6 +47,8 @@ Há uma árvore esparsa autenticada em memória, ainda candidata e isolada, mas
 `NXPS v2` já registra uma raiz `NXSM` tipada e verifica que ela corresponde ao
 snapshot; veja
 [`PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md`](PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md).
-Não há backend de prova, persistência nem transição atômica. O próximo marco é
-fazer uma AIR/STARK verificar a atualização dessa raiz, antes de qualquer uso
-fora do domínio de pesquisa.
+Não há backend de prova nem persistência. A [transição local candidata 2×2](PRIVATE_STATE_TRANSITION_CANDIDATE_V0_1.md)
+já deriva uma âncora posterior a partir de `NXPS v2`, mas não é prova-backed,
+atômica entre processos ou autorizada. O próximo marco é fazer uma AIR/STARK
+verificar a atualização dessa raiz, antes de qualquer uso fora do domínio de
+pesquisa.

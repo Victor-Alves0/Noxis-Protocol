@@ -21,10 +21,11 @@ notas. Commitments ou nullifiers duplicados sao rejeitados.
 
 ## Limites de seguranca intencionais
 
-Isto **nao** e uma implementacao de transicao de estado, persistencia,
-sincronizacao de rede nem um verificador de provas. Em especial, nao ha metodo
-para aplicar uma transferencia, marcar uma nota como gasta ou aceitar uma prova
-opaca.
+Isto nao e persistencia, sincronizacao de rede nem um verificador de provas.
+Existe agora uma [transição local candidata 2×2](PRIVATE_STATE_TRANSITION_CANDIDATE_V0_1.md)
+que deriva snapshot, raiz de notas e raiz `NXSM` posteriores somente em memória.
+Ela não aceita prova opaca, não persiste nem autoriza estado compartilhado; o
+snapshot por si só continua incapaz de aceitar uma transferência de rede.
 
 O campo `pre_state_id` do intento privado ainda nao possui um enquadramento
 canonico `H_STATE` compativel com a prova candidata. Portanto, permitir uma
@@ -35,9 +36,7 @@ atual e nunca e convertido para ele.
 ## Proximo passo
 
 O frame candidato `H_STATE` foi publicado separadamente em
-`PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md`. Os domínios `NXSM` e um estado mutável
-isolado já estão congelados como candidatos, mas ainda falta um corpus externo
-de interoperabilidade e uma nova âncora que use sua raiz tipada. Somente depois
-disso será possível projetar uma transição atômica: verificar a prova
-selecionada, conferir o estado anterior, impedir nullifier repetido, acrescentar
-commitments e produzir a nova raiz.
+`PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md`. A transição local agora torna o
+antes/depois determinístico, mas ainda falta a prova selecionada que a autorize,
+o armazenamento de envelopes, persistência crash-consistent e integração de
+consenso antes de qualquer estado compartilhado.

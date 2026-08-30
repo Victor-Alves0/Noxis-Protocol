@@ -32,6 +32,8 @@ isolados como candidatos de pesquisa. O corpus verifica folhas, nós ordenados,
 vazios e quatro raízes de conjuntos pequenos; veja
 [`NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md`](NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md).
 Ainda não existe serialização canônica de estado, backend STARK nem transição
-privada. O `H_STATE` atual continua comprometendo o conjunto ordenado com
-SHA-256; ele só será migrado para uma raiz `NXSM` em uma nova versão depois de
-revisão independente mais ampla.
+privada autorizada. Existe uma transição local transparente que deriva uma raiz
+posterior de `NXSM`, mas ela não aceita prova nem estado compartilhado. O
+`H_STATE` atual continua comprometendo o conjunto ordenado com SHA-256; ele só
+será migrado para uma raiz `NXSM` em uma nova versão depois de revisão
+independente mais ampla.

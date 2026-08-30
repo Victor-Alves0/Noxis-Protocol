@@ -16,6 +16,7 @@ use sha2::{Digest, Sha256};
 
 mod state_anchor;
 mod state_anchor_v2;
+mod transition_v2;
 
 pub use state_anchor::{
     PRIVATE_NULLIFIER_SET_COMMITMENT_DOMAIN, PRIVATE_STATE_ANCHOR_ENCODED_LENGTH,
@@ -25,6 +26,9 @@ pub use state_anchor::{
 pub use state_anchor_v2::{
     PRIVATE_STATE_NXSM_ANCHOR_ENCODED_LENGTH, PRIVATE_STATE_NXSM_ANCHOR_ID_DOMAIN,
     PrivateStateAnchorV2, PrivateStateAnchorV2Error,
+};
+pub use transition_v2::{
+    CandidatePrivateStateTransitionV2, CandidatePrivateStateTransitionV2Error,
 };
 
 /// Deliberate local-only bound; a persistent v2 accumulator will replace it.

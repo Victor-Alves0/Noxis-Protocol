@@ -176,6 +176,14 @@ resultado com o ativo da intenção; valor, destinatário, aleatoriedades e
 conservação ainda não fazem parte dessa relação. Ver
 [`STARK_H_NOTE_ASSET_BINDING_RESEARCH_V0_1.md`](STARK_H_NOTE_ASSET_BINDING_RESEARCH_V0_1.md).
 
+**Transição local de estado privado:** `noxis-private-state` agora deriva,
+somente em memória, o estado posterior 2×2 a partir de `NXPS v2`, snapshot,
+árvore `NXSM` e intenção. Ela acrescenta os commitments de saída, marca os dois
+nullifiers, reconstrói a nova âncora e falha fechado contra gasto repetido ou
+commitment reintroduzido. Não consome prova, não persiste ciphertexts e não é
+regra de ledger. Ver
+[`PRIVATE_STATE_TRANSITION_CANDIDATE_V0_1.md`](PRIVATE_STATE_TRANSITION_CANDIDATE_V0_1.md).
+
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem
 codec/`Debug`/`Clone`, caminho P24 de 32 níveis e uma declaração executável
