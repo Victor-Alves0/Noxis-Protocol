@@ -111,6 +111,7 @@ O bundle `NXKB` agora transporta `NXKS + NXKP` entre diretórios, mantendo
 `NXKA` externo; a repetição após publicar somente o cabeçalho já é idempotente.
 O demo/teste já executa backup/restauração sintéticos em processos separados.
 O término real depois do cabeçalho também retoma de forma idempotente. Testar
-término durante a publicação de `NXKP` e outros pontos de falha do sistema de
-arquivos. Só após esses testes, inventário de segredo e revisão independente a
-raiz de wallet poderá atravessar a fronteira do keystore.
+o término após sincronizar o temporário `NXKP` agora também retoma
+canonicamente. Definir plataformas/sistemas de arquivos suportados e testar os
+demais pontos de falha. Só após esses testes, inventário de segredo e revisão
+independente a raiz de wallet poderá atravessar a fronteira do keystore.

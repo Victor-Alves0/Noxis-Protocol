@@ -6,6 +6,8 @@
 //! write opaque ciphertext bytes that were already parsed; they never receive
 //! plaintext or a password.
 
+#[cfg(feature = "research-testing")]
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     fmt,
     fs::{self, OpenOptions},
@@ -26,6 +28,18 @@ const TEMPORARY_PAYLOAD_FILE_SUFFIX: &str = ".nxkp.tmp";
 /// Bound on retained immutable synthetic payload generations per candidate
 /// directory. Real wallet retention needs separate backup/UX review.
 pub const MAX_SYNTHETIC_PAYLOAD_GENERATIONS: usize = 32;
+
+#[cfg(feature = "research-testing")]
+static RESEARCH_STOP_AFTER_PAYLOAD_TEMPORARY_SYNC: AtomicBool = AtomicBool::new(false);
+
+/// Enables one process-local research failpoint after an `NXKP` temporary file
+/// has been fully synchronized but before its atomic rename. This API exists
+/// only in the explicit `research-testing` build and always terminates the
+/// process with exit code 87 when reached.
+#[cfg(feature = "research-testing")]
+pub fn set_research_stop_after_payload_temporary_sync() {
+    RESEARCH_STOP_AFTER_PAYLOAD_TEMPORARY_SYNC.store(true, Ordering::SeqCst);
+}
 
 /// Lifecycle view for opaque synthetic payload generations. It borrows the
 /// header store, and therefore cannot outlive that store's exclusive lock.
@@ -449,6 +463,10 @@ impl<'a> CandidateKeystorePayloadStore<'a> {
             path: temporary.clone(),
             source,
         })?;
+        #[cfg(feature = "research-testing")]
+        if RESEARCH_STOP_AFTER_PAYLOAD_TEMPORARY_SYNC.swap(false, Ordering::SeqCst) {
+            std::process::exit(87);
+        }
         drop(file);
         fs::rename(&temporary, destination).map_err(|source| PayloadStoreError::Io {
             operation: "publish candidate keystore payload file",

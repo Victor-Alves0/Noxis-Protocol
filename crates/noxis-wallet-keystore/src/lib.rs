@@ -34,6 +34,8 @@ pub use header_store::{
     CandidateKeystoreHeaderStore, HeaderStoreError, HeaderStoreInitializeOutcome,
     KEYSTORE_HEADER_LOCK_FILE_NAME,
 };
+#[cfg(feature = "research-testing")]
+pub use payload_store::set_research_stop_after_payload_temporary_sync;
 pub use payload_store::{
     CandidateKeystorePayloadStore, MAX_SYNTHETIC_PAYLOAD_GENERATIONS, PayloadStoreError,
     PayloadStorePublishOutcome,

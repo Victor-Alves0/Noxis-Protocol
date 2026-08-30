@@ -15,6 +15,7 @@ use noxis_wallet_keystore::{
     CandidateKeystoreHeaderStore, CandidateKeystorePayloadV1, CandidateSyntheticRecoveryBundleV1,
     EXTERNAL_ROLLBACK_ANCHOR_V1_LENGTH, ExternalRollbackAnchorV1, HeaderStoreInitializeOutcome,
     KeystoreHeaderV2, PayloadStorePublishOutcome, SYNTHETIC_RECOVERY_BUNDLE_V1_LENGTH,
+    set_research_stop_after_payload_temporary_sync,
 };
 use rand_core::{OsRng, RngCore as _};
 
@@ -35,7 +36,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             bundle,
             anchor,
             stop_after_header,
-        } => restore(wallet_dir, bundle, anchor, stop_after_header),
+            stop_after_payload_temporary_sync,
+        } => restore(
+            wallet_dir,
+            bundle,
+            anchor,
+            stop_after_header,
+            stop_after_payload_temporary_sync,
+        ),
     }
 }
 
@@ -50,6 +58,7 @@ enum Command {
         bundle: PathBuf,
         anchor: PathBuf,
         stop_after_header: bool,
+        stop_after_payload_temporary_sync: bool,
     },
 }
 
@@ -60,6 +69,7 @@ fn parse_command(args: &[String]) -> Result<Command, Box<dyn Error>> {
     let wallet_dir = value_after(args, "--wallet-dir")?;
     let bundle = value_after(args, "--bundle")?;
     let anchor = value_after(args, "--anchor")?;
+    let failpoint = optional_failpoint(args)?;
     match args[0].as_str() {
         "create" if args.len() == 7 => Ok(Command::Create {
             wallet_dir,
@@ -70,16 +80,27 @@ fn parse_command(args: &[String]) -> Result<Command, Box<dyn Error>> {
             wallet_dir,
             bundle,
             anchor,
-            stop_after_header: optional_stop_after_header(args)?,
+            stop_after_header: failpoint == Some(Failpoint::AfterHeader),
+            stop_after_payload_temporary_sync: failpoint
+                == Some(Failpoint::AfterPayloadTemporarySync),
         }),
         _ => Err(usage().into()),
     }
 }
 
-fn optional_stop_after_header(args: &[String]) -> Result<bool, Box<dyn Error>> {
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum Failpoint {
+    AfterHeader,
+    AfterPayloadTemporarySync,
+}
+
+fn optional_failpoint(args: &[String]) -> Result<Option<Failpoint>, Box<dyn Error>> {
     match args.len() {
-        7 => Ok(false),
-        8 if args[7] == "--stop-after-header" => Ok(true),
+        7 => Ok(None),
+        8 if args[7] == "--stop-after-header" => Ok(Some(Failpoint::AfterHeader)),
+        8 if args[7] == "--stop-after-payload-temporary-sync" => {
+            Ok(Some(Failpoint::AfterPayloadTemporarySync))
+        }
         _ => Err(usage().into()),
     }
 }
@@ -134,6 +155,7 @@ fn restore(
     bundle: PathBuf,
     anchor: PathBuf,
     stop_after_header: bool,
+    stop_after_payload_temporary_sync: bool,
 ) -> Result<(), Box<dyn Error>> {
     let store = CandidateKeystoreHeaderStore::open(&wallet_dir)?;
     ensure_external_to_wallet(&bundle, store.path())?;
@@ -153,6 +175,9 @@ fn restore(
         println!("Header publication: {:?}", header);
         println!("process intentionally stopped before payload publication");
         std::process::exit(86);
+    }
+    if stop_after_payload_temporary_sync {
+        set_research_stop_after_payload_temporary_sync();
     }
     let outcome = recovery_bundle.restore(&store, external_anchor)?;
 
@@ -215,5 +240,5 @@ fn read_exact(path: &Path, expected_length: usize) -> Result<Vec<u8>, Box<dyn Er
 }
 
 fn usage() -> String {
-    "usage:\n  noxis-keystore-synthetic-demo create --wallet-dir <dir> --bundle <external.nxkb> --anchor <external.nxka>\n  noxis-keystore-synthetic-demo restore --wallet-dir <new-dir> --bundle <external.nxkb> --anchor <external.nxka> [--stop-after-header]".to_owned()
+    "usage:\n  noxis-keystore-synthetic-demo create --wallet-dir <dir> --bundle <external.nxkb> --anchor <external.nxka>\n  noxis-keystore-synthetic-demo restore --wallet-dir <new-dir> --bundle <external.nxkb> --anchor <external.nxka> [--stop-after-header|--stop-after-payload-temporary-sync]".to_owned()
 }
