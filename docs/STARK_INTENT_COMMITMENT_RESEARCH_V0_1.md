@@ -57,9 +57,9 @@ bit, and changed first or final private intent bytes.
 - It does **not** prove note ownership, value conservation, output-note
   opening, nullifier absence or an `NXSM` transition.
 - It has no cryptographic aggregation or recursion with the ownership or
-  `NXSM` research proofs. A local sequential preflight can verify it before
-  one anchored ownership proof against the same `NXPU` statement, but that
-  receipt remains non-transferable.
+  `NXSM` research proofs. A local sequential preflight can verify it once
+  before one or both anchored ownership proofs against the same `NXPU`
+  statement, but every resulting receipt remains non-transferable.
 - It is not a proof format, a wallet operation, a validator operation or a
   ledger authorization.
 

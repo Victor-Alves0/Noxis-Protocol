@@ -144,11 +144,12 @@ versionados: o perfil P24 normal (`log_blowup = 3`) e o de AIRs de grau alto
 e são usados diretamente pelo construtor. Isso melhora auditabilidade, mas não
 seleciona backend, cria um formato Noxis de prova ou habilita liquidação.
 
-**Preflight de intenção e posse:** para uma entrada da declaração `NXPU`, o
-contrato de prova agora executa e verifica o `H_INTENT` canônico e a posse
-ancorada contra a mesma âncora e estado local, retendo apenas um recibo público
-após descartar ambas as provas opacas. Isso é evidência operacional de vínculo
-entre os componentes, não agregação, recursão ou prova de transferência; ver
+**Preflight de intenção e posse:** para a declaração `NXPU` 2×2, o contrato de
+prova agora executa e verifica `H_INTENT` uma vez e as duas posses ancoradas em
+sequência contra a mesma âncora e estado local, retendo apenas um recibo
+público após descartar as três provas opacas. Isso é evidência operacional de
+vínculo entre os componentes, não agregação, recursão ou prova de transferência;
+ver
 [`STARK_ANCHORED_OWNERSHIP_PREFLIGHT_RESEARCH_V0_1.md`](STARK_ANCHORED_OWNERSHIP_PREFLIGHT_RESEARCH_V0_1.md).
 
 **Abertura e preflight candidatos:** o crate isolado
