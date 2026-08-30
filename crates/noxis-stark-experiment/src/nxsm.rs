@@ -1,9 +1,9 @@
 //! Bounded private-prefix experiment for the candidate `NXSM` sparse tree.
 //!
-//! The real sparse tree has 512 levels. This module proves the first eight
-//! levels exactly, using the real `NXSM` empty leaf and node domain. It is a
-//! resource-measurement and constraint-validation component for future
-//! recursion; it is not an absence proof for the full 512-level tree.
+//! The real sparse tree has 512 levels. This module proves an exact eight-level
+//! segment using the real `NXSM` empty leaf and node domain. It also offers a
+//! bounded-memory local preflight that sequences all 64 segments. Neither is a
+//! portable absence proof for the full 512-level tree.
 
 use noxis_nullifier_tree_reference::NullifierSparseTreeReferenceV1;
 use noxis_poseidon2_reference::{BabyBearDigestV2, P24_WIDTH, Poseidon2P24Reference};

@@ -86,6 +86,7 @@ transferable proof.
 cargo test --release -p noxis-stark-experiment private_nxsm_prefix_binds_real_empty_leaf_node_domain_and_nullifier_bits
 cargo test --release -p noxis-stark-experiment private_nxsm_terminal_segment_reaches_an_actual_sparse_tree_root
 cargo test --release -p noxis-stark-experiment sequential_private_segments_reach_a_complete_candidate_nxsm_root -- --ignored
+cargo run --release -p noxis-stark-experiment --features local-nxsm-preflight --bin noxis-stark-smoke -- nxsm-preflight
 ```
 
 The first two tests derive an actual path from candidate sparse-tree state
@@ -93,4 +94,7 @@ containing spent nullifiers, prove both the first and final eight levels, and
 compare their boundaries to the independent
 `noxis-nullifier-tree-reference`. The ignored operational test derives all 512
 siblings, runs the 64-proof local sequence and confirms the final candidate
-root. It is ignored because the measured cost is unsuitable for normal CI.
+root. It is ignored because the measured cost is unsuitable for normal CI. The
+explicit command creates the same deterministic, non-secret candidate fixture
+and prints a local receipt. It requires the dedicated feature so this heavy
+research path cannot be selected accidentally, and it refuses debug builds.

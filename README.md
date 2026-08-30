@@ -171,6 +171,18 @@ An executable local preflight additionally binds one such proof to the typed
 candidate state anchor and its `NXSM` nullifier transition; the `NXSM` witness
 is still transparent and therefore is not a privacy proof.
 
+To reproduce the separate complete `NXSM` local preflight, explicitly opt in:
+
+```powershell
+cargo run --release -p noxis-stark-experiment --features local-nxsm-preflight --bin noxis-stark-smoke -- nxsm-preflight
+```
+
+It derives one non-secret candidate path, locally verifies and discards 64
+private eight-level STARK proofs, and checks the final candidate root. On the
+development machine this took about 32 minutes. It produces only a local
+research receipt — never a portable proof, transaction, wallet or validator
+operation.
+
 On POSIX systems, use `./scripts/demo-local.sh`. The demo prints the initialized
 genesis and state identities, accepts a fixture-authorized mint and one research
 transfer, rejects the same nullifier on a second submission, then reopens the

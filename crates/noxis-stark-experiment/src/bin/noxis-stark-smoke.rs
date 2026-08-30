@@ -6,6 +6,34 @@ use noxis_stark_experiment::{
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    match parse_smoke_mode(std::env::args().skip(1))? {
+        SmokeMode::Default => run_default_smoke(),
+        SmokeMode::NxsmPreflight => run_nxsm_preflight(),
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SmokeMode {
+    Default,
+    NxsmPreflight,
+}
+
+fn parse_smoke_mode(
+    arguments: impl IntoIterator<Item = String>,
+) -> Result<SmokeMode, Box<dyn std::error::Error>> {
+    let arguments: Vec<String> = arguments.into_iter().collect();
+    match arguments.as_slice() {
+        [] => Ok(SmokeMode::Default),
+        [command] if command == "nxsm-preflight" => Ok(SmokeMode::NxsmPreflight),
+        _ => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "usage: noxis-stark-smoke [nxsm-preflight]",
+        )
+        .into()),
+    }
+}
+
+fn run_default_smoke() -> Result<(), Box<dyn std::error::Error>> {
     let addr = run_p24_addr_research_smoke()?;
     let note = run_p24_note_research_smoke()?;
     let ownership = run_p24_note_ownership_research_smoke()?;
@@ -57,4 +85,69 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         merkle_path32.trace_rows
     );
     Ok(())
+}
+
+#[cfg(feature = "local-nxsm-preflight")]
+fn run_nxsm_preflight() -> Result<(), Box<dyn std::error::Error>> {
+    use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
+    use noxis_poseidon2_reference::BabyBearDigestV2;
+    use noxis_privacy_types::NullifierV2;
+    use noxis_stark_experiment::run_p24_nxsm_absence_path512_sequential_preflight;
+
+    if cfg!(debug_assertions) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "NXSM preflight requires an optimized build; rerun with --release",
+        )
+        .into());
+    }
+
+    let nullifier = NullifierV2::from_elements([10; 16])?;
+    let mut tree = NullifierSparseTreeStateV1::new_candidate()?;
+    tree.mark_spent(NullifierV2::from_elements([3; 16])?)?;
+    tree.mark_spent(NullifierV2::from_elements([9; 16])?)?;
+    let siblings: [BabyBearDigestV2; 512] = tree.prove(nullifier).siblings().try_into()?;
+    let root = tree.root()?.elements();
+
+    println!("Noxis NXSM local sequential preflight started");
+    println!("Verifying 64 private eight-level segments; this can take about 32 minutes.");
+    let result = run_p24_nxsm_absence_path512_sequential_preflight(nullifier, siblings, root)?;
+    println!("Noxis NXSM local sequential preflight accepted");
+    println!(
+        "Verified and discarded private segments: {}",
+        result.segments_verified
+    );
+    println!("Candidate root lane 0: {}", result.root[0]);
+    println!(
+        "Research-only local receipt: not a serialized, portable, aggregate, wallet, validator, or network proof."
+    );
+    Ok(())
+}
+
+#[cfg(not(feature = "local-nxsm-preflight"))]
+fn run_nxsm_preflight() -> Result<(), Box<dyn std::error::Error>> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        "NXSM preflight is opt-in; rerun with --features local-nxsm-preflight --release",
+    )
+    .into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SmokeMode, parse_smoke_mode};
+
+    #[test]
+    fn defaults_to_the_regular_research_smoke() {
+        assert_eq!(parse_smoke_mode([]).unwrap(), SmokeMode::Default);
+    }
+
+    #[test]
+    fn accepts_only_the_explicit_nxsm_preflight_command() {
+        assert_eq!(
+            parse_smoke_mode([String::from("nxsm-preflight")]).unwrap(),
+            SmokeMode::NxsmPreflight
+        );
+        assert!(parse_smoke_mode([String::from("nxsm-preflight"), String::from("extra")]).is_err());
+    }
 }
