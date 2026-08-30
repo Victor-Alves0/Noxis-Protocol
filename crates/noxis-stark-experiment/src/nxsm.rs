@@ -17,7 +17,7 @@ use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{Proof, prove, verify};
 
 use crate::{
-    P24_ROUNDS, Poseidon2P24Air, StarkExperimentError, Val, make_hiding_config_with_log_blowup,
+    P24_ROUNDS, Poseidon2P24Air, StarkExperimentError, Val, make_high_degree_hiding_config,
     matrix_expression, matrix_values, round_values,
 };
 
@@ -537,7 +537,7 @@ pub fn prove_p24_nxsm_absence_segment8(
         .name("noxis-nxsm-prefix8-prover".to_owned())
         .stack_size(PROVER_STACK_BYTES)
         .spawn(move || {
-            let config = make_hiding_config_with_log_blowup(4);
+            let config = make_high_degree_hiding_config();
             let proof = prove(&config, &air, trace, &public_values);
             Ok(Poseidon2P24NxsmPrefix8Proof {
                 config,

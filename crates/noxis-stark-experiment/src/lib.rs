@@ -41,6 +41,7 @@ mod intent;
 mod note;
 mod nxsm;
 mod ownership;
+mod profile;
 
 pub use addr::{
     Poseidon2P24AddrExperimentResult, prove_and_verify_p24_addr, run_p24_addr_research_smoke,
@@ -63,6 +64,7 @@ pub use ownership::{
     prove_and_verify_p24_note_ownership_path32, prove_p24_note_ownership_path32,
     run_p24_note_ownership_research_smoke, verify_p24_note_ownership_proof,
 };
+pub use profile::{RESEARCH_STARK_VERIFIER_PROFILE_VERSION, ResearchStarkVerifierProfileV1};
 
 const TRACE_WIDTH: usize = 2;
 const TRACE_ROWS: usize = 8;
@@ -1474,7 +1476,7 @@ fn prove_and_verify_with_large_stack(
         .name("noxis-p24-path32-prover".to_owned())
         .stack_size(P24_MERKLE_PATH32_PROVER_STACK_BYTES)
         .spawn(move || {
-            let config = make_hiding_config_with_log_blowup(4);
+            let config = make_high_degree_hiding_config();
             let proof = prove(&config, &air, trace, &public_values);
             verify(&config, &air, &proof, &public_values)
                 .map_err(|_| StarkExperimentError::VerificationFailed)
@@ -1842,10 +1844,14 @@ pub(crate) fn matrix_expression<AB: AirBuilder>(
 }
 
 pub(crate) fn make_hiding_config() -> Config {
-    make_hiding_config_with_log_blowup(3)
+    make_hiding_config_for_profile(ResearchStarkVerifierProfileV1::STANDARD_P24)
 }
 
-fn make_hiding_config_with_log_blowup(log_blowup: usize) -> Config {
+pub(crate) fn make_high_degree_hiding_config() -> Config {
+    make_hiding_config_for_profile(ResearchStarkVerifierProfileV1::HIGH_DEGREE_P24)
+}
+
+fn make_hiding_config_for_profile(profile: ResearchStarkVerifierProfileV1) -> Config {
     let byte_hash = ByteHash {};
     let u64_hash = U64Hash::new(KeccakF {});
     let field_hash = FieldHash::new(u64_hash);
@@ -1853,19 +1859,19 @@ fn make_hiding_config_with_log_blowup(log_blowup: usize) -> Config {
     let val_mmcs = ValHidingMmcs::new(field_hash, compress, 0, secure_rng());
     let challenge_mmcs = ChallengeHidingMmcs::new(val_mmcs.clone());
     let fri_params = FriParameters {
-        log_blowup,
-        log_final_poly_len: 0,
-        max_log_arity: 1,
-        num_queries: 32,
-        commit_proof_of_work_bits: 0,
-        query_proof_of_work_bits: 0,
+        log_blowup: profile.fri_log_blowup(),
+        log_final_poly_len: profile.fri_log_final_poly_len(),
+        max_log_arity: profile.fri_max_log_arity(),
+        num_queries: profile.fri_num_queries(),
+        commit_proof_of_work_bits: profile.fri_commit_proof_of_work_bits(),
+        query_proof_of_work_bits: profile.fri_query_proof_of_work_bits(),
         mmcs: challenge_mmcs,
     };
     let pcs = HidingPcs::new(
         Radix2DitParallel::default(),
         val_mmcs,
         fri_params,
-        4,
+        profile.num_random_codewords(),
         secure_rng(),
     );
     let challenger = Challenger::from_hasher(vec![], byte_hash);
@@ -1935,6 +1941,25 @@ mod tests {
 
         assert_eq!(result.output, output);
         assert_eq!(result.trace_rows, P24_TRACE_ROWS);
+    }
+
+    #[test]
+    fn high_degree_profile_constructs_and_verifies_a_p24_proof() {
+        let input = core::array::from_fn(|index| index as u32 + 1);
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let output = reference.permutation(input).unwrap();
+        let air = Poseidon2P24Air::from_reference(&reference);
+        let trace = build_p24_trace(&air, input);
+        let public_values = input
+            .into_iter()
+            .chain(output)
+            .map(Val::from_u32)
+            .collect::<Vec<_>>();
+        let config = make_high_degree_hiding_config();
+        let proof = prove(&config, &air, trace, &public_values);
+
+        verify(&config, &air, &proof, &public_values)
+            .expect("the explicit high-degree profile should verify a P24 proof");
     }
 
     #[test]

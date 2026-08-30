@@ -34,10 +34,23 @@ randomness for proof generation. The test proves that this process-local
 randomness is not needed by a newly constructed verifier configuration with
 the same code-level parameters.
 
+## Explicit code-level descriptor
+
+`ResearchStarkVerifierProfileV1` now centralizes the two experimental P24
+profiles: `STANDARD_P24` uses FRI blowup `3`; `HIGH_DEGREE_P24` uses `4` for
+the full-depth membership and NXSM AIRs. Both fix 32 FRI queries, no proof of
+work, final polynomial log length `0`, maximum folding-arity log `1` and four
+random codewords. The constructor consumes this descriptor instead of carrying
+those values as scattered literals.
+
+This is deliberately a Rust-level research descriptor, not a protocol
+selection. Its source and locked dependencies still determine field, extension
+degree, hash/PCS types and serialization behavior.
+
 ## Crucial limitation: this is still not portable verification
 
-The configuration is implicit in Rust code and pinned library versions; it is
-not a public, versioned Noxis verifier descriptor. The process-boundary test
+The configuration is now explicit in a versioned Rust descriptor, but it is
+not a selected Noxis protocol verifier descriptor. The process-boundary test
 uses the same test executable and pinned dependency set, so it does not
 establish cross-version, cross-machine or independent-implementation
 compatibility.
@@ -60,9 +73,9 @@ portable proof system.
 2. Define a public, versioned verifier descriptor that fixes field, AIR,
    Poseidon parameters, FRI/PCS parameters, verifier material and dependency
    compatibility rules.
-3. Publish a descriptor that reconstructs the verification configuration (or
-   prescribes immutable verifier material) without relying on implicit Rust
-   code or process-local state.
+3. Extend the research descriptor into a canonical protocol descriptor that
+   also fixes field, AIR, hash/PCS types, dependency compatibility and any
+   immutable verifier material.
 4. Specify a bounded canonical proof envelope in the wire/storage registry,
    including parser behavior, upgrade policy and negative test vectors.
 5. Add cross-process and independent-implementation verification evidence,

@@ -137,6 +137,13 @@ formato de prova, compatibilidade entre versões/máquinas ou perfil selecionado
 Ver
 [`STARK_VERIFIER_PROFILE_RESEARCH_V0_1.md`](STARK_VERIFIER_PROFILE_RESEARCH_V0_1.md).
 
+**Parâmetros de pesquisa explícitos:** os valores FRI/PCS que antes apareciam
+espalhados no construtor do experimento agora pertencem a dois descritores Rust
+versionados: o perfil P24 normal (`log_blowup = 3`) e o de AIRs de grau alto
+(`log_blowup = 4`). Ambos fixam consultas, aridade, PoW e codewords aleatórios
+e são usados diretamente pelo construtor. Isso melhora auditabilidade, mas não
+seleciona backend, cria um formato Noxis de prova ou habilita liquidação.
+
 **Preflight de intenção e posse:** para uma entrada da declaração `NXPU`, o
 contrato de prova agora executa e verifica o `H_INTENT` canônico e a posse
 ancorada contra a mesma âncora e estado local, retendo apenas um recibo público

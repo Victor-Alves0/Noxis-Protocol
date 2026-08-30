@@ -21,7 +21,7 @@ use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{Proof, prove, verify};
 
 use crate::{
-    P24_ROUNDS, Poseidon2P24Air, StarkExperimentError, Val, make_hiding_config_with_log_blowup,
+    P24_ROUNDS, Poseidon2P24Air, StarkExperimentError, Val, make_high_degree_hiding_config,
     matrix_expression, matrix_values, round_values,
 };
 
@@ -860,7 +860,7 @@ pub fn prove_p24_note_ownership_path32(
             // the full-depth path AIR, which requires a four-bit FRI blowup.
             // The generic three-bit research configuration is insufficient
             // here and yields an invalid quotient opening at verification.
-            let config = make_hiding_config_with_log_blowup(4);
+            let config = make_high_degree_hiding_config();
             let proof = prove(&config, &air, trace, &public_values);
             Ok(Poseidon2P24OwnershipProof {
                 config,
