@@ -53,22 +53,25 @@ Os testes verificam que `NXKB` é codificado/decodificado e restaurado entre doi
 diretórios temporários distintos, com `NXKA` também codificado/decodificado de
 forma independente. Eles também verificam que recibo incompatível falha antes
 de escrever sequer o cabeçalho de destino, e que truncamento ou substituição de
-cabeçalho é rejeitado.
+cabeçalho é rejeitado. Uma restauração interrompida após o cabeçalho e antes do
+payload é retomada pelo mesmo bundle/recibo sem sobrescrever bytes.
 
 ## Limites deliberados
 
 - Os dados do teste ainda representam apenas ciphertext de uma raiz sintética.
 - O bundle é um formato de transporte, não uma UX de backup, um arquivo de
   recuperação de senha ou um mecanismo de custódia.
-- A restauração possui duas publicações (cabeçalho e payload); uma interrupção
-  entre elas ainda requer tratamento explícito antes de qualquer segredo real.
+- A restauração possui duas publicações (cabeçalho e payload). A repetição do
+  mesmo bundle após a primeira publicação é testada e idempotente, mas ainda
+  faltam testes de término real de processo e de todos os pontos de falha do
+  sistema de arquivos.
 - Não há teste entre processos, cópia para mídia externa, sincronização remota
   ou garantia de que o usuário guardou `NXKA` em local independente.
 
 ## Próximo gate
 
 Criar uma demonstração operacional sintética que execute captura, cópia e
-restauração em processos separados e testar cada ponto de interrupção da
-restauração. Só depois de resolver essa atomicidade operacional, inventariar os
-segredos de uma wallet e passar por revisão independente será aceitável propor
-um container real.
+restauração em processos separados e testar término real de processo nos
+pontos de recuperação. Só depois de resolver essa atomicidade operacional,
+inventariar os segredos de uma wallet e passar por revisão independente será
+aceitável propor um container real.

@@ -309,6 +309,13 @@ mod tests {
                 .unwrap(),
             payload
         );
+        assert_eq!(
+            bundle.restore(&destination, serialized_anchor).unwrap(),
+            RecoveryRestoreOutcome {
+                header: HeaderStoreInitializeOutcome::AlreadyInitialized,
+                payload: PayloadStorePublishOutcome::AlreadyPublished,
+            }
+        );
         drop(destination);
         std::fs::remove_dir_all(source_root).unwrap();
         std::fs::remove_dir_all(destination_root).unwrap();
@@ -346,6 +353,53 @@ mod tests {
             destination.load(),
             Err(HeaderStoreError::Io { .. })
         ));
+        drop(destination);
+        std::fs::remove_dir_all(source_root).unwrap();
+        std::fs::remove_dir_all(destination_root).unwrap();
+    }
+
+    #[test]
+    fn restore_resumes_after_interruption_between_header_and_payload_publication() {
+        let source_root = test_directory("resume-source");
+        let destination_root = test_directory("resume-destination");
+        let header = header();
+        let payload = synthetic_payload(header, 7, 9);
+        let external_anchor = anchor_for(header, payload);
+        let bundle = {
+            let source = CandidateKeystoreHeaderStore::open(&source_root).unwrap();
+            source.initialize(header).unwrap();
+            source
+                .open_payloads()
+                .unwrap()
+                .publish(payload, external_anchor)
+                .unwrap();
+            CandidateSyntheticRecoveryBundleV1::capture(&source, external_anchor).unwrap()
+        };
+        {
+            let destination = CandidateKeystoreHeaderStore::open(&destination_root).unwrap();
+            // This is the durable state a process can leave after publishing
+            // the header but before it opens the payload store.
+            assert_eq!(
+                destination.initialize(header).unwrap(),
+                HeaderStoreInitializeOutcome::Initialized
+            );
+        }
+        let destination = CandidateKeystoreHeaderStore::open(&destination_root).unwrap();
+        assert_eq!(
+            bundle.restore(&destination, external_anchor).unwrap(),
+            RecoveryRestoreOutcome {
+                header: HeaderStoreInitializeOutcome::AlreadyInitialized,
+                payload: PayloadStorePublishOutcome::Published,
+            }
+        );
+        assert_eq!(
+            destination
+                .open_payloads()
+                .unwrap()
+                .load_anchored(external_anchor)
+                .unwrap(),
+            payload
+        );
         drop(destination);
         std::fs::remove_dir_all(source_root).unwrap();
         std::fs::remove_dir_all(destination_root).unwrap();
