@@ -14,7 +14,8 @@ privadas de saída. A execução faz, nesta ordem:
    conservação privada `u128` por bytes/carries e os dois slots públicos de
    commitment de saída da `NXPU`;
 3. prova e verifica `H_INTENT` **uma única vez**;
-4. prova e verifica posse/Merkle de profundidade 32 para cada input;
+4. passa os commitments de entrada recém-verificados às duas provas de
+   posse/Merkle de profundidade 32, que os igualam ao próprio `H_NOTE` interno;
 5. prova e verifica `H_NOTE` com vínculo do ativo público para cada output;
 6. confere todos os resultados públicos contra os slots canônicos da mesma
    intenção e devolve apenas um recibo de resultados públicos.
@@ -49,8 +50,8 @@ Esta execução **não** é uma transação privada submetível. Ainda não há:
 - AIR única que absorva todas as relações;
 - agregação ou recursão das quatro provas;
 - prova privada da transição completa `NXSM` (a witness é local transparente);
-- uma AIR única que vincule a conservação já aritmetizada às relações de
-  `H_INTENT`, posse, nullifier e semântica restante de abertura;
+- uma AIR única que absorva a ponte local entre conservação/posse e vincule
+  `H_INTENT`, nullifier e semântica restante de abertura;
 - AIR que recompute o vínculo já checado localmente entre commitment de saída,
   slot e envelope cifrado/digest de ciphertext, além da ponte entre `H_ADDR` e
   a chave híbrida de recebimento;
@@ -68,7 +69,8 @@ recibo. A variante usada pelo preflight também vincula os `H_NOTE` de saída ao
 slots públicos da `NXPU`. O preflight continua a fazer a checagem local antes
 do provador para produzir rejeições claras. A relação isolada ainda não é uma
 prova transferível nem está ligada dentro de uma única AIR ao `H_INTENT`, aos
-nullifiers ou à posse; ver
+nullifiers ou à posse; as duas provas de posse recebem os mesmos commitments de
+entrada apenas como bridge local de pesquisa. Ver
 [`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
 
 ## Como reproduzir
@@ -82,12 +84,14 @@ duas saídas privadas ordenadas canonicamente e uma mesma âncora candidata. Em
 seguida cifra as duas saídas em `NXRE`, valida o `NXPT` ligado aos digests e
 executa toda a sequência; também testa rejeição ao alterar o commitment de
 intenção retido. Como o backend atual não agrega provas, o teste é
-computacionalmente mais caro que as verificações unitárias isoladas. Na máquina
-de desenvolvimento de referência, a execução release mais recente, medida em
-2026-08-30 com vínculo de pacote/envelope nas duas saídas, terminou em **466,64
-segundos**; durante uma execução anterior comparável, o processo observado
-atingiu aproximadamente **4 GB** de memória residente. Esses números são uma
-medição de pesquisa local, não meta de desempenho nem garantia operacional.
+computacionalmente mais caro que as verificações unitárias isoladas. A medição
+histórica de **466,64 segundos**, feita em 2026-08-30 antes da ponte de
+commitments de entrada, não deve ser tratada como desempenho do fluxo atual.
+O teste release completo com a ponte passou; uma nova medição controlada deve
+substituir o número histórico antes de qualquer comparação. Execuções de posse
+de profundidade 32 podem usar aproximadamente **4 GB** de memória residente.
+Esses números são pesquisa local, não meta de desempenho nem garantia
+operacional.
 
 ## Próximo passo correto
 

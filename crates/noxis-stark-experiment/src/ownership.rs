@@ -29,6 +29,8 @@ const KEY_BYTES: usize = 32;
 const NOTE_BYTES: usize = 178;
 const POSITION_BYTES: usize = 4;
 const DIGEST_LANES: usize = 16;
+const OWNERSHIP_PUBLIC_VALUES: usize = DIGEST_LANES * 2;
+const NOTE_COMMITMENT_BINDING_OFFSET: usize = OWNERSHIP_PUBLIC_VALUES;
 const DIGEST_BYTES: usize = DIGEST_LANES * 4;
 const BITS_PER_BYTE: usize = 8;
 const RATE: usize = 15;
@@ -119,6 +121,9 @@ pub struct Poseidon2P24OwnershipProof {
     config: crate::Config,
     proof: Proof<crate::Config>,
     public_result: Poseidon2P24OwnershipExperimentResult,
+    /// Present only for the local research variant that binds the private
+    /// `H_NOTE` result to a supplied public commitment.
+    bound_note_commitment: Option<BabyBearDigestV2>,
 }
 
 impl Poseidon2P24OwnershipProof {
@@ -151,10 +156,14 @@ struct Poseidon2P24OwnershipAir {
     nullifier_iv: [u32; 9],
     leaf_iv: [u32; 9],
     node_iv: [u32; 9],
+    bind_note_commitment: bool,
 }
 
 impl Poseidon2P24OwnershipAir {
-    fn from_reference(reference: &Poseidon2P24Reference) -> Result<Self, StarkExperimentError> {
+    fn from_reference_with_note_commitment(
+        reference: &Poseidon2P24Reference,
+        bind_note_commitment: bool,
+    ) -> Result<Self, StarkExperimentError> {
         let manifest = CandidatePoseidon2P24NoteDomainsManifestV1::new();
         let tree_manifest = CandidatePoseidon2P24ManifestV2::new();
         Ok(Self {
@@ -164,6 +173,7 @@ impl Poseidon2P24OwnershipAir {
             nullifier_iv: manifest.iv(Poseidon2P24NoteDomainV1::Nullifier)?,
             leaf_iv: tree_manifest.iv(Poseidon2P24TreeDomainV1::Leaf)?,
             node_iv: tree_manifest.iv(Poseidon2P24TreeDomainV1::Node)?,
+            bind_note_commitment,
         })
     }
 
@@ -424,7 +434,11 @@ impl<F> BaseAir<F> for Poseidon2P24OwnershipAir {
     }
 
     fn num_public_values(&self) -> usize {
-        DIGEST_LANES * 2
+        if self.bind_note_commitment {
+            OWNERSHIP_PUBLIC_VALUES + DIGEST_LANES
+        } else {
+            OWNERSHIP_PUBLIC_VALUES
+        }
     }
 
     fn max_constraint_degree(&self) -> Option<usize> {
@@ -586,6 +600,14 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24OwnershipAir {
             NOTE_SQUEEZE_PHASE,
             &note_output,
         );
+        if self.bind_note_commitment {
+            for lane in 0..DIGEST_LANES {
+                builder.assert_eq(
+                    witness[NOTE_DIGEST_OFFSET + lane],
+                    public_values[NOTE_COMMITMENT_BINDING_OFFSET + lane],
+                );
+            }
+        }
         let public_nullifier = public_values[..DIGEST_LANES]
             .iter()
             .copied()
@@ -813,10 +835,53 @@ pub fn prove_p24_note_ownership_path32(
     leaf_position: u32,
     siblings: [BabyBearDigestV2; MEMBERSHIP_DEPTH],
 ) -> Result<Poseidon2P24OwnershipProof, StarkExperimentError> {
+    prove_p24_note_ownership_path32_with_note_commitment_binding(
+        nullifier_key,
+        note_preimage,
+        leaf_position,
+        siblings,
+        None,
+    )
+}
+
+/// Produces one depth-32 ownership proof while constraining the private
+/// `H_NOTE(note_preimage)` result to the supplied public research commitment.
+///
+/// The extra commitment is not a transaction field or portable proof input.
+/// It exists only so a local composition can require this ownership witness to
+/// use the same input note as another independently verified relation.
+pub fn prove_p24_note_ownership_path32_bound_note_commitment(
+    nullifier_key: [u8; KEY_BYTES],
+    note_preimage: [u8; NOTE_BYTES],
+    leaf_position: u32,
+    siblings: [BabyBearDigestV2; MEMBERSHIP_DEPTH],
+    expected_note_commitment: BabyBearDigestV2,
+) -> Result<Poseidon2P24OwnershipProof, StarkExperimentError> {
+    prove_p24_note_ownership_path32_with_note_commitment_binding(
+        nullifier_key,
+        note_preimage,
+        leaf_position,
+        siblings,
+        Some(expected_note_commitment),
+    )
+}
+
+fn prove_p24_note_ownership_path32_with_note_commitment_binding(
+    nullifier_key: [u8; KEY_BYTES],
+    note_preimage: [u8; NOTE_BYTES],
+    leaf_position: u32,
+    siblings: [BabyBearDigestV2; MEMBERSHIP_DEPTH],
+    expected_note_commitment: Option<BabyBearDigestV2>,
+) -> Result<Poseidon2P24OwnershipProof, StarkExperimentError> {
     let reference = Poseidon2P24Reference::load_candidate()?;
     let private_reference = Poseidon2P24PrivacyReference::load_candidate()?;
     let recipient_commitment = private_reference.hash_addr(&nullifier_key)?;
     let note_commitment = private_reference.hash_note(&note_preimage)?;
+    if let Some(expected_note_commitment) = expected_note_commitment
+        && note_commitment != expected_note_commitment
+    {
+        return Err(StarkExperimentError::OwnershipNoteCommitmentMismatch);
+    }
     let tree_leaf = reference.leaf(note_commitment)?;
     let directions: [bool; MEMBERSHIP_DEPTH] =
         core::array::from_fn(|level| ((leaf_position >> level) & 1) == 1);
@@ -832,7 +897,10 @@ pub fn prove_p24_note_ownership_path32(
     let nullifier_preimage =
         make_nullifier_preimage(nullifier_key, note_preimage, note_commitment, leaf_position);
     let nullifier = private_reference.hash_nullifier_preimage(&nullifier_preimage)?;
-    let air = Poseidon2P24OwnershipAir::from_reference(&reference)?;
+    let air = Poseidon2P24OwnershipAir::from_reference_with_note_commitment(
+        &reference,
+        expected_note_commitment.is_some(),
+    )?;
     let witness = OwnershipTraceWitness {
         nullifier_key,
         note_preimage,
@@ -844,11 +912,14 @@ pub fn prove_p24_note_ownership_path32(
         intermediates,
     };
     let trace = build_ownership_trace(&air, &witness);
-    let public_values = nullifier
+    let mut public_values = nullifier
         .into_iter()
         .chain(root)
         .map(Val::from_u32)
         .collect::<Vec<_>>();
+    if let Some(expected_note_commitment) = expected_note_commitment {
+        public_values.extend(expected_note_commitment.map(Val::from_u32));
+    }
     // The composed depth-32 relation builds a substantially larger AIR than
     // the shallow ownership experiment. Keep the prover on the same explicit
     // 64 MiB stack budget as the standalone full-depth path prover.
@@ -870,6 +941,7 @@ pub fn prove_p24_note_ownership_path32(
                     root,
                     trace_rows: TRACE_ROWS,
                 },
+                bound_note_commitment: expected_note_commitment,
             })
         })
         .map_err(|_| StarkExperimentError::ProverThreadFailed)?;
@@ -887,14 +959,20 @@ pub fn verify_p24_note_ownership_proof(
     ownership_proof: &Poseidon2P24OwnershipProof,
 ) -> Result<Poseidon2P24OwnershipExperimentResult, StarkExperimentError> {
     let reference = Poseidon2P24Reference::load_candidate()?;
-    let air = Poseidon2P24OwnershipAir::from_reference(&reference)?;
-    let public_values = ownership_proof
+    let air = Poseidon2P24OwnershipAir::from_reference_with_note_commitment(
+        &reference,
+        ownership_proof.bound_note_commitment.is_some(),
+    )?;
+    let mut public_values = ownership_proof
         .public_result
         .nullifier
         .into_iter()
         .chain(ownership_proof.public_result.root)
         .map(Val::from_u32)
         .collect::<Vec<_>>();
+    if let Some(expected_note_commitment) = ownership_proof.bound_note_commitment {
+        public_values.extend(expected_note_commitment.map(Val::from_u32));
+    }
     verify(
         &ownership_proof.config,
         &air,
@@ -915,6 +993,25 @@ pub fn prove_and_verify_p24_note_ownership_path32(
 ) -> Result<Poseidon2P24OwnershipExperimentResult, StarkExperimentError> {
     let proof =
         prove_p24_note_ownership_path32(nullifier_key, note_preimage, leaf_position, siblings)?;
+    verify_p24_note_ownership_proof(&proof)
+}
+
+/// Produces and independently verifies a depth-32 ownership proof while
+/// binding the private note commitment to one supplied local research value.
+pub fn prove_and_verify_p24_note_ownership_path32_bound_note_commitment(
+    nullifier_key: [u8; KEY_BYTES],
+    note_preimage: [u8; NOTE_BYTES],
+    leaf_position: u32,
+    siblings: [BabyBearDigestV2; MEMBERSHIP_DEPTH],
+    expected_note_commitment: BabyBearDigestV2,
+) -> Result<Poseidon2P24OwnershipExperimentResult, StarkExperimentError> {
+    let proof = prove_p24_note_ownership_path32_bound_note_commitment(
+        nullifier_key,
+        note_preimage,
+        leaf_position,
+        siblings,
+        expected_note_commitment,
+    )?;
     verify_p24_note_ownership_proof(&proof)
 }
 
@@ -1294,12 +1391,17 @@ mod tests {
     #[test]
     fn ownership_stark_binds_one_private_key_note_position_leaf_and_path_to_the_public_root() {
         let (key, note, position) = valid_witness();
-        let mut proof =
-            prove_p24_note_ownership_path32(key, note, position, synthetic_merkle_siblings())
-                .unwrap();
-        let result = verify_p24_note_ownership_proof(&proof).unwrap();
         let reference = Poseidon2P24PrivacyReference::load_candidate().unwrap();
         let commitment = reference.hash_note(&note).unwrap();
+        let mut proof = prove_p24_note_ownership_path32_bound_note_commitment(
+            key,
+            note,
+            position,
+            synthetic_merkle_siblings(),
+            commitment,
+        )
+        .unwrap();
+        let result = verify_p24_note_ownership_proof(&proof).unwrap();
         let expected = reference
             .hash_nullifier_preimage(&make_nullifier_preimage(key, note, commitment, position))
             .unwrap();
@@ -1325,6 +1427,26 @@ mod tests {
         assert!(matches!(
             verify_p24_note_ownership_proof(&proof),
             Err(StarkExperimentError::VerificationFailed)
+        ));
+    }
+
+    #[test]
+    fn bound_ownership_rejects_a_different_note_commitment_before_proving() {
+        let (key, note, position) = valid_witness();
+        let mut wrong_commitment = Poseidon2P24PrivacyReference::load_candidate()
+            .unwrap()
+            .hash_note(&note)
+            .unwrap();
+        wrong_commitment[0] += 1;
+        assert!(matches!(
+            prove_p24_note_ownership_path32_bound_note_commitment(
+                key,
+                note,
+                position,
+                synthetic_merkle_siblings(),
+                wrong_commitment,
+            ),
+            Err(StarkExperimentError::OwnershipNoteCommitmentMismatch)
         ));
     }
 
@@ -1360,7 +1482,8 @@ mod tests {
                 Val::from_u32(root[index - DIGEST_LANES])
             }
         });
-        let air = Poseidon2P24OwnershipAir::from_reference(&reference).unwrap();
+        let air = Poseidon2P24OwnershipAir::from_reference_with_note_commitment(&reference, false)
+            .unwrap();
         let witness = OwnershipTraceWitness {
             nullifier_key: key,
             note_preimage: note,
@@ -1373,6 +1496,22 @@ mod tests {
         };
         let trace = build_ownership_trace(&air, &witness);
         p3_air::check_constraints(&air, &trace, &public_values);
+
+        let bound_air =
+            Poseidon2P24OwnershipAir::from_reference_with_note_commitment(&reference, true)
+                .unwrap();
+        let bound_trace = build_ownership_trace(&bound_air, &witness);
+        let mut bound_public_values: Vec<Val> = public_values.into();
+        bound_public_values.extend(commitment.map(Val::from_u32));
+        p3_air::check_constraints(&bound_air, &bound_trace, &bound_public_values);
+        let mut wrong_bound_commitment = bound_public_values;
+        wrong_bound_commitment[NOTE_COMMITMENT_BINDING_OFFSET] += Val::ONE;
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                p3_air::check_constraints(&bound_air, &bound_trace, &wrong_bound_commitment);
+            }))
+            .is_err()
+        );
 
         let assert_rejected =
             |trace: &RowMajorMatrix<Val>, public_values: &[Val; DIGEST_LANES * 2]| {

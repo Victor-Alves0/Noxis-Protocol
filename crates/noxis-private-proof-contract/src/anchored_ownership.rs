@@ -9,12 +9,14 @@
 use std::fmt;
 
 use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
+use noxis_poseidon2_reference::BabyBearDigestV2;
 use noxis_privacy_types::{MerkleRootV2, NullifierV2, PrivacyTypesError};
 use noxis_stark_experiment::{
     Poseidon2P24IntentExperimentResult, Poseidon2P24OwnershipExperimentResult,
     Poseidon2P24OwnershipProof, StarkExperimentError, prove_and_verify_p24_intent,
-    prove_and_verify_p24_note_ownership_path32, prove_p24_note_ownership_path32,
-    verify_p24_note_ownership_proof,
+    prove_and_verify_p24_note_ownership_path32,
+    prove_and_verify_p24_note_ownership_path32_bound_note_commitment,
+    prove_p24_note_ownership_path32, verify_p24_note_ownership_proof,
 };
 
 use crate::{
@@ -423,21 +425,80 @@ pub fn run_candidate_anchored_ownership_pair_preflight(
     first_witness: &CandidateAnchoredOwnershipWitnessV1,
     second_witness: &CandidateAnchoredOwnershipWitnessV1,
 ) -> Result<CandidateAnchoredOwnershipPairPreflightV1, CandidateAnchoredOwnershipError> {
+    run_candidate_anchored_ownership_pair_preflight_with_note_commitments(
+        statement,
+        pre_tree,
+        nxsm_witness,
+        first_witness,
+        second_witness,
+        None,
+    )
+}
+
+/// Runs both ownership proofs while binding each private `H_NOTE` to one
+/// supplied local research commitment. This is crate-visible because exposing
+/// input commitments would undermine the final transaction privacy model.
+pub(crate) fn run_candidate_anchored_ownership_pair_preflight_bound_note_commitments(
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+    nxsm_witness: &CandidateNxsmNullifierTransitionWitnessV1,
+    first_witness: &CandidateAnchoredOwnershipWitnessV1,
+    second_witness: &CandidateAnchoredOwnershipWitnessV1,
+    input_note_commitments: [BabyBearDigestV2; 2],
+) -> Result<CandidateAnchoredOwnershipPairPreflightV1, CandidateAnchoredOwnershipError> {
+    run_candidate_anchored_ownership_pair_preflight_with_note_commitments(
+        statement,
+        pre_tree,
+        nxsm_witness,
+        first_witness,
+        second_witness,
+        Some(input_note_commitments),
+    )
+}
+
+fn run_candidate_anchored_ownership_pair_preflight_with_note_commitments(
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+    nxsm_witness: &CandidateNxsmNullifierTransitionWitnessV1,
+    first_witness: &CandidateAnchoredOwnershipWitnessV1,
+    second_witness: &CandidateAnchoredOwnershipWitnessV1,
+    input_note_commitments: Option<[BabyBearDigestV2; 2]>,
+) -> Result<CandidateAnchoredOwnershipPairPreflightV1, CandidateAnchoredOwnershipError> {
     statement.revalidate(pre_tree)?;
     nxsm_witness.revalidate(statement.nullifier_transition())?;
-    let first_result = prove_and_verify_p24_note_ownership_path32(
-        first_witness.nullifier_key,
-        first_witness.note_preimage,
-        first_witness.leaf_position,
-        first_witness.siblings,
-    )?;
+    let first_result = if let Some(input_note_commitments) = input_note_commitments {
+        prove_and_verify_p24_note_ownership_path32_bound_note_commitment(
+            first_witness.nullifier_key,
+            first_witness.note_preimage,
+            first_witness.leaf_position,
+            first_witness.siblings,
+            input_note_commitments[0],
+        )?
+    } else {
+        prove_and_verify_p24_note_ownership_path32(
+            first_witness.nullifier_key,
+            first_witness.note_preimage,
+            first_witness.leaf_position,
+            first_witness.siblings,
+        )?
+    };
     validate_public_result(statement, pre_tree, nxsm_witness, 0, &first_result)?;
-    let second_result = prove_and_verify_p24_note_ownership_path32(
-        second_witness.nullifier_key,
-        second_witness.note_preimage,
-        second_witness.leaf_position,
-        second_witness.siblings,
-    )?;
+    let second_result = if let Some(input_note_commitments) = input_note_commitments {
+        prove_and_verify_p24_note_ownership_path32_bound_note_commitment(
+            second_witness.nullifier_key,
+            second_witness.note_preimage,
+            second_witness.leaf_position,
+            second_witness.siblings,
+            input_note_commitments[1],
+        )?
+    } else {
+        prove_and_verify_p24_note_ownership_path32(
+            second_witness.nullifier_key,
+            second_witness.note_preimage,
+            second_witness.leaf_position,
+            second_witness.siblings,
+        )?
+    };
     validate_public_result(statement, pre_tree, nxsm_witness, 1, &second_result)?;
     if first_result.nullifier == second_result.nullifier {
         return Err(CandidateAnchoredOwnershipError::DuplicateNullifier);

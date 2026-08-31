@@ -63,7 +63,9 @@ pub use nxsm::{
 pub use ownership::{
     Poseidon2P24OwnershipExperimentResult, Poseidon2P24OwnershipProof,
     prove_and_verify_p24_note_ownership, prove_and_verify_p24_note_ownership_path2,
-    prove_and_verify_p24_note_ownership_path32, prove_p24_note_ownership_path32,
+    prove_and_verify_p24_note_ownership_path32,
+    prove_and_verify_p24_note_ownership_path32_bound_note_commitment,
+    prove_p24_note_ownership_path32, prove_p24_note_ownership_path32_bound_note_commitment,
     run_p24_note_ownership_research_smoke, verify_p24_note_ownership_proof,
 };
 pub use profile::{RESEARCH_STARK_VERIFIER_PROFILE_VERSION, ResearchStarkVerifierProfileV1};
@@ -1356,6 +1358,7 @@ pub enum StarkExperimentError {
     ValueConservationInputOverflow,
     ValueConservationOutputOverflow,
     ValueConservationMismatch,
+    OwnershipNoteCommitmentMismatch,
     VerificationFailed,
     ProverThreadFailed,
 }
@@ -1501,6 +1504,8 @@ impl std::fmt::Display for StarkExperimentError {
             Self::ValueConservationMismatch => {
                 formatter.write_str("value-conservation input and output sums differ")
             }
+            Self::OwnershipNoteCommitmentMismatch => formatter
+                .write_str("ownership note does not match its supplied research commitment"),
             Self::VerificationFailed => {
                 formatter.write_str("Plonky3 rejected the research STARK proof")
             }

@@ -27,7 +27,8 @@ use crate::{
     CandidatePrivateTransferProofPublicStatementIdV1,
     CandidatePrivateTransferProofPublicStatementV1, CandidateValueConservationError,
     revalidate_candidate_anchored_ownership_pair_preflight,
-    revalidate_candidate_output_notes_preflight, run_candidate_anchored_ownership_pair_preflight,
+    revalidate_candidate_output_notes_preflight,
+    run_candidate_anchored_ownership_pair_preflight_bound_note_commitments,
     run_candidate_output_notes_preflight, run_candidate_value_conservation_preflight,
 };
 
@@ -124,7 +125,7 @@ pub fn run_candidate_private_transfer_stark_preflight(
     // This is a local transparent gate, not a substitute for the future AIR.
     // Run it before expensive STARK work so a malformed value/asset witness
     // cannot consume proving resources or be mistaken for a transfer preflight.
-    run_candidate_value_conservation_preflight(
+    let value_conservation = run_candidate_value_conservation_preflight(
         statement,
         pre_tree,
         input_witnesses,
@@ -133,12 +134,13 @@ pub fn run_candidate_private_transfer_stark_preflight(
 
     let intent_result = prove_and_verify_p24_intent(statement.air_public_inputs().intent())?;
     validate_intent_result(statement, &intent_result)?;
-    let ownership = run_candidate_anchored_ownership_pair_preflight(
+    let ownership = run_candidate_anchored_ownership_pair_preflight_bound_note_commitments(
         statement,
         pre_tree,
         nxsm_witness,
         &input_witnesses[0],
         &input_witnesses[1],
+        value_conservation.input_note_commitments(),
     )?;
     let outputs = run_candidate_output_notes_preflight(statement, pre_tree, output_witnesses)?;
 

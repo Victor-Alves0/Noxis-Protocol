@@ -42,7 +42,17 @@ de suas checagens transparentes de formato. Ele extrai os dois slots esperados
 da mesma `NXPU`; essas checagens dão erros claros para versão, ativo, zero,
 overflow ou desequilíbrio, e a STARK em seguida confirma as mesmas regras
 vinculadas aos quatro `H_NOTE` exatos e aos slots. O recibo retornado retém
-somente o ID da declaração `NXPU`, nunca valores, notas ou commitments.
+publicamente somente o ID da declaração `NXPU`, nunca valores, notas ou
+commitments. Internamente no crate, os dois commitments de entrada ficam vivos
+apenas até a ponte imediata para as provas de posse.
+
+No preflight completo, os dois commitments de entrada produzidos por esta
+relação não saem do crate: eles são passados diretamente às duas provas de
+posse/Merkle. Cada uma agora torna esse commitment um input público **local de
+pesquisa** e exige que seja igual ao `H_NOTE` calculado dentro da própria prova
+de posse. Assim, a conservação e a posse não podem usar aberturas de entrada
+diferentes na mesma execução. Essa ponte ainda é operacional entre duas provas
+independentes, não agregação nem uma AIR única.
 
 ## Como reproduzir
 
@@ -62,14 +72,14 @@ observam a rejeição das restrições.
 ## Limites que permanecem
 
 Esta relação não liga suas duas notas de entrada à prova de posse/Merkle ou aos
-nullifiers. Ela liga as saídas aos slots passados pela `NXPU`, mas ainda não
-prova dentro do mesmo AIR o `H_INTENT` que autentica a declaração, nem cobre
-envelopes `NXRE`, inserção na árvore ou estado `NXSM`. O preflight superior usa
-a mesma witness local para as relações restantes, mas isso é composição
-operacional sequencial, não uma prova agregada nem uma AIR completa. Não há
-formato de prova Noxis, verificador selecionado, admissão de consenso ou
-ativação de privacidade.
+nullifiers na mesma AIR. O preflight passa os commitments de entrada às provas
+de posse locais para impedir troca de witness entre as duas relações, mas ainda
+não há agregação. Ela liga as saídas aos slots passados pela `NXPU`, mas ainda
+não prova dentro do mesmo AIR o `H_INTENT` que autentica a declaração, nem
+cobre envelopes `NXRE`, inserção na árvore ou estado `NXSM`. Não há formato de
+prova Noxis, verificador selecionado, admissão de consenso ou ativação de
+privacidade.
 
-O próximo trabalho correto é compartilhar a witness e os vínculos públicos com
-`H_INTENT`, posse e nullifier dentro de uma composição auditável, sem publicar
-commitments de entrada na declaração final; então incluir o envelope.
+O próximo trabalho correto é passar de ponte operacional a uma composição que
+compartilhe witness e vínculos públicos com `H_INTENT` e nullifier, sem
+publicar commitments de entrada na declaração final; então incluir o envelope.

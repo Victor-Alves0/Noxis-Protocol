@@ -9,6 +9,7 @@
 use std::fmt;
 
 use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
+use noxis_poseidon2_reference::BabyBearDigestV2;
 use noxis_stark_experiment::{
     StarkExperimentError, prove_and_verify_p24_value_conservation_bound_outputs,
 };
@@ -29,16 +30,25 @@ const VALUE_LENGTH: usize = 16;
 const CANDIDATE_NOTE_VERSION: u16 = 1;
 
 /// Evidence that one process checked and locally verified the fixed 2x2
-/// value-conservation STARK against the exact candidate statement. It retains
-/// no note opening, amount, commitment or proof object.
+/// value-conservation STARK against the exact candidate statement. Its public
+/// API exposes no note opening, amount, commitment or proof object; two input
+/// commitments stay crate-visible only for the immediately following local
+/// ownership bridge.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CandidateValueConservationPreflightV1 {
     statement_id: CandidatePrivateTransferProofPublicStatementIdV1,
+    input_note_commitments: [BabyBearDigestV2; 2],
 }
 
 impl CandidateValueConservationPreflightV1 {
     pub const fn statement_id(&self) -> CandidatePrivateTransferProofPublicStatementIdV1 {
         self.statement_id
+    }
+
+    /// Local-only bridge to the next sequential research relation. It is
+    /// crate-visible so input commitments cannot become a transaction API.
+    pub(crate) const fn input_note_commitments(&self) -> [BabyBearDigestV2; 2] {
+        self.input_note_commitments
     }
 }
 
@@ -94,10 +104,11 @@ pub fn run_candidate_value_conservation_preflight(
         return Err(CandidateValueConservationError::ValueNotConserved);
     }
 
-    // Keep the exact witness openings inside the prover. The experimental
-    // result and opaque proof are deliberately dropped after verification;
-    // neither becomes a public transaction field.
-    let _stark_result = prove_and_verify_p24_value_conservation_bound_outputs(
+    // Keep the exact witness openings inside the prover. The opaque proof and
+    // output commitments are dropped after verification; only the two input
+    // commitments remain crate-visible for the immediately following local
+    // ownership bridge, never as transaction fields.
+    let stark_result = prove_and_verify_p24_value_conservation_bound_outputs(
         [
             *input_witnesses[0].note_preimage(),
             *input_witnesses[1].note_preimage(),
@@ -114,6 +125,10 @@ pub fn run_candidate_value_conservation_preflight(
 
     Ok(CandidateValueConservationPreflightV1 {
         statement_id: statement.statement_id(),
+        input_note_commitments: [
+            stark_result.note_commitments[0],
+            stark_result.note_commitments[1],
+        ],
     })
 }
 

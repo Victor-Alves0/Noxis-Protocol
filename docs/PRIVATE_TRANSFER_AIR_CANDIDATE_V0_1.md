@@ -36,6 +36,11 @@ dois slots públicos da `NXPU`; a relação ainda não se liga ao `H_INTENT`, à
 posse, ao nullifier ou ao envelope na mesma prova e, por isso, não é a AIR
 única da transferência.
 
+O preflight também preserva internamente os dois commitments de entrada da
+relação de conservação e os fornece às provas de posse, que os restringem ao
+`H_NOTE` interno. Isso impede usar notas de entrada diferentes entre essas
+provas sequenciais, mas não substitui uma AIR composta ou agregação.
+
 ## Testemunha privada e restrições
 
 Para cada entrada, a testemunha contém abertura da nota, chave de nullifier, posição e 32 irmãos Merkle. Para cada saída, contém abertura da nota. A declaração `NXNT` exige ainda dois caminhos `NXSM` de 512 irmãos na sequência prévia → intermediária → posterior, conforme a [interface de witness](PRIVATE_TRANSFER_WITNESS_CONSTRAINT_INTERFACE_CANDIDATE_V0_1.md). A AIR deverá impor:

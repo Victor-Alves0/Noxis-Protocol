@@ -32,6 +32,7 @@ pub use air_profile::{
     CANDIDATE_PRIVATE_TRANSFER_AIR_PROFILE_ID_DOMAIN, CandidatePrivateTransferAirProfileError,
     CandidatePrivateTransferAirProfileIdV1, CandidatePrivateTransferAirProfileV1,
 };
+pub(crate) use anchored_ownership::run_candidate_anchored_ownership_pair_preflight_bound_note_commitments;
 pub use anchored_ownership::{
     CandidateAnchoredOwnershipError, CandidateAnchoredOwnershipPairPreflightV1,
     CandidateAnchoredOwnershipProofV1, CandidateAnchoredOwnershipWitnessV1,
