@@ -75,7 +75,8 @@ Como próximo recorte executável, `noxis-stark-experiment` também contém uma
 AIR única para `H_INTENT`, conservação de quatro notas e a posse/Merkle da
 **primeira** entrada. O teste de restrições constrói um witness canônico e
 confirma as três famílias no mesmo traço de 8.192 linhas. Ela ainda não é usada
-pelo preflight normal nem foi promovida a prova completa medida: a segunda
+pelo preflight normal. Em 2026-08-31, a geração **e verificação** local em
+release dessa primeira prova composta passaram em **1.178,05 s**. A segunda
 posse, nullifier-transition e envelope continuam fora desse recorte.
 
 ## Como reproduzir

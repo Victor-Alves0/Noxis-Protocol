@@ -327,5 +327,17 @@ mod tests {
         public.extend(prepared.nullifier.map(Val::from_u32));
         public.extend(prepared.root.map(Val::from_u32));
         p3_air::check_constraints(&air, &trace, &public);
+        if std::env::var_os("NOXIS_RUN_COMPOSED_OWNERSHIP_PROOF").is_some() {
+            let result = prove_and_verify_p24_intent_value_first_input_ownership(
+                &intent,
+                notes,
+                key,
+                0,
+                [[0; 16]; MEMBERSHIP_DEPTH],
+            )
+            .unwrap();
+            assert_eq!(result.ownership.nullifier, prepared.nullifier);
+            assert_eq!(result.ownership.root, prepared.root);
+        }
     }
 }
