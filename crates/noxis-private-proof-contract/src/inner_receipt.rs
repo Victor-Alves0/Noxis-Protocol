@@ -38,3 +38,28 @@ pub fn candidate_inner_relation_receipt_id(
     hasher.update([input_index.unwrap_or(0xff)]);
     CandidateInnerRelationReceiptIdV1(hasher.finalize().into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relation_kind_and_input_index_are_domain_separated() {
+        // This checks the tags independently of a concrete NXPU fixture; the
+        // outer constructor supplies the statement identity at runtime.
+        let mut ids = std::collections::BTreeSet::new();
+        for (kind, index) in [
+            (CandidateInnerRelationKindV1::IntentValue, None),
+            (CandidateInnerRelationKindV1::InputOwnership, Some(0)),
+            (CandidateInnerRelationKindV1::InputOwnership, Some(1)),
+            (CandidateInnerRelationKindV1::NullifierTransition, None),
+        ] {
+            let mut hasher = Sha256::new();
+            hasher.update(CANDIDATE_INNER_RELATION_RECEIPT_ID_DOMAIN);
+            hasher.update([42; 32]);
+            hasher.update([kind as u8]);
+            hasher.update([index.unwrap_or(0xff)]);
+            assert!(ids.insert(<[u8; 32]>::from(hasher.finalize())));
+        }
+    }
+}
