@@ -175,7 +175,15 @@ fn validate_elements(input: &[u32]) -> Result<(), P24CoreError> {
 }
 
 fn add(left: u32, right: u32) -> u32 {
-    ((u64::from(left) + u64::from(right)) % u64::from(BABYBEAR_MODULUS)) as u32
+    // Both inputs are canonical, so their sum is strictly below 2p and also
+    // below `u32::MAX`. One conditional subtraction is the exact field
+    // reduction and avoids a 64-bit division in the zkVM.
+    let sum = left + right;
+    if sum >= BABYBEAR_MODULUS {
+        sum - BABYBEAR_MODULUS
+    } else {
+        sum
+    }
 }
 
 fn multiply(left: u32, right: u32) -> u32 {
