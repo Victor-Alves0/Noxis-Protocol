@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 
 mod air_profile;
 mod anchored_ownership;
+mod inner_receipt;
 mod nxsm_transition;
 mod nxsm_witness;
 mod output_notes;
@@ -43,6 +44,10 @@ pub use anchored_ownership::{
     run_candidate_anchored_ownership_pair_preflight,
     run_candidate_intent_anchored_ownership_pair_preflight,
     run_candidate_intent_anchored_ownership_preflight, verify_candidate_anchored_ownership,
+};
+pub use inner_receipt::{
+    CANDIDATE_INNER_RELATION_RECEIPT_ID_DOMAIN, CandidateInnerRelationKindV1,
+    CandidateInnerRelationReceiptIdV1, candidate_inner_relation_receipt_id,
 };
 pub use nxsm_transition::{
     CANDIDATE_NXSM_NULLIFIER_TRANSITION_ENCODED_LENGTH,
