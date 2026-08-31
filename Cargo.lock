@@ -737,6 +737,7 @@ dependencies = [
  "noxis-poseidon2-reference",
  "noxis-privacy-types",
  "noxis-tree-params",
+ "noxis-types",
  "p3-air",
  "p3-baby-bear",
  "p3-challenger",

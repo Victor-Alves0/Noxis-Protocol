@@ -40,6 +40,7 @@ use rand_chacha::ChaCha12Rng;
 mod addr;
 mod intent;
 mod intent_value_conservation;
+mod intent_value_first_ownership;
 mod note;
 mod nxsm;
 mod ownership;
@@ -55,6 +56,10 @@ pub use intent::{
 pub use intent_value_conservation::{
     Poseidon2P24IntentValueConservationExperimentResult,
     prove_and_verify_p24_intent_value_conservation,
+};
+pub use intent_value_first_ownership::{
+    Poseidon2P24IntentValueFirstOwnershipExperimentResult,
+    prove_and_verify_p24_intent_value_first_input_ownership,
 };
 pub use note::{
     Poseidon2P24NoteExperimentResult, Poseidon2P24NoteWithAssetExperimentResult,

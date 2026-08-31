@@ -71,6 +71,13 @@ prova transferível nem inclui nullifiers ou posse; as duas provas de posse
 recebem os mesmos commitments de entrada apenas como bridge local de pesquisa. Ver
 [`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
 
+Como próximo recorte executável, `noxis-stark-experiment` também contém uma
+AIR única para `H_INTENT`, conservação de quatro notas e a posse/Merkle da
+**primeira** entrada. O teste de restrições constrói um witness canônico e
+confirma as três famílias no mesmo traço de 8.192 linhas. Ela ainda não é usada
+pelo preflight normal nem foi promovida a prova completa medida: a segunda
+posse, nullifier-transition e envelope continuam fora desse recorte.
+
 ## Como reproduzir
 
 ```powershell
