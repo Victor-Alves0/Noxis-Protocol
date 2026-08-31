@@ -80,32 +80,22 @@ pub enum P24CoreError {
 /// Applies the frozen candidate permutation to a canonical state.
 pub fn permutation(input: BabyBearStateP24) -> Result<BabyBearStateP24, P24CoreError> {
     validate_elements(&input)?;
-    let external = external_matrix();
-    let internal = internal_matrix();
-    let constants = round_constants();
-    let mut state = matmul(&external, &input);
+    let mut state = matmul_parameters(P24_EXTERNAL_OFFSET, &input);
 
-    for constants in constants.iter().take(P24_HALF_FULL_ROUNDS) {
-        add_round_constants(&mut state, constants);
+    for round in 0..P24_HALF_FULL_ROUNDS {
+        add_round_constants(&mut state, round);
         apply_sbox_to_all(&mut state);
-        state = matmul(&external, &state);
+        state = matmul_parameters(P24_EXTERNAL_OFFSET, &state);
     }
-    for constants in constants
-        .iter()
-        .skip(P24_HALF_FULL_ROUNDS)
-        .take(P24_PARTIAL_ROUNDS)
-    {
-        state[0] = add(state[0], constants[0]);
+    for round in P24_HALF_FULL_ROUNDS..(P24_HALF_FULL_ROUNDS + P24_PARTIAL_ROUNDS) {
+        state[0] = add(state[0], round_constant(round, 0));
         state[0] = sbox_seven(state[0]);
-        state = matmul(&internal, &state);
+        state = internal_j_plus_diagonal(&state);
     }
-    for constants in constants
-        .iter()
-        .skip(P24_HALF_FULL_ROUNDS + P24_PARTIAL_ROUNDS)
-    {
-        add_round_constants(&mut state, constants);
+    for round in (P24_HALF_FULL_ROUNDS + P24_PARTIAL_ROUNDS)..P24_TOTAL_ROUNDS {
+        add_round_constants(&mut state, round);
         apply_sbox_to_all(&mut state);
-        state = matmul(&external, &state);
+        state = matmul_parameters(P24_EXTERNAL_OFFSET, &state);
     }
     Ok(state)
 }
@@ -175,32 +165,6 @@ pub fn root_from_note_path(
     Ok(current)
 }
 
-fn external_matrix() -> [[u32; P24_WIDTH]; P24_WIDTH] {
-    matrix_from(P24_EXTERNAL_OFFSET)
-}
-
-fn internal_matrix() -> [[u32; P24_WIDTH]; P24_WIDTH] {
-    matrix_from(P24_INTERNAL_OFFSET)
-}
-
-fn round_constants() -> [[u32; P24_WIDTH]; P24_TOTAL_ROUNDS] {
-    let mut constants = [[0_u32; P24_WIDTH]; P24_TOTAL_ROUNDS];
-    for (row, values) in constants.iter_mut().enumerate() {
-        let offset = P24_ROUND_CONSTANT_OFFSET + (row * P24_WIDTH);
-        values.copy_from_slice(&P24_PARAMETERS[offset..offset + P24_WIDTH]);
-    }
-    constants
-}
-
-fn matrix_from(offset: usize) -> [[u32; P24_WIDTH]; P24_WIDTH] {
-    let mut matrix = [[0_u32; P24_WIDTH]; P24_WIDTH];
-    for (row, values) in matrix.iter_mut().enumerate() {
-        let row_offset = offset + (row * P24_WIDTH);
-        values.copy_from_slice(&P24_PARAMETERS[row_offset..row_offset + P24_WIDTH]);
-    }
-    matrix
-}
-
 fn validate_elements(input: &[u32]) -> Result<(), P24CoreError> {
     for (index, value) in input.iter().copied().enumerate() {
         if value >= BABYBEAR_MODULUS {
@@ -218,21 +182,42 @@ fn multiply(left: u32, right: u32) -> u32 {
     ((u64::from(left) * u64::from(right)) % u64::from(BABYBEAR_MODULUS)) as u32
 }
 
-fn matmul(matrix: &[[u32; P24_WIDTH]; P24_WIDTH], state: &BabyBearStateP24) -> BabyBearStateP24 {
+fn matmul_parameters(offset: usize, state: &BabyBearStateP24) -> BabyBearStateP24 {
     let mut output = [0_u32; P24_WIDTH];
     for (row, result) in output.iter_mut().enumerate() {
         let mut accumulated = 0_u32;
         for column in 0..P24_WIDTH {
-            accumulated = add(accumulated, multiply(matrix[row][column], state[column]));
+            let matrix_value = P24_PARAMETERS[offset + (row * P24_WIDTH) + column];
+            accumulated = add(accumulated, multiply(matrix_value, state[column]));
         }
         *result = accumulated;
     }
     output
 }
 
-fn add_round_constants(state: &mut BabyBearStateP24, constants: &BabyBearStateP24) {
-    for (value, constant) in state.iter_mut().zip(constants) {
-        *value = add(*value, *constant);
+/// Applies the frozen internal matrix in its canonical `J + diagonal` form.
+///
+/// The candidate artifact stores its full 24×24 matrix for auditability, but
+/// validates it as this exact structure. Evaluating the structure directly
+/// preserves the permutation while avoiding 21 dense matrix products per
+/// permutation in a constrained guest.
+fn internal_j_plus_diagonal(state: &BabyBearStateP24) -> BabyBearStateP24 {
+    let sum = state.iter().copied().fold(0_u32, add);
+    core::array::from_fn(|index| {
+        add(
+            sum,
+            multiply(P24_PARAMETERS[P24_DIAGONAL_OFFSET + index], state[index]),
+        )
+    })
+}
+
+fn round_constant(round: usize, lane: usize) -> u32 {
+    P24_PARAMETERS[P24_ROUND_CONSTANT_OFFSET + (round * P24_WIDTH) + lane]
+}
+
+fn add_round_constants(state: &mut BabyBearStateP24, round: usize) {
+    for (lane, value) in state.iter_mut().enumerate() {
+        *value = add(*value, round_constant(round, lane));
     }
 }
 
