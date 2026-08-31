@@ -5,8 +5,9 @@
 //! permutation behind the Noxis candidate privacy primitives. It now also
 //! proves standalone private `H_ADDR` and `H_NOTE` preimage relations, plus a
 //! composed key-to-note-to-nullifier-to-leaf depth-32 membership relation. It
-//! does **not** yet prove nullifier absence, state-anchor acceptance, asset
-//! conservation, a private transfer, or any production privacy property.
+//! does **not** yet prove nullifier absence, state-anchor acceptance, a
+//! complete private transfer, or any production privacy property. The
+//! intent-bound value-conservation experiment remains only one local slice.
 
 use noxis_nullifier_tree_reference::NullifierTreeReferenceError;
 use noxis_poseidon2_privacy_reference::Poseidon2P24PrivacyReferenceError;
@@ -38,6 +39,7 @@ use rand_chacha::ChaCha12Rng;
 
 mod addr;
 mod intent;
+mod intent_value_conservation;
 mod note;
 mod nxsm;
 mod ownership;
@@ -49,6 +51,10 @@ pub use addr::{
 };
 pub use intent::{
     Poseidon2P24IntentExperimentResult, prove_and_verify_p24_intent, run_p24_intent_research_smoke,
+};
+pub use intent_value_conservation::{
+    Poseidon2P24IntentValueConservationExperimentResult,
+    prove_and_verify_p24_intent_value_conservation,
 };
 pub use note::{
     Poseidon2P24NoteExperimentResult, Poseidon2P24NoteWithAssetExperimentResult,

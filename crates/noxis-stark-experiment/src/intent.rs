@@ -23,20 +23,22 @@ use crate::{
     matrix_values, round_values,
 };
 
-const INTENT_ABSORB_PERMUTATIONS: usize = P24_INTENT_COMMITMENT_INPUT_ELEMENTS.div_ceil(15);
-const INTENT_PERMUTATIONS: usize = INTENT_ABSORB_PERMUTATIONS + 1;
-const INTENT_STEPS: usize = INTENT_PERMUTATIONS * P24_ROUNDS;
-const INTENT_TRACE_ROWS: usize = 512;
-const INTENT_SELECTOR_OFFSET: usize = P24_WIDTH;
-const INTENT_WITNESS_OFFSET: usize = INTENT_SELECTOR_OFFSET + INTENT_STEPS;
-const INTENT_BYTES: usize = PrivateTransferIntentV2::ENCODED_LENGTH;
+pub(crate) const INTENT_ABSORB_PERMUTATIONS: usize =
+    P24_INTENT_COMMITMENT_INPUT_ELEMENTS.div_ceil(15);
+pub(crate) const INTENT_PERMUTATIONS: usize = INTENT_ABSORB_PERMUTATIONS + 1;
+pub(crate) const INTENT_STEPS: usize = INTENT_PERMUTATIONS * P24_ROUNDS;
+pub(crate) const INTENT_TRACE_ROWS: usize = 512;
+pub(crate) const INTENT_SELECTOR_OFFSET: usize = P24_WIDTH;
+pub(crate) const INTENT_WITNESS_OFFSET: usize = INTENT_SELECTOR_OFFSET + INTENT_STEPS;
+pub(crate) const INTENT_BYTES: usize = PrivateTransferIntentV2::ENCODED_LENGTH;
 const INTENT_BITS_PER_BYTE: usize = 8;
-const INTENT_BYTES_OFFSET: usize = 0;
-const INTENT_BITS_OFFSET: usize = INTENT_BYTES_OFFSET + INTENT_BYTES;
-const INTENT_WITNESS_ELEMENTS: usize = INTENT_BITS_OFFSET + (INTENT_BYTES * INTENT_BITS_PER_BYTE);
-const INTENT_TRACE_WIDTH: usize = INTENT_WITNESS_OFFSET + INTENT_WITNESS_ELEMENTS;
-const INTENT_PUBLIC_VALUES: usize = P24_INTENT_COMMITMENT_INPUT_ELEMENTS + 16;
-const INTENT_COMMITMENT_OFFSET: usize = P24_INTENT_COMMITMENT_INPUT_ELEMENTS;
+pub(crate) const INTENT_BYTES_OFFSET: usize = 0;
+pub(crate) const INTENT_BITS_OFFSET: usize = INTENT_BYTES_OFFSET + INTENT_BYTES;
+pub(crate) const INTENT_WITNESS_ELEMENTS: usize =
+    INTENT_BITS_OFFSET + (INTENT_BYTES * INTENT_BITS_PER_BYTE);
+pub(crate) const INTENT_TRACE_WIDTH: usize = INTENT_WITNESS_OFFSET + INTENT_WITNESS_ELEMENTS;
+pub(crate) const INTENT_PUBLIC_VALUES: usize = P24_INTENT_COMMITMENT_INPUT_ELEMENTS + 16;
+pub(crate) const INTENT_COMMITMENT_OFFSET: usize = P24_INTENT_COMMITMENT_INPUT_ELEMENTS;
 
 /// Public result after a verified `H_INTENT(intent.encode())` candidate proof.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -49,13 +51,15 @@ pub struct Poseidon2P24IntentExperimentResult {
 
 /// AIR for `NXIC v1` over the 214 public `BytePack3LE` intent elements.
 #[derive(Clone, Debug)]
-struct Poseidon2P24IntentAir {
+pub(crate) struct Poseidon2P24IntentAir {
     permutation: Poseidon2P24Air,
     iv: [u32; 9],
 }
 
 impl Poseidon2P24IntentAir {
-    fn from_reference(reference: &Poseidon2P24Reference) -> Result<Self, StarkExperimentError> {
+    pub(crate) fn from_reference(
+        reference: &Poseidon2P24Reference,
+    ) -> Result<Self, StarkExperimentError> {
         Ok(Self {
             permutation: Poseidon2P24Air::from_reference(reference),
             iv: CandidatePoseidon2P24IntentCommitmentManifestV1::new()
@@ -84,6 +88,18 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24IntentAir {
         let main = builder.main();
         let local = main.current_slice();
         let next = main.next_slice();
+        self.eval_relation(builder, local, next, &public_values);
+    }
+}
+
+impl Poseidon2P24IntentAir {
+    pub(crate) fn eval_relation<AB: AirBuilder>(
+        &self,
+        builder: &mut AB,
+        local: &[AB::Var],
+        next: &[AB::Var],
+        public_values: &[AB::PublicVar],
+    ) {
         let local_state = &local[..P24_WIDTH];
         let next_state = &next[..P24_WIDTH];
         let selectors = &local[INTENT_SELECTOR_OFFSET..];
@@ -91,7 +107,7 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24IntentAir {
         let witness = &local[INTENT_WITNESS_OFFSET..];
         let next_witness = &next[INTENT_WITNESS_OFFSET..];
 
-        self.assert_canonical_packing::<AB>(builder, witness, &public_values);
+        self.assert_canonical_packing::<AB>(builder, witness, public_values);
         for lane in 0..INTENT_WITNESS_ELEMENTS {
             builder
                 .when_transition()
@@ -181,9 +197,7 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24IntentAir {
                 * (round_states[P24_ROUNDS - 1][0].clone() - public_output[15].clone()),
         );
     }
-}
 
-impl Poseidon2P24IntentAir {
     fn assert_canonical_packing<AB: AirBuilder>(
         &self,
         builder: &mut AB,
@@ -270,12 +284,25 @@ fn proof_and_verify(
         .map_err(|_| StarkExperimentError::VerificationFailed)
 }
 
-fn build_p24_intent_trace(
+pub(crate) fn build_p24_intent_trace(
     air: &Poseidon2P24IntentAir,
     encoded: [u8; INTENT_BYTES],
     packed: [u32; P24_INTENT_COMMITMENT_INPUT_ELEMENTS],
 ) -> RowMajorMatrix<Val> {
-    let mut values = Val::zero_vec(INTENT_TRACE_ROWS * INTENT_TRACE_WIDTH);
+    build_p24_intent_trace_with_rows(air, encoded, packed, INTENT_TRACE_ROWS)
+}
+
+pub(crate) fn build_p24_intent_trace_with_rows(
+    air: &Poseidon2P24IntentAir,
+    encoded: [u8; INTENT_BYTES],
+    packed: [u32; P24_INTENT_COMMITMENT_INPUT_ELEMENTS],
+    trace_rows: usize,
+) -> RowMajorMatrix<Val> {
+    assert!(
+        trace_rows >= INTENT_TRACE_ROWS,
+        "intent trace must contain all selector steps"
+    );
+    let mut values = Val::zero_vec(trace_rows * INTENT_TRACE_WIDTH);
     let mut raw_state = [Val::ZERO; P24_WIDTH];
     for lane in 0..15 {
         raw_state[lane] = Val::from_u32(packed[lane]);
@@ -285,7 +312,7 @@ fn build_p24_intent_trace(
     }
     let mut state = matrix_values(&air.permutation.external_matrix, &raw_state);
 
-    for row in 0..INTENT_TRACE_ROWS {
+    for row in 0..trace_rows {
         let offset = row * INTENT_TRACE_WIDTH;
         values[offset..offset + P24_WIDTH].copy_from_slice(&state);
         write_canonical_intent_witness(&mut values[offset + INTENT_WITNESS_OFFSET..], encoded);
@@ -320,7 +347,7 @@ fn write_canonical_intent_witness(witness: &mut [Val], encoded: [u8; INTENT_BYTE
     }
 }
 
-fn byte_pack3le(
+pub(crate) fn byte_pack3le(
     input: [u8; PrivateTransferIntentV2::ENCODED_LENGTH],
 ) -> [u32; P24_INTENT_COMMITMENT_INPUT_ELEMENTS] {
     core::array::from_fn(|index| {

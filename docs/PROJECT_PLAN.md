@@ -176,16 +176,16 @@ resultado com o ativo da intenção; valor, destinatário, aleatoriedades e
 conservação ainda não fazem parte dessa relação. Ver
 [`STARK_H_NOTE_ASSET_BINDING_RESEARCH_V0_1.md`](STARK_H_NOTE_ASSET_BINDING_RESEARCH_V0_1.md).
 
-**Conservação de valor dentro da AIR:** uma relação P3 separada agora abre
-quatro `H_NOTE` privados no mesmo traço, prende todos ao ativo público e prova
-que as duas entradas não nulas conservam valor `u128` sem overflow, usando os
-16 bytes canônicos e carries Booleanos. A variante do preflight também prende
-os dois `H_NOTE` de saída aos slots públicos de commitment da `NXPU`. A prova e
-os quatro commitments de pesquisa são verificados e descartados localmente;
-os dois de entrada permanecem internos e são passados às provas de posse, que
-os restringem ao próprio `H_NOTE`, evitando troca de witness entre relações
-sequenciais. Ela ainda não se une, numa única AIR, ao `H_INTENT`, à posse,
-nullifier ou envelope e não ativa privacidade. Ver
+**Conservação de valor composta ao intent:** uma relação P3 agora coloca no
+mesmo traço a AIR pública de `H_INTENT` e quatro `H_NOTE` privados. Ela prende
+todas as notas ao ativo público, prova que as duas entradas não nulas conservam
+valor `u128` sem overflow usando os 16 bytes canônicos e carries Booleanos, e
+recompõe os 128 bytes dos dois commitments de saída do intent para igualá-los
+aos `H_NOTE` privados. A prova e os commitments de pesquisa são verificados e
+descartados localmente; os dois de entrada permanecem internos e são passados
+às provas de posse, que os restringem ao próprio `H_NOTE`, evitando troca de
+witness entre relações sequenciais. Ela ainda não inclui posse, nullifier ou
+envelope e não ativa privacidade. Ver
 [`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
 
 **Transição local de estado privado:** `noxis-private-state` agora deriva,
@@ -270,11 +270,11 @@ como gates separados. Ver
 **Preflight STARK ligado ao pacote:** o contrato de prova agora aceita o
 recibo validado de `NXPT`, exige que sua intenção seja a mesma da declaração e
 só então exige ativo privado igual ao ativo público, conservação `u128` sem
-overflow, vínculo dos outputs aos slots e a ponte local dos commitments de
-entrada para duas posses. O teste release completo passa; a medida histórica de
-466,64 s é anterior a essa ponte e não representa o fluxo atual. Continua
-composição sequencial local, sem AIR única, prova portátil, atualização de
-estado ou ponte entre `H_ADDR` e a chave híbrida do destinatário. Ver
+overflow, vínculo dos outputs aos slots autenticados por `H_INTENT` e a ponte
+local dos commitments de entrada para duas posses. O teste release completo
+passou em 499,12 s em 2026-08-31. Continua composição parcial: não há AIR que
+inclua posse, nullifier, envelope e estado; tampouco prova portátil,
+atualização de estado ou ponte entre `H_ADDR` e a chave híbrida do destinatário. Ver
 [`PACKET_BOUND_STARK_PREFLIGHT_RESEARCH_V0_1.md`](PACKET_BOUND_STARK_PREFLIGHT_RESEARCH_V0_1.md).
 
 **Descriptor e raiz local de destinatário:** a wallet agora cria junto um

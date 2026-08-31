@@ -10,10 +10,9 @@ privadas de saída. A execução faz, nesta ordem:
 
 1. revalida a declaração pública, âncora e transição local de nullifiers;
 2. rejeita localmente versão, ativo, zero, overflow ou desequilíbrio com erros
-   precisos e então prova/verifica, no mesmo AIR, quatro `H_NOTE`, ativo comum,
-   conservação privada `u128` por bytes/carries e os dois slots públicos de
-   commitment de saída da `NXPU`;
-3. prova e verifica `H_INTENT` **uma única vez**;
+   precisos e então prova/verifica, no mesmo AIR composto, `H_INTENT`, quatro
+   `H_NOTE`, ativo comum, conservação privada `u128` por bytes/carries e o
+   vínculo byte a byte entre cada slot de saída do intent e seu `H_NOTE`;
 4. passa os commitments de entrada recém-verificados às duas provas de
    posse/Merkle de profundidade 32, que os igualam ao próprio `H_NOTE` interno;
 5. prova e verifica `H_NOTE` com vínculo do ativo público para cada output;
@@ -39,15 +38,15 @@ estas duas notas de saída produzem os commitments declarados pela mesma
 transação, com o mesmo ativo e valor conservado?” Se um commitment, nullifier,
 raiz, slot, ativo, valor ou `H_INTENT` não coincide, o caminho falha fechado.
 
-O código evita calcular `H_INTENT` duas vezes: os preflights de posse e de
-saída expõem variantes sem intent para que a composição superior faça essa
-prova uma vez e use uma única declaração compartilhada.
+O código evita calcular `H_INTENT` duas vezes: ele agora é parte da mesma AIR
+que prova conservação e os dois commitments de saída, enquanto os preflights
+de posse e de saída expõem variantes sem intent para compartilhar a declaração.
 
 ## O que continua faltando
 
 Esta execução **não** é uma transação privada submetível. Ainda não há:
 
-- AIR única que absorva todas as relações;
+- AIR única que absorva posse, nullifiers, envelope e transição de estado;
 - agregação ou recursão das quatro provas;
 - prova privada da transição completa `NXSM` (a witness é local transparente);
 - uma AIR única que absorva a ponte local entre conservação/posse e vincule
@@ -63,14 +62,13 @@ importantes, mas não são dependência deste crate: inverter a dependência cri
 um ciclo arquitetural. O próximo AIR deverá incorporar as relações, não ligar
 crates em ciclo.
 
-A conservação `u128` agora também é imposta pela relação STARK de quatro
-`H_NOTE`, com bytes range-checked e carries Booleanos, e não retém valores no
-recibo. A variante usada pelo preflight também vincula os `H_NOTE` de saída aos
-slots públicos da `NXPU`. O preflight continua a fazer a checagem local antes
-do provador para produzir rejeições claras. A relação isolada ainda não é uma
-prova transferível nem está ligada dentro de uma única AIR ao `H_INTENT`, aos
-nullifiers ou à posse; as duas provas de posse recebem os mesmos commitments de
-entrada apenas como bridge local de pesquisa. Ver
+A conservação `u128` agora também é imposta pela relação STARK composta de
+`H_INTENT` e quatro `H_NOTE`, com bytes range-checked e carries Booleanos, e
+não retém valores no recibo. A mesma AIR liga os `H_NOTE` de saída aos slots
+canônicos autenticados pelo intent. O preflight continua a fazer a checagem
+local antes do provador para produzir rejeições claras. Ela ainda não é uma
+prova transferível nem inclui nullifiers ou posse; as duas provas de posse
+recebem os mesmos commitments de entrada apenas como bridge local de pesquisa. Ver
 [`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
 
 ## Como reproduzir
@@ -84,11 +82,9 @@ duas saídas privadas ordenadas canonicamente e uma mesma âncora candidata. Em
 seguida cifra as duas saídas em `NXRE`, valida o `NXPT` ligado aos digests e
 executa toda a sequência; também testa rejeição ao alterar o commitment de
 intenção retido. Como o backend atual não agrega provas, o teste é
-computacionalmente mais caro que as verificações unitárias isoladas. A medição
-histórica de **466,64 segundos**, feita em 2026-08-30 antes da ponte de
-commitments de entrada, não deve ser tratada como desempenho do fluxo atual.
-O teste release completo com a ponte passou; uma nova medição controlada deve
-substituir o número histórico antes de qualquer comparação. Execuções de posse
+computacionalmente mais caro que as verificações unitárias isoladas. Em
+2026-08-31, a execução local em release, já com a AIR composta de intent e
+conservação, passou em **499,12 segundos**. Execuções de posse
 de profundidade 32 podem usar aproximadamente **4 GB** de memória residente.
 Esses números são pesquisa local, não meta de desempenho nem garantia
 operacional.

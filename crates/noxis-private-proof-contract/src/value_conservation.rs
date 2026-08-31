@@ -9,9 +9,11 @@
 use std::fmt;
 
 use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
+use noxis_poseidon2_privacy_reference::Poseidon2P24PrivacyReference;
 use noxis_poseidon2_reference::BabyBearDigestV2;
 use noxis_stark_experiment::{
-    StarkExperimentError, prove_and_verify_p24_value_conservation_bound_outputs,
+    Poseidon2P24IntentExperimentResult, StarkExperimentError,
+    prove_and_verify_p24_intent_value_conservation,
 };
 
 use crate::{
@@ -34,10 +36,11 @@ const CANDIDATE_NOTE_VERSION: u16 = 1;
 /// API exposes no note opening, amount, commitment or proof object; two input
 /// commitments stay crate-visible only for the immediately following local
 /// ownership bridge.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CandidateValueConservationPreflightV1 {
     statement_id: CandidatePrivateTransferProofPublicStatementIdV1,
     input_note_commitments: [BabyBearDigestV2; 2],
+    intent_result: Poseidon2P24IntentExperimentResult,
 }
 
 impl CandidateValueConservationPreflightV1 {
@@ -49,6 +52,13 @@ impl CandidateValueConservationPreflightV1 {
     /// crate-visible so input commitments cannot become a transaction API.
     pub(crate) const fn input_note_commitments(&self) -> [BabyBearDigestV2; 2] {
         self.input_note_commitments
+    }
+
+    /// The intent proof emitted by the composed value relation. Kept inside
+    /// this crate so callers cannot mistake the local result for a portable
+    /// transaction proof.
+    pub(crate) const fn intent_result(&self) -> &Poseidon2P24IntentExperimentResult {
+        &self.intent_result
     }
 }
 
@@ -104,31 +114,47 @@ pub fn run_candidate_value_conservation_preflight(
         return Err(CandidateValueConservationError::ValueNotConserved);
     }
 
-    // Keep the exact witness openings inside the prover. The opaque proof and
-    // output commitments are dropped after verification; only the two input
-    // commitments remain crate-visible for the immediately following local
-    // ownership bridge, never as transaction fields.
-    let stark_result = prove_and_verify_p24_value_conservation_bound_outputs(
+    // Preserve a precise, inexpensive error for a witness whose outputs do
+    // not match the public intent slots. The composed AIR repeats this exact
+    // binding cryptographically; this check merely avoids invoking a prover
+    // for a malformed local witness.
+    let privacy =
+        Poseidon2P24PrivacyReference::load_candidate().map_err(StarkExperimentError::from)?;
+    for (output_index, output_witness) in output_witnesses.iter().enumerate() {
+        if privacy
+            .hash_note(output_witness.note_preimage())
+            .map_err(StarkExperimentError::from)?
+            != statement.air_public_inputs().intent().output_commitments()[output_index].elements()
+        {
+            return Err(
+                StarkExperimentError::ValueConservationOutputCommitmentMismatch {
+                    index: output_index,
+                }
+                .into(),
+            );
+        }
+    }
+
+    // One composed AIR now proves H_INTENT, all four H_NOTE openings and
+    // value conservation together. Its final constraints bind the two output
+    // commitments encoded in the intent to the two private output notes.
+    let stark_result = prove_and_verify_p24_intent_value_conservation(
+        statement.air_public_inputs().intent(),
         [
             *input_witnesses[0].note_preimage(),
             *input_witnesses[1].note_preimage(),
             *output_witnesses[0].note_preimage(),
             *output_witnesses[1].note_preimage(),
         ],
-        expected_asset,
-        statement
-            .air_public_inputs()
-            .intent()
-            .output_commitments()
-            .map(|commitment| commitment.elements()),
     )?;
 
     Ok(CandidateValueConservationPreflightV1 {
         statement_id: statement.statement_id(),
         input_note_commitments: [
-            stark_result.note_commitments[0],
-            stark_result.note_commitments[1],
+            stark_result.values.note_commitments[0],
+            stark_result.values.note_commitments[1],
         ],
+        intent_result: stark_result.intent,
     })
 }
 

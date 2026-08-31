@@ -21,7 +21,7 @@ M[0..214)  = BytePack3LE(PrivateTransferIntentV2::encode()[640])
 H[0..16)  = H_INTENT(intent[640])
 ```
 
-`M[0]` até `M[212]` devem ser menores que `2^24`; `M[213]` deve ser menor que `2^8`. A fatia AIR atual já decompõe cada um dos 640 bytes privados do traço em oito bits Booleanos, recompõe os bytes e força cada `M` público a ser o `BytePack3LE` correspondente antes de reavaliar `H_INTENT`. Ela ainda não conecta esses bytes às witnesses de posse, abertura, valor ou nullifier; portanto não pode ser tratada como a relação completa.
+`M[0]` até `M[212]` devem ser menores que `2^24`; `M[213]` deve ser menor que `2^8`. A fatia AIR atual já decompõe cada um dos 640 bytes privados do traço em oito bits Booleanos, recompõe os bytes e força cada `M` público a ser o `BytePack3LE` correspondente antes de reavaliar `H_INTENT`. A composição executável também conecta os 128 bytes dos dois commitments de saída às duas aberturas `H_NOTE` privadas da conservação; ela ainda não conecta posse, entradas, nullifier ou envelope e não pode ser tratada como a relação completa.
 
 Os bytes recompostos carregam, na ordem já congelada: circuito, gênese, contexto de validação, estado anterior, parâmetros da árvore, raiz privada, ativo, dois nullifiers, dois commitments de saída e dois digests de envelopes. A moldura [`CandidatePrivateTransferAirPublicInputsV1`](../crates/noxis-private-proof-contract/src/public_inputs.rs) só pode ser construída de uma `PrivateTransferIntentV2` canônica e rederiva `H_INTENT`.
 
@@ -31,10 +31,9 @@ conservação inválida. A relação STARK de conservação agora também impõe
 regras usando os bytes privados das quatro pré-imagens `H_NOTE`, carries
 Booleanos e commitments de pesquisa; ver
 [`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
-Na variante usada pelo preflight, os `H_NOTE` de saída também são igualados aos
-dois slots públicos da `NXPU`; a relação ainda não se liga ao `H_INTENT`, à
-posse, ao nullifier ou ao envelope na mesma prova e, por isso, não é a AIR
-única da transferência.
+Na composição usada pelo preflight, os `H_NOTE` de saída são igualados aos dois
+slots já autenticados nos bytes do `H_INTENT`; ela ainda não inclui posse,
+nullifier ou envelope e, por isso, não é a AIR única da transferência.
 
 O preflight também preserva internamente os dois commitments de entrada da
 relação de conservação e os fornece às provas de posse, que os restringem ao
@@ -66,4 +65,4 @@ O deployment AIR precisa comprometer os IDs e bytes completos de P24, NXPH e NXI
 - A declaração [`NXPU v1`](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md) já une a moldura de notas, `NXPS v2` e `NXNT v1`, mas ainda não há AIR que demonstre a relação em zero conhecimento nem que atualize a raiz de notas.
 - `CircuitId`, `ProofVerifierId`, digest do programa AIR e backend STARK permanecem não selecionados.
 
-Essas lacunas são bloqueios de segurança, não detalhes de implementação. O perfil [`NXAR v1`](PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md) já congela a forma e as famílias de restrição existentes; o próximo artefato deve juntar a fatia `H_INTENT` a uma primeira família de witness, continuando a falhar fechado até existir backend auditado.
+Essas lacunas são bloqueios de segurança, não detalhes de implementação. O perfil [`NXAR v1`](PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md) já congela a forma e as famílias de restrição existentes; o próximo artefato deve juntar a composição atual à primeira família de posse/nullifier, continuando a falhar fechado até existir backend auditado.

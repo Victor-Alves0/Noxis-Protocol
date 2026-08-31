@@ -15,7 +15,7 @@ use noxis_private_packet_validation::{
 };
 use noxis_stark_experiment::{
     Poseidon2P24IntentExperimentResult, Poseidon2P24NoteWithAssetExperimentResult,
-    Poseidon2P24OwnershipExperimentResult, StarkExperimentError, prove_and_verify_p24_intent,
+    Poseidon2P24OwnershipExperimentResult, StarkExperimentError,
 };
 
 use crate::{
@@ -48,11 +48,10 @@ pub struct CandidatePrivateTransferStarkPreflightResultsV1 {
 
 /// Receipt from one complete run of the currently available proof relations.
 ///
-/// It proves `H_INTENT` exactly once, then sequentially checks two input
-/// ownership relations and two output-note relations against one `NXPU v1`
-/// statement. The `NXSM` witness remains transparent local material. This is
-/// operational composition only: it is not an AIR composition or proof
-/// recursion.
+/// Its value relation contains a composed `H_INTENT` + four `H_NOTE` AIR, then
+/// two input-ownership relations and two output-note relations run locally
+/// against the same `NXPU v1` statement. The `NXSM` witness remains transparent
+/// local material; this is not aggregation, recursion or settlement.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CandidatePrivateTransferStarkPreflightV1 {
     intent_result: Poseidon2P24IntentExperimentResult,
@@ -110,7 +109,8 @@ impl CandidatePrivateTransferStarkPreflightV1 {
 /// Executes every currently available candidate proof relation for a fixed 2×2
 /// private-transfer statement.
 ///
-/// First `H_INTENT` is proved and verified once. Then both input ownership
+/// First a single composed AIR binds `H_INTENT`, all four `H_NOTE` openings,
+/// the intent output slots and value conservation. Then both input ownership
 /// proofs and both output `H_NOTE` proofs run sequentially. Every result is
 /// bound to the same statement identity before it is retained.
 pub fn run_candidate_private_transfer_stark_preflight(
@@ -132,7 +132,7 @@ pub fn run_candidate_private_transfer_stark_preflight(
         output_witnesses,
     )?;
 
-    let intent_result = prove_and_verify_p24_intent(statement.air_public_inputs().intent())?;
+    let intent_result = value_conservation.intent_result().clone();
     validate_intent_result(statement, &intent_result)?;
     let ownership = run_candidate_anchored_ownership_pair_preflight_bound_note_commitments(
         statement,

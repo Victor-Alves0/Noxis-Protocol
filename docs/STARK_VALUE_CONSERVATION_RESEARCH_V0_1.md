@@ -17,9 +17,9 @@ A relação faz parte de `noxis-stark-experiment` e impõe, no mesmo AIR:
    menos significativo ao mais significativo, com carry Booleano explícito;
 5. os carries finais são zero — portanto nenhuma soma ultrapassa `u128` — e
    as duas somas são iguais.
-6. na variante usada pelo preflight, os commitments `H_NOTE` das duas saídas
-   são iguais aos dois slots públicos de saída fornecidos pela declaração
-   `NXPU`.
+6. na variante composta usada pelo preflight, os commitments `H_NOTE` das duas
+   saídas são iguais aos dois slots codificados nos bytes canônicos do mesmo
+   `H_INTENT`.
 
 Os valores, destinatários, `rho`, `rcm` e o restante das pré-imagens ficam no
 traço privado. A prova também range-checka todos os bytes das quatro notas com
@@ -28,23 +28,27 @@ decomposição em oito bits e recompõe o packing `BytePack3LE` usado por
 
 ## Interface pública de pesquisa
 
-O experimento recebe publicamente quatro commitments P24, o `asset_id` e, na
-variante vinculada, a cópia dos dois commitments de saída esperados. O AIR
-exige igualdade entre a cópia e os `H_NOTE` das saídas. Isso é necessário para
-testar a composição entre as quatro aberturas, a aritmética e os slots em um
-único AIR, mas **não é uma interface de transação Noxis**: revelar os
-commitments de entrada prejudicaria a privacidade. A API é apenas in-memory,
-verifica a prova na mesma execução e descarta tanto a prova opaca quanto esse
-resultado de pesquisa.
+O experimento isolado recebe publicamente quatro commitments P24 e o
+`asset_id`. A variante composta acrescenta os 230 elementos públicos já
+necessários a `H_INTENT`, mas não uma cópia dos slots de saída: ela os lê dos
+bytes autenticados desse intent. Isso é necessário para testar a composição
+entre quatro aberturas, aritmética e intenção em um único AIR, mas **não é uma
+interface de transação Noxis**: revelar os commitments de entrada prejudicaria
+a privacidade. A API é apenas in-memory, verifica a prova na mesma execução e
+descarta tanto a prova opaca quanto esse resultado de pesquisa.
 
-`run_candidate_value_conservation_preflight` usa a variante vinculada depois
-de suas checagens transparentes de formato. Ele extrai os dois slots esperados
-da mesma `NXPU`; essas checagens dão erros claros para versão, ativo, zero,
-overflow ou desequilíbrio, e a STARK em seguida confirma as mesmas regras
-vinculadas aos quatro `H_NOTE` exatos e aos slots. O recibo retornado retém
-publicamente somente o ID da declaração `NXPU`, nunca valores, notas ou
-commitments. Internamente no crate, os dois commitments de entrada ficam vivos
-apenas até a ponte imediata para as provas de posse.
+`prove_and_verify_p24_intent_value_conservation` é a variante composta usada
+por `run_candidate_value_conservation_preflight`. Ela coloca, no mesmo traço
+de 512 linhas, a AIR de `H_INTENT` e a AIR das quatro notas. Para cada um dos
+16 elementos BabyBear de cada saída, recompõe os quatro bytes little-endian do
+intent e exige igualdade com o commitment `H_NOTE` privado correspondente.
+Assim, não há cópia separada dos slots de saída como entrada pública da AIR:
+o vínculo usa os bytes que a própria AIR de `H_INTENT` já autenticou.
+
+As checagens transparentes continuam dando erros claros para versão, ativo,
+zero, overflow, desequilíbrio ou slot de saída incorreto antes do provador. O
+recibo retornado retém somente o ID da declaração `NXPU`; internamente, os dois
+commitments de entrada ficam vivos apenas até a ponte imediata para posse.
 
 No preflight completo, os dois commitments de entrada produzidos por esta
 relação não saem do crate: eles são passados diretamente às duas provas de
@@ -74,12 +78,11 @@ observam a rejeição das restrições.
 Esta relação não liga suas duas notas de entrada à prova de posse/Merkle ou aos
 nullifiers na mesma AIR. O preflight passa os commitments de entrada às provas
 de posse locais para impedir troca de witness entre as duas relações, mas ainda
-não há agregação. Ela liga as saídas aos slots passados pela `NXPU`, mas ainda
-não prova dentro do mesmo AIR o `H_INTENT` que autentica a declaração, nem
-cobre envelopes `NXRE`, inserção na árvore ou estado `NXSM`. Não há formato de
-prova Noxis, verificador selecionado, admissão de consenso ou ativação de
-privacidade.
+não há agregação. Ela agora liga as saídas dentro da mesma AIR ao `H_INTENT`,
+mas ainda não cobre envelopes `NXRE`, inserção na árvore ou estado `NXSM`.
+Não há formato de prova Noxis, verificador selecionado, admissão de consenso ou
+ativação de privacidade.
 
-O próximo trabalho correto é passar de ponte operacional a uma composição que
-compartilhe witness e vínculos públicos com `H_INTENT` e nullifier, sem
-publicar commitments de entrada na declaração final; então incluir o envelope.
+O próximo trabalho correto é acrescentar ao mesmo vínculo as duas relações de
+posse/Merkle e os nullifiers, sem publicar commitments de entrada na declaração
+final; então incluir o envelope.

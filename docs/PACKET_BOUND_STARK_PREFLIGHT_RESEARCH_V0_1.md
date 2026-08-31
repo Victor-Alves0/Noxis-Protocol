@@ -8,15 +8,15 @@ relações privadas depois de receber um recibo de
 `noxis-private-packet-validation`. Esse recibo garante que os dois `NXRE`
 canônicos pertencem aos dois digests públicos da mesma intenção `NXPT`.
 
-Em seguida, o preflight existente executa `H_INTENT` uma vez, duas relações de
-posse/inclusão e duas relações `H_NOTE` de saída contra a mesma declaração
-`NXPU`. Antes dessas provas, ele rejeita localmente ativo privado divergente,
+Em seguida, o preflight existente executa uma AIR composta de `H_INTENT`,
+quatro `H_NOTE` e conservação, duas relações de posse/inclusão e duas relações
+`H_NOTE` de saída contra a mesma declaração `NXPU`. Antes dessas provas, ele rejeita localmente ativo privado divergente,
 entrada de valor zero, overflow ou conservação `u128` inválida. O recibo final mantém ambos os comprovantes locais e pode revalidar os
 bytes do pacote antes de revalidar os resultados públicos retidos.
 
 ```text
 NXPT → NXRE[2] estritos → H_ENVELOPE[2] = intent digests
-     → mesma intent → H_INTENT + ownership[2] + H_NOTE[2]
+     → mesma intent → (H_INTENT + H_NOTE[4] + value) + ownership[2] + H_NOTE[2]
 ```
 
 ## Evidência reproduzida
@@ -25,10 +25,10 @@ NXPT → NXRE[2] estritos → H_ENVELOPE[2] = intent digests
 cargo test -p noxis-private-proof-contract --release --locked transfer_preflight::tests::executes_every_available_private_relation_for_one_statement -- --exact
 ```
 
-Em 2026-08-30, a execução local release mais recente passou em **466,64 segundos**. O teste
+Em 2026-08-31, a execução local release mais recente passou em **499,12 segundos**. O teste
 cria duas pré-imagens de saída de 178 bytes, cifra cada uma em um `NXRE`,
 calcula os digests candidatos nos slots canônicos, valida o pacote `NXPT` e só
-então executa as cinco relações disponíveis.
+então executa a relação composta, as duas posses e as duas relações de saída.
 
 ## Rejeições estabelecidas pela fronteira
 
@@ -43,9 +43,9 @@ então executa as cinco relações disponíveis.
 
 ## Limites importantes
 
-- As cinco provas seguem independentes e são descartadas após verificação;
-  não existe uma AIR única, agregação, recursão, serialização de prova ou
-  verificador portátil.
+- A AIR de intent/conservação é única, mas posse, nullifiers, envelope e estado
+  seguem independentes e são descartados após verificação; não existe
+  agregação, recursão, serialização de prova ou verificador portátil.
 - A relação `H_ADDR` ainda não prova que o commitment de recebimento da nota é
   a mesma chave X25519 + ML-KEM do `NXRE`. O teste cifra a pré-imagem de saída,
   mas essa ponte de chaves permanece um requisito de design criptográfico.

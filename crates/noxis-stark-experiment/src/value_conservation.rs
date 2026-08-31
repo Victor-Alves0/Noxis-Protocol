@@ -26,24 +26,24 @@ use crate::{
     matrix_values, round_values,
 };
 
-const NOTE_COUNT: usize = 4;
-const INPUT_NOTE_COUNT: usize = 2;
-const NOTE_INPUT_BYTES: usize = 178;
+pub(crate) const NOTE_COUNT: usize = 4;
+pub(crate) const INPUT_NOTE_COUNT: usize = 2;
+pub(crate) const NOTE_INPUT_BYTES: usize = 178;
 const NOTE_BITS_PER_BYTE: usize = 8;
 const NOTE_INPUT_ELEMENTS: usize = 60;
 const NOTE_ABSORB_PERMUTATIONS: usize = 4;
 const NOTE_PERMUTATIONS: usize = NOTE_ABSORB_PERMUTATIONS + 1;
 const NOTE_STEPS: usize = NOTE_PERMUTATIONS * P24_ROUNDS;
-const TRACE_ROWS: usize = 256;
+pub(crate) const TRACE_ROWS: usize = 256;
 const NOTE_SELECTOR_OFFSET: usize = P24_WIDTH;
-const NOTE_WITNESS_OFFSET: usize = NOTE_SELECTOR_OFFSET + NOTE_STEPS;
-const NOTE_BYTES_OFFSET: usize = 0;
+pub(crate) const NOTE_WITNESS_OFFSET: usize = NOTE_SELECTOR_OFFSET + NOTE_STEPS;
+pub(crate) const NOTE_BYTES_OFFSET: usize = 0;
 const NOTE_BITS_OFFSET: usize = NOTE_BYTES_OFFSET + NOTE_INPUT_BYTES;
 const NOTE_PACKED_OFFSET: usize = NOTE_BITS_OFFSET + (NOTE_INPUT_BYTES * NOTE_BITS_PER_BYTE);
 const NOTE_WITNESS_ELEMENTS: usize = NOTE_PACKED_OFFSET + NOTE_INPUT_ELEMENTS;
-const NOTE_TRACE_WIDTH: usize = NOTE_WITNESS_OFFSET + NOTE_WITNESS_ELEMENTS;
-const NOTE_COMMITMENT_PUBLIC_VALUES: usize = 16;
-const ASSET_BYTES: usize = 32;
+pub(crate) const NOTE_TRACE_WIDTH: usize = NOTE_WITNESS_OFFSET + NOTE_WITNESS_ELEMENTS;
+pub(crate) const NOTE_COMMITMENT_PUBLIC_VALUES: usize = 16;
+pub(crate) const ASSET_BYTES: usize = 32;
 const NOTE_VERSION_OFFSET: usize = 0;
 const NOTE_ASSET_OFFSET: usize = 2;
 const NOTE_VALUE_OFFSET: usize = NOTE_ASSET_OFFSET + ASSET_BYTES;
@@ -54,9 +54,9 @@ const ARITHMETIC_OUTPUT_CARRY_OFFSET: usize = ARITHMETIC_INPUT_CARRY_OFFSET + 1;
 const ARITHMETIC_INPUT_ZERO_INVERSE_OFFSET: usize = ARITHMETIC_OUTPUT_CARRY_OFFSET + 1;
 const ARITHMETIC_WIDTH: usize = ARITHMETIC_INPUT_ZERO_INVERSE_OFFSET + INPUT_NOTE_COUNT;
 const ARITHMETIC_OFFSET: usize = NOTE_COUNT * NOTE_TRACE_WIDTH;
-const TRACE_WIDTH: usize = ARITHMETIC_OFFSET + ARITHMETIC_WIDTH;
-const COMMITMENT_PUBLIC_VALUES: usize = NOTE_COUNT * NOTE_COMMITMENT_PUBLIC_VALUES;
-const PUBLIC_VALUES: usize = COMMITMENT_PUBLIC_VALUES + ASSET_BYTES;
+pub(crate) const TRACE_WIDTH: usize = ARITHMETIC_OFFSET + ARITHMETIC_WIDTH;
+pub(crate) const COMMITMENT_PUBLIC_VALUES: usize = NOTE_COUNT * NOTE_COMMITMENT_PUBLIC_VALUES;
+pub(crate) const PUBLIC_VALUES: usize = COMMITMENT_PUBLIC_VALUES + ASSET_BYTES;
 const OUTPUT_COMMITMENT_PUBLIC_VALUES: usize =
     (NOTE_COUNT - INPUT_NOTE_COUNT) * NOTE_COMMITMENT_PUBLIC_VALUES;
 const OUTPUT_COMMITMENT_BINDINGS_OFFSET: usize = PUBLIC_VALUES;
@@ -77,14 +77,14 @@ pub struct Poseidon2P24ValueConservationExperimentResult {
 }
 
 #[derive(Clone, Debug)]
-struct Poseidon2P24ValueConservationAir {
+pub(crate) struct Poseidon2P24ValueConservationAir {
     permutation: Poseidon2P24Air,
     note_iv: [u32; 9],
     bind_output_commitments: bool,
 }
 
 impl Poseidon2P24ValueConservationAir {
-    fn from_reference(
+    pub(crate) fn from_reference(
         reference: &Poseidon2P24Reference,
         bind_output_commitments: bool,
     ) -> Result<Self, StarkExperimentError> {
@@ -343,6 +343,18 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24ValueConservationAir {
         let main = builder.main();
         let local = main.current_slice();
         let next = main.next_slice();
+        self.eval_relation(builder, local, next, &public_values);
+    }
+}
+
+impl Poseidon2P24ValueConservationAir {
+    pub(crate) fn eval_relation<AB: AirBuilder>(
+        &self,
+        builder: &mut AB,
+        local: &[AB::Var],
+        next: &[AB::Var],
+        public_values: &[AB::PublicVar],
+    ) {
         let mut note_witnesses = Vec::with_capacity(NOTE_COUNT);
         for note_index in 0..NOTE_COUNT {
             let start = note_index * NOTE_TRACE_WIDTH;
@@ -350,7 +362,7 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24ValueConservationAir {
                 builder,
                 &local[start..start + NOTE_TRACE_WIDTH],
                 &next[start..start + NOTE_TRACE_WIDTH],
-                &public_values,
+                public_values,
                 note_index * NOTE_COMMITMENT_PUBLIC_VALUES,
             );
             note_witnesses.push(&local[start + NOTE_WITNESS_OFFSET..start + NOTE_TRACE_WIDTH]);
@@ -459,7 +471,7 @@ fn prove_and_verify_value_conservation(
     })
 }
 
-fn validate_witness_values(
+pub(crate) fn validate_witness_values(
     note_preimages: &[[u8; NOTE_INPUT_BYTES]; NOTE_COUNT],
     asset_id: [u8; ASSET_BYTES],
     output_commitments: Option<[BabyBearDigestV2; NOTE_COUNT - INPUT_NOTE_COUNT]>,
@@ -515,12 +527,24 @@ fn value(note: &[u8; NOTE_INPUT_BYTES]) -> u128 {
     )
 }
 
-fn build_trace(
+pub(crate) fn build_trace(
     air: &Poseidon2P24ValueConservationAir,
     note_preimages: [[u8; NOTE_INPUT_BYTES]; NOTE_COUNT],
 ) -> RowMajorMatrix<Val> {
+    build_trace_with_rows(air, note_preimages, TRACE_ROWS)
+}
+
+pub(crate) fn build_trace_with_rows(
+    air: &Poseidon2P24ValueConservationAir,
+    note_preimages: [[u8; NOTE_INPUT_BYTES]; NOTE_COUNT],
+    trace_rows: usize,
+) -> RowMajorMatrix<Val> {
+    assert!(
+        trace_rows >= TRACE_ROWS,
+        "value trace must contain all selector steps"
+    );
     let packed = note_preimages.map(byte_pack3le);
-    let mut values = Val::zero_vec(TRACE_ROWS * TRACE_WIDTH);
+    let mut values = Val::zero_vec(trace_rows * TRACE_WIDTH);
     let mut states: [[Val; P24_WIDTH]; NOTE_COUNT] =
         core::array::from_fn(|note_index| initial_note_state(air, &packed[note_index]));
     let mut input_carry = 0_u16;
@@ -528,7 +552,7 @@ fn build_trace(
     let input_inverse = input_nonzero_inverse(&note_preimages[0]);
     let second_input_inverse = input_nonzero_inverse(&note_preimages[1]);
 
-    for row in 0..TRACE_ROWS {
+    for row in 0..trace_rows {
         let row_offset = row * TRACE_WIDTH;
         for note_index in 0..NOTE_COUNT {
             let offset = row_offset + (note_index * NOTE_TRACE_WIDTH);
