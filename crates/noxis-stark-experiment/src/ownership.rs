@@ -25,12 +25,12 @@ use crate::{
     matrix_expression, matrix_values, round_values,
 };
 
-const KEY_BYTES: usize = 32;
-const NOTE_BYTES: usize = 178;
+pub(crate) const KEY_BYTES: usize = 32;
+pub(crate) const NOTE_BYTES: usize = 178;
 const POSITION_BYTES: usize = 4;
-const DIGEST_LANES: usize = 16;
-const OWNERSHIP_PUBLIC_VALUES: usize = DIGEST_LANES * 2;
-const NOTE_COMMITMENT_BINDING_OFFSET: usize = OWNERSHIP_PUBLIC_VALUES;
+pub(crate) const DIGEST_LANES: usize = 16;
+pub(crate) const OWNERSHIP_PUBLIC_VALUES: usize = DIGEST_LANES * 2;
+pub(crate) const NOTE_COMMITMENT_BINDING_OFFSET: usize = OWNERSHIP_PUBLIC_VALUES;
 const DIGEST_BYTES: usize = DIGEST_LANES * 4;
 const BITS_PER_BYTE: usize = 8;
 const RATE: usize = 15;
@@ -45,17 +45,17 @@ const NODE_PHASES_PER_HASH: usize = 4;
 /// Candidate tree depth. This is deliberately the same 32-bit position that
 /// is serialized into `H_NULLIFIER`, so no second, unbound direction witness
 /// exists.
-const MEMBERSHIP_DEPTH: usize = 32;
+pub(crate) const MEMBERSHIP_DEPTH: usize = 32;
 const NODE_PHASES: usize = NODE_PHASES_PER_HASH * MEMBERSHIP_DEPTH;
 const TOTAL_PHASES: usize =
     ADDR_PHASES + NOTE_PHASES + NULLIFIER_PHASES + LEAF_PHASES + NODE_PHASES;
 const TOTAL_STEPS: usize = TOTAL_PHASES * P24_ROUNDS;
 /// `TOTAL_STEPS` needs 4260 rows; the FRI trace is a power of two.
-const TRACE_ROWS: usize = 8192;
+pub(crate) const TRACE_ROWS: usize = 8192;
 const ROUND_SELECTOR_OFFSET: usize = P24_WIDTH;
 const PHASE_SELECTOR_OFFSET: usize = ROUND_SELECTOR_OFFSET + P24_ROUNDS;
 const DONE_OFFSET: usize = PHASE_SELECTOR_OFFSET + TOTAL_PHASES;
-const WITNESS_OFFSET: usize = DONE_OFFSET + 1;
+pub(crate) const WITNESS_OFFSET: usize = DONE_OFFSET + 1;
 const PROVER_STACK_BYTES: usize = 64 * 1024 * 1024;
 
 const KEY_BYTES_OFFSET: usize = 0;
@@ -72,9 +72,9 @@ const TREE_LEAF_DIGEST_OFFSET: usize = NOTE_DIGEST_OFFSET + DIGEST_LANES;
 const MERKLE_SIBLINGS_OFFSET: usize = TREE_LEAF_DIGEST_OFFSET + DIGEST_LANES;
 const MERKLE_INTERMEDIATE_OFFSET: usize =
     MERKLE_SIBLINGS_OFFSET + (MEMBERSHIP_DEPTH * DIGEST_LANES);
-const WITNESS_ELEMENTS: usize =
+pub(crate) const WITNESS_ELEMENTS: usize =
     MERKLE_INTERMEDIATE_OFFSET + ((MEMBERSHIP_DEPTH - 1) * DIGEST_LANES);
-const TRACE_WIDTH: usize = WITNESS_OFFSET + WITNESS_ELEMENTS;
+pub(crate) const TRACE_WIDTH: usize = WITNESS_OFFSET + WITNESS_ELEMENTS;
 
 const ADDR_BLOCK_PHASE: usize = 0;
 const ADDR_SQUEEZE_PHASE: usize = 1;
@@ -135,7 +135,7 @@ impl Poseidon2P24OwnershipProof {
 }
 
 #[derive(Clone, Copy)]
-struct OwnershipTraceWitness {
+pub(crate) struct OwnershipTraceWitness {
     nullifier_key: [u8; KEY_BYTES],
     note_preimage: [u8; NOTE_BYTES],
     leaf_position: u32,
@@ -147,9 +147,20 @@ struct OwnershipTraceWitness {
     intermediates: [BabyBearDigestV2; MEMBERSHIP_DEPTH - 1],
 }
 
+/// Deterministically prepared private material for the depth-32 ownership
+/// relation. It stays crate-visible so a future composed AIR can reuse the
+/// exact same derivation rather than reimplementing roots, nullifiers or
+/// note-commitment handling in another module.
+pub(crate) struct PreparedOwnershipPath32 {
+    pub(crate) witness: OwnershipTraceWitness,
+    pub(crate) nullifier: BabyBearDigestV2,
+    pub(crate) root: BabyBearDigestV2,
+    pub(crate) note_commitment: BabyBearDigestV2,
+}
+
 /// AIR for one key-to-note-to-nullifier-to-leaf ownership binding.
 #[derive(Clone, Debug)]
-struct Poseidon2P24OwnershipAir {
+pub(crate) struct Poseidon2P24OwnershipAir {
     permutation: Poseidon2P24Air,
     addr_iv: [u32; 9],
     note_iv: [u32; 9],
@@ -160,7 +171,7 @@ struct Poseidon2P24OwnershipAir {
 }
 
 impl Poseidon2P24OwnershipAir {
-    fn from_reference_with_note_commitment(
+    pub(crate) fn from_reference_with_note_commitment(
         reference: &Poseidon2P24Reference,
         bind_note_commitment: bool,
     ) -> Result<Self, StarkExperimentError> {
@@ -456,6 +467,18 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24OwnershipAir {
         let main = builder.main();
         let local = main.current_slice();
         let next = main.next_slice();
+        self.eval_relation(builder, local, next, &public_values);
+    }
+}
+
+impl Poseidon2P24OwnershipAir {
+    pub(crate) fn eval_relation<AB: AirBuilder>(
+        &self,
+        builder: &mut AB,
+        local: &[AB::Var],
+        next: &[AB::Var],
+        public_values: &[AB::PublicVar],
+    ) {
         let local_state = &local[..P24_WIDTH];
         let next_state = &next[..P24_WIDTH];
         let round_selectors = &local[ROUND_SELECTOR_OFFSET..ROUND_SELECTOR_OFFSET + P24_ROUNDS];
@@ -874,47 +897,27 @@ fn prove_p24_note_ownership_path32_with_note_commitment_binding(
     expected_note_commitment: Option<BabyBearDigestV2>,
 ) -> Result<Poseidon2P24OwnershipProof, StarkExperimentError> {
     let reference = Poseidon2P24Reference::load_candidate()?;
-    let private_reference = Poseidon2P24PrivacyReference::load_candidate()?;
-    let recipient_commitment = private_reference.hash_addr(&nullifier_key)?;
-    let note_commitment = private_reference.hash_note(&note_preimage)?;
+    let prepared = prepare_ownership_path32(
+        &reference,
+        nullifier_key,
+        note_preimage,
+        leaf_position,
+        siblings,
+    )?;
     if let Some(expected_note_commitment) = expected_note_commitment
-        && note_commitment != expected_note_commitment
+        && prepared.note_commitment != expected_note_commitment
     {
         return Err(StarkExperimentError::OwnershipNoteCommitmentMismatch);
     }
-    let tree_leaf = reference.leaf(note_commitment)?;
-    let directions: [bool; MEMBERSHIP_DEPTH] =
-        core::array::from_fn(|level| ((leaf_position >> level) & 1) == 1);
-    let mut current = tree_leaf;
-    let mut intermediates = [[0_u32; DIGEST_LANES]; MEMBERSHIP_DEPTH - 1];
-    for level in 0..MEMBERSHIP_DEPTH {
-        current = candidate_node(&reference, current, siblings[level], directions[level])?;
-        if level + 1 < MEMBERSHIP_DEPTH {
-            intermediates[level] = current;
-        }
-    }
-    let root = current;
-    let nullifier_preimage =
-        make_nullifier_preimage(nullifier_key, note_preimage, note_commitment, leaf_position);
-    let nullifier = private_reference.hash_nullifier_preimage(&nullifier_preimage)?;
     let air = Poseidon2P24OwnershipAir::from_reference_with_note_commitment(
         &reference,
         expected_note_commitment.is_some(),
     )?;
-    let witness = OwnershipTraceWitness {
-        nullifier_key,
-        note_preimage,
-        leaf_position,
-        recipient_commitment,
-        note_commitment,
-        tree_leaf,
-        siblings,
-        intermediates,
-    };
-    let trace = build_ownership_trace(&air, &witness);
-    let mut public_values = nullifier
+    let trace = build_ownership_trace(&air, &prepared.witness);
+    let mut public_values = prepared
+        .nullifier
         .into_iter()
-        .chain(root)
+        .chain(prepared.root)
         .map(Val::from_u32)
         .collect::<Vec<_>>();
     if let Some(expected_note_commitment) = expected_note_commitment {
@@ -937,8 +940,8 @@ fn prove_p24_note_ownership_path32_with_note_commitment_binding(
                 config,
                 proof,
                 public_result: Poseidon2P24OwnershipExperimentResult {
-                    nullifier,
-                    root,
+                    nullifier: prepared.nullifier,
+                    root: prepared.root,
                     trace_rows: TRACE_ROWS,
                 },
                 bound_note_commitment: expected_note_commitment,
@@ -948,6 +951,47 @@ fn prove_p24_note_ownership_path32_with_note_commitment_binding(
     prover
         .join()
         .map_err(|_| StarkExperimentError::ProverThreadFailed)?
+}
+
+pub(crate) fn prepare_ownership_path32(
+    reference: &Poseidon2P24Reference,
+    nullifier_key: [u8; KEY_BYTES],
+    note_preimage: [u8; NOTE_BYTES],
+    leaf_position: u32,
+    siblings: [BabyBearDigestV2; MEMBERSHIP_DEPTH],
+) -> Result<PreparedOwnershipPath32, StarkExperimentError> {
+    let private_reference = Poseidon2P24PrivacyReference::load_candidate()?;
+    let recipient_commitment = private_reference.hash_addr(&nullifier_key)?;
+    let note_commitment = private_reference.hash_note(&note_preimage)?;
+    let tree_leaf = reference.leaf(note_commitment)?;
+    let directions: [bool; MEMBERSHIP_DEPTH] =
+        core::array::from_fn(|level| ((leaf_position >> level) & 1) == 1);
+    let mut root = tree_leaf;
+    let mut intermediates = [[0_u32; DIGEST_LANES]; MEMBERSHIP_DEPTH - 1];
+    for level in 0..MEMBERSHIP_DEPTH {
+        root = candidate_node(reference, root, siblings[level], directions[level])?;
+        if level + 1 < MEMBERSHIP_DEPTH {
+            intermediates[level] = root;
+        }
+    }
+    let nullifier_preimage =
+        make_nullifier_preimage(nullifier_key, note_preimage, note_commitment, leaf_position);
+    let nullifier = private_reference.hash_nullifier_preimage(&nullifier_preimage)?;
+    Ok(PreparedOwnershipPath32 {
+        witness: OwnershipTraceWitness {
+            nullifier_key,
+            note_preimage,
+            leaf_position,
+            recipient_commitment,
+            note_commitment,
+            tree_leaf,
+            siblings,
+            intermediates,
+        },
+        nullifier,
+        root,
+        note_commitment,
+    })
 }
 
 /// Independently verifies a locally held ownership proof against exactly the
@@ -1046,10 +1090,22 @@ pub fn run_p24_note_ownership_research_smoke()
     prove_and_verify_p24_note_ownership(key, note, 42)
 }
 
-fn build_ownership_trace(
+pub(crate) fn build_ownership_trace(
     air: &Poseidon2P24OwnershipAir,
     witness: &OwnershipTraceWitness,
 ) -> RowMajorMatrix<Val> {
+    build_ownership_trace_with_rows(air, witness, TRACE_ROWS)
+}
+
+pub(crate) fn build_ownership_trace_with_rows(
+    air: &Poseidon2P24OwnershipAir,
+    witness: &OwnershipTraceWitness,
+    trace_rows: usize,
+) -> RowMajorMatrix<Val> {
+    assert!(
+        trace_rows >= TRACE_ROWS,
+        "ownership trace must contain all selector steps"
+    );
     let key_packed = byte_pack3le(&witness.nullifier_key, ADDR_ELEMENTS);
     let note_packed = byte_pack3le(&witness.note_preimage, NOTE_ELEMENTS);
     let nullifier_preimage = make_nullifier_preimage(
@@ -1059,10 +1115,10 @@ fn build_ownership_trace(
         witness.leaf_position,
     );
     let nullifier_packed = byte_pack3le(&nullifier_preimage, NULLIFIER_ELEMENTS);
-    let mut values = Val::zero_vec(TRACE_ROWS * TRACE_WIDTH);
+    let mut values = Val::zero_vec(trace_rows * TRACE_WIDTH);
     let mut state = initial_state_values(&air.permutation, air.addr_iv, &key_packed);
 
-    for row in 0..TRACE_ROWS {
+    for row in 0..trace_rows {
         let offset = row * TRACE_WIDTH;
         values[offset..offset + P24_WIDTH].copy_from_slice(&state);
         write_witness(&mut values[offset + WITNESS_OFFSET..], witness);
