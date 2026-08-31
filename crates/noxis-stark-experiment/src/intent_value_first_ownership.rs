@@ -41,6 +41,7 @@ const COMMITMENT_BYTES: usize = NOTE_COMMITMENT_PUBLIC_VALUES * 4;
 const TRACE_ROWS: usize = OWNERSHIP_ROWS;
 const TRACE_WIDTH: usize = INTENT_TRACE_WIDTH + VALUE_WIDTH + OWNERSHIP_WIDTH;
 const PUBLIC_VALUES: usize = INTENT_PUBLIC_VALUES + VALUE_PUBLIC_VALUES + OWNERSHIP_PUBLIC_VALUES;
+const PROVER_STACK_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Poseidon2P24IntentValueFirstOwnershipExperimentResult {
@@ -165,9 +166,19 @@ pub fn prove_and_verify_p24_intent_value_first_input_ownership(
     public.extend(asset.map(Val::from_u8));
     public.extend(prepared.nullifier.map(Val::from_u32));
     public.extend(prepared.root.map(Val::from_u32));
-    let config = make_high_degree_hiding_config();
-    let proof = prove(&config, &air, trace, &public);
-    verify(&config, &air, &proof, &public).map_err(|_| StarkExperimentError::VerificationFailed)?;
+    let prover = std::thread::Builder::new()
+        .name("noxis-p24-intent-value-first-ownership-prover".to_owned())
+        .stack_size(PROVER_STACK_BYTES)
+        .spawn(move || {
+            let config = make_high_degree_hiding_config();
+            let proof = prove(&config, &air, trace, &public);
+            verify(&config, &air, &proof, &public)
+                .map_err(|_| StarkExperimentError::VerificationFailed)
+        })
+        .map_err(|_| StarkExperimentError::ProverThreadFailed)?;
+    prover
+        .join()
+        .map_err(|_| StarkExperimentError::ProverThreadFailed)??;
     Ok(Poseidon2P24IntentValueFirstOwnershipExperimentResult {
         intent: Poseidon2P24IntentExperimentResult {
             intent_commitment,
