@@ -48,6 +48,7 @@ pub use anchored_ownership::{
 pub use inner_receipt::{
     CANDIDATE_INNER_RELATION_RECEIPT_ID_DOMAIN, CandidateInnerRelationKindV1,
     CandidateInnerRelationReceiptIdV1, candidate_inner_relation_receipt_id,
+    candidate_inner_relation_receipt_id_from_statement_id,
 };
 pub use nxsm_transition::{
     CANDIDATE_NXSM_NULLIFIER_TRANSITION_ENCODED_LENGTH,

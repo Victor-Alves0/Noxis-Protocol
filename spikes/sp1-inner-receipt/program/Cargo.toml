@@ -1,0 +1,8 @@
+[package]
+version = "0.1.0"
+name = "noxis-sp1-inner-receipt-program"
+edition = "2021"
+
+[dependencies]
+sp1-zkvm = { version = "=6.5.0" }
+noxis-sp1-inner-receipt-lib = { path = "../lib" }

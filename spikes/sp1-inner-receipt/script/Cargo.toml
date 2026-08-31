@@ -1,0 +1,19 @@
+[package]
+version = "0.1.0"
+name = "noxis-sp1-inner-receipt-script"
+edition = "2021"
+default-run = "noxis-sp1-inner-receipt"
+
+[[bin]]
+name = "noxis-sp1-inner-receipt"
+path = "src/bin/main.rs"
+
+[dependencies]
+sp1-sdk = { version = "=6.5.0", features = ["blocking"] }
+clap = { version = "4.0", features = ["derive", "env"] }
+hex = "0.4.3"
+noxis-sp1-inner-receipt-lib = { path = "../lib" }
+noxis-private-proof-contract = { path = "../../../crates/noxis-private-proof-contract" }
+
+[build-dependencies]
+sp1-build = { version = "=6.5.0" }
