@@ -1,0 +1,8 @@
+[package]
+name = "noxis-sp1-p24-membership-lib"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+noxis-poseidon2-core = { path = "../../../crates/noxis-poseidon2-core" }

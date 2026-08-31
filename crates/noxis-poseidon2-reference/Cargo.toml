@@ -8,5 +8,8 @@ rust-version.workspace = true
 [dependencies]
 noxis-tree-params = { path = "../noxis-tree-params" }
 
+[dev-dependencies]
+noxis-poseidon2-core = { path = "../noxis-poseidon2-core" }
+
 [lints]
 workspace = true

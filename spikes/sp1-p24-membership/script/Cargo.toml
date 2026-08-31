@@ -1,0 +1,20 @@
+[package]
+version = "0.1.0"
+name = "noxis-sp1-p24-membership-script"
+edition = "2021"
+default-run = "noxis-sp1-p24-membership"
+
+[[bin]]
+name = "noxis-sp1-p24-membership"
+path = "src/bin/main.rs"
+
+[dependencies]
+sp1-sdk = { version = "=6.5.0", features = ["blocking"] }
+clap = { version = "4.0", features = ["derive", "env"] }
+hex = "0.4.3"
+noxis-poseidon2-core = { path = "../../../crates/noxis-poseidon2-core" }
+noxis-poseidon2-reference = { path = "../../../crates/noxis-poseidon2-reference" }
+noxis-sp1-p24-membership-lib = { path = "../lib" }
+
+[build-dependencies]
+sp1-build = { version = "=6.5.0" }

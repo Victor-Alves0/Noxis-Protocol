@@ -579,6 +579,29 @@ mod tests {
     }
 
     #[test]
+    fn no_std_core_matches_reference_depth_32_membership_path() {
+        use noxis_poseidon2_core::{permutation, root_from_note_path};
+
+        let reference = Poseidon2P24Reference::load_candidate().unwrap();
+        let commitments = [
+            core::array::from_fn(|index| (index as u32) + 7),
+            core::array::from_fn(|index| (index as u32) + 107),
+        ];
+        let (_leaf, siblings, expected_root) = reference.small_tree_path(&commitments, 1).unwrap();
+
+        assert_eq!(
+            permutation(core::array::from_fn(|index| index as u32)).unwrap(),
+            reference
+                .permutation(core::array::from_fn(|index| index as u32))
+                .unwrap()
+        );
+        assert_eq!(
+            root_from_note_path(commitments[1], 1, siblings).unwrap(),
+            expected_root
+        );
+    }
+
+    #[test]
     fn hash16_rejects_wrong_arity_and_noncanonical_input() {
         let reference = Poseidon2P24Reference::load_candidate().unwrap();
         assert_eq!(

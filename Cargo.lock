@@ -641,6 +641,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "noxis-poseidon2-core"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "sha2",
+]
+
+[[package]]
 name = "noxis-poseidon2-privacy-reference"
 version = "0.1.0"
 dependencies = [
@@ -654,6 +662,7 @@ dependencies = [
 name = "noxis-poseidon2-reference"
 version = "0.1.0"
 dependencies = [
+ "noxis-poseidon2-core",
  "noxis-tree-params",
 ]
 

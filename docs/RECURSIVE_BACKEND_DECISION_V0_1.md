@@ -28,3 +28,12 @@ spike that proves a frozen Noxis inner-relation receipt. Acceptance requires:
 
 Until all gates pass, no `CircuitId`, wire proof format, consensus admission or
 privacy claim may name that backend.
+
+## Current bounded experiments
+
+The first SP1 smoke spike proves only a locally derived inner-receipt ID. The
+follow-on [P24 membership spike](SP1_P24_MEMBERSHIP_SPIKE_V0_1.md) isolates the
+more meaningful tree subrelation: a private note commitment and a private
+depth-32 path yield one public candidate root. Both are evaluation artifacts.
+Neither supplies the statement, parameter-ID, key/address, note-opening or
+nullifier bindings required by acceptance gate 3.
