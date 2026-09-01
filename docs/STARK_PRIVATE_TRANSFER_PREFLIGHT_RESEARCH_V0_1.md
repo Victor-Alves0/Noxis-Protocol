@@ -82,7 +82,7 @@ posse, nullifier-transition e envelope continuam fora desse recorte.
 ## Como reproduzir
 
 ```powershell
-cargo test -p noxis-private-proof-contract transfer_preflight::tests::executes_every_available_private_relation_for_one_statement --release --locked
+cargo test --release -p noxis-private-proof-contract transfer_preflight::tests::executes_every_available_private_relation_for_one_statement --lib -- --exact --ignored --nocapture
 ```
 
 O teste constrói duas notas de entrada, seus caminhos Merkle e nullifiers,
@@ -90,12 +90,15 @@ duas saídas privadas ordenadas canonicamente e uma mesma âncora candidata. Em
 seguida cifra as duas saídas em `NXRE`, valida o `NXPT` ligado aos digests e
 executa toda a sequência; também testa rejeição ao alterar o commitment de
 intenção retido. Como o backend atual não agrega provas, o teste é
-computacionalmente mais caro que as verificações unitárias isoladas. Em
-2026-08-31, a execução local em release, já com a AIR composta de intent e
-conservação, passou em **499,12 segundos**. Execuções de posse
-de profundidade 32 podem usar aproximadamente **4 GB** de memória residente.
-Esses números são pesquisa local, não meta de desempenho nem garantia
-operacional.
+computacionalmente mais caro que as verificações unitárias isoladas e é
+ignorado por padrão. Em 2026-09-01, a execução local em release, já incluindo
+o bundle que retém e revalida as provas opacas, passou em **936,43 segundos**.
+O build release adicional levou **33,53 segundos**. O pico observado durante
+as provas de posse de profundidade 32 foi de aproximadamente **4,45 GB** de
+memória residente. Uma execução debug foi interrompida após cerca de 181
+minutos ainda em progresso; ela não é um benchmark útil. Esses números são
+pesquisa local, não meta de desempenho nem garantia operacional. Ver
+[`PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md`](PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md).
 
 ## Próximo passo correto
 

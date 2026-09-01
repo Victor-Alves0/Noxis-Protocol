@@ -21,6 +21,7 @@ mod nxsm_witness;
 mod output_notes;
 mod public_inputs;
 mod public_statement;
+mod transfer_bundle;
 mod transfer_preflight;
 mod value_conservation;
 
@@ -73,6 +74,12 @@ pub use public_statement::{
     CandidatePrivateTransferProofPublicStatementError,
     CandidatePrivateTransferProofPublicStatementIdV1,
     CandidatePrivateTransferProofPublicStatementV1,
+};
+pub use transfer_bundle::{
+    CandidatePrivateTransferProofBundleError, CandidatePrivateTransferProofBundleReceiptsV1,
+    CandidatePrivateTransferProofBundleResultsV1, CandidatePrivateTransferProofBundleV1,
+    CandidatePrivateTransferProofBundleVerifierV1, prove_candidate_private_transfer_proof_bundle,
+    verify_candidate_private_transfer_proof_bundle,
 };
 pub use transfer_preflight::{
     CandidatePacketBoundPrivateTransferStarkPreflightV1,

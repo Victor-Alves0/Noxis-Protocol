@@ -1,0 +1,85 @@
+# In-memory private-transfer proof bundle — research v0.1
+
+## Implemented boundary
+
+`CandidatePrivateTransferProofBundleV1` retains three opaque Plonky3 proof
+objects inside one process:
+
+1. one composed `H_INTENT` plus four-note value-conservation proof;
+2. one ownership and depth-32 membership proof for input slot zero;
+3. one ownership and depth-32 membership proof for input slot one.
+
+Every relation is bound to the same canonical `NXPU v1` statement ID. The two
+ownership relations also retain crate-local bindings to the exact input-note
+commitments proved by the value relation. Domain-separated receipt identities
+include the relation kind and input slot, so a caller cannot silently swap the
+two ownership proofs or mix a proof from another statement.
+
+`CandidatePrivateTransferProofBundleVerifierV1` fails closed. It reconstructs
+the expected receipt identities, revalidates the statement against the current
+nullifier tree, derives a fresh `NXSM` witness from that current state, verifies
+all three opaque proofs independently, and rechecks the asset, output
+commitments, nullifiers, note root and input-note cross-bindings.
+
+## Why this matters
+
+The earlier complete preflight proved and verified each relation, then dropped
+the proof object and retained only public results. That demonstrated that the
+relations could execute, but another component could not independently verify
+what had been produced.
+
+The bundle changes that boundary: proof material now survives long enough for
+a separate verifier adapter to check it again. In plain terms, Noxis no longer
+has to trust a local receipt saying “the proofs passed”; the adapter receives
+the actual in-memory proofs and verifies them.
+
+## Fail-closed state behavior
+
+The bundle is not sufficient on its own. Verification requires the exact
+current candidate nullifier state. A bundle valid for an earlier state is
+rejected if its anchor no longer matches or if either nullifier has become
+spent. Atomic mutation remains a ledger responsibility.
+
+## Deliberate non-claims
+
+This boundary has no encoder or decoder and therefore introduces no new wire
+magic or storage format. It is not:
+
+- a `noxis_crypto::ProofVerifier` implementation;
+- a byte proof accepted by `noxis-ledger`;
+- aggregation or recursion;
+- a selected verifier profile or production proof suite;
+- consensus admission or a private transaction submitted over ABCI;
+- a claim that the current performance is suitable for a wallet.
+
+The separation is necessary because the active ledger proof API still accepts
+portable bytes and legacy 32-byte nullifiers, while the candidate private
+statement uses local opaque proofs and 64-byte nullifiers. Bridging those types
+implicitly would create an unsafe production bypass.
+
+## Reproduction and measured cost
+
+The full test is ignored by default because it runs both the compatibility
+preflight and the retained bundle, then independently verifies the bundle and
+checks rejection after the state changes. Run it explicitly in optimized mode:
+
+```powershell
+cargo test --release -p noxis-private-proof-contract transfer_preflight::tests::executes_every_available_private_relation_for_one_statement --lib -- --exact --ignored --nocapture
+```
+
+On 2026-09-01 this command passed locally in **936.43 seconds** (about 15 minutes
+36 seconds), excluding the 33.53-second release compilation. Peak resident
+memory observed during the depth-32 ownership phases was about **4.45 GB**.
+
+An unoptimized debug run was intentionally stopped after approximately 181
+minutes while it was still making CPU progress. This is why the integration
+test is ignored by default and why debug timings must not be presented as a
+wallet benchmark.
+
+## Next implementation gate
+
+Define a typed private-ledger admission boundary that reconstructs `NXPU v1`
+from one candidate transaction, invokes this verifier, and atomically applies
+the two nullifiers and two output commitments without converting them through
+the legacy 32-byte transfer model. Portable proof encoding, verifier identity
+and consensus activation remain separate later gates.

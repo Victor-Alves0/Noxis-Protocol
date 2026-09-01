@@ -13,7 +13,7 @@ use noxis_privacy_types::PrivateTransferIntentV2;
 use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_uni_stark::{prove, verify};
+use p3_uni_stark::{Proof, prove, verify};
 
 use crate::{
     StarkExperimentError, Val,
@@ -49,6 +49,25 @@ pub struct Poseidon2P24IntentValueConservationExperimentResult {
     pub values: Poseidon2P24ValueConservationExperimentResult,
     /// Fixed trace height used by the composed prover.
     pub trace_rows: usize,
+}
+
+/// Opaque in-memory proof for the composed intent/value relation.
+///
+/// The exact Plonky3 configuration remains attached to the proof. There is no
+/// encoder, decoder, verifier key, network frame or production suite ID yet.
+/// A verifier must also supply the exact canonical intent whose bytes are part
+/// of the public input.
+pub struct Poseidon2P24IntentValueConservationProof {
+    config: crate::Config,
+    proof: Proof<crate::Config>,
+    public_result: Poseidon2P24IntentValueConservationExperimentResult,
+}
+
+impl Poseidon2P24IntentValueConservationProof {
+    /// Public commitments and trace shape retained beside the opaque proof.
+    pub const fn public_result(&self) -> &Poseidon2P24IntentValueConservationExperimentResult {
+        &self.public_result
+    }
 }
 
 /// AIR that executes the two source relations side by side and then proves
@@ -123,13 +142,13 @@ impl<AB: AirBuilder> Air<AB> for Poseidon2P24IntentValueConservationAir {
     }
 }
 
-/// Produces and independently verifies a single local STARK that binds the
-/// public intent outputs to the two private output-note openings while proving
-/// four-note value conservation. It returns no portable proof artifact.
-pub fn prove_and_verify_p24_intent_value_conservation(
+/// Produces one opaque local STARK that binds the public intent outputs to the
+/// two private output-note openings while proving four-note value conservation.
+/// Call [`verify_p24_intent_value_conservation_proof`] in a verifier context.
+pub fn prove_p24_intent_value_conservation(
     intent: &PrivateTransferIntentV2,
     note_preimages: [[u8; NOTE_INPUT_BYTES]; NOTE_COUNT],
-) -> Result<Poseidon2P24IntentValueConservationExperimentResult, StarkExperimentError> {
+) -> Result<Poseidon2P24IntentValueConservationProof, StarkExperimentError> {
     let asset_id = intent.asset_id().0;
     validate_witness_values(&note_preimages, asset_id, None)?;
 
@@ -165,20 +184,65 @@ pub fn prove_and_verify_p24_intent_value_conservation(
 
     let config = make_hiding_config();
     let proof = prove(&config, &air, trace, &public_values);
-    verify(&config, &air, &proof, &public_values)
-        .map_err(|_| StarkExperimentError::VerificationFailed)?;
-    Ok(Poseidon2P24IntentValueConservationExperimentResult {
-        intent: Poseidon2P24IntentExperimentResult {
-            intent_commitment,
+    Ok(Poseidon2P24IntentValueConservationProof {
+        config,
+        proof,
+        public_result: Poseidon2P24IntentValueConservationExperimentResult {
+            intent: Poseidon2P24IntentExperimentResult {
+                intent_commitment,
+                trace_rows: TRACE_ROWS,
+            },
+            values: Poseidon2P24ValueConservationExperimentResult {
+                note_commitments,
+                asset_id,
+                trace_rows: TRACE_ROWS,
+            },
             trace_rows: TRACE_ROWS,
         },
-        values: Poseidon2P24ValueConservationExperimentResult {
-            note_commitments,
-            asset_id,
-            trace_rows: TRACE_ROWS,
-        },
-        trace_rows: TRACE_ROWS,
     })
+}
+
+/// Independently verifies a retained local proof against one exact canonical
+/// intent. Every public value is reconstructed rather than trusted from a
+/// caller-supplied byte vector.
+pub fn verify_p24_intent_value_conservation_proof(
+    proof: &Poseidon2P24IntentValueConservationProof,
+    intent: &PrivateTransferIntentV2,
+) -> Result<Poseidon2P24IntentValueConservationExperimentResult, StarkExperimentError> {
+    let reference = Poseidon2P24Reference::load_candidate()?;
+    let air = Poseidon2P24IntentValueConservationAir::from_reference(&reference)?;
+    let encoded = intent.encode();
+    let result = proof.public_result();
+    if result.values.asset_id != intent.asset_id().0
+        || result.intent.trace_rows != TRACE_ROWS
+        || result.values.trace_rows != TRACE_ROWS
+        || result.trace_rows != TRACE_ROWS
+    {
+        return Err(StarkExperimentError::VerificationFailed);
+    }
+    let mut public_values = intent_byte_pack3le(encoded)
+        .into_iter()
+        .chain(result.intent.intent_commitment.elements())
+        .map(Val::from_u32)
+        .collect::<Vec<_>>();
+    for commitment in result.values.note_commitments {
+        public_values.extend(commitment.map(Val::from_u32));
+    }
+    public_values.extend(result.values.asset_id.map(Val::from_u8));
+    debug_assert_eq!(public_values.len(), PUBLIC_VALUES);
+    verify(&proof.config, &air, &proof.proof, &public_values)
+        .map_err(|_| StarkExperimentError::VerificationFailed)?;
+    Ok(result.clone())
+}
+
+/// Compatibility helper that proves and verifies in one process, then drops
+/// the opaque proof and returns only its public result.
+pub fn prove_and_verify_p24_intent_value_conservation(
+    intent: &PrivateTransferIntentV2,
+    note_preimages: [[u8; NOTE_INPUT_BYTES]; NOTE_COUNT],
+) -> Result<Poseidon2P24IntentValueConservationExperimentResult, StarkExperimentError> {
+    let proof = prove_p24_intent_value_conservation(intent, note_preimages)?;
+    verify_p24_intent_value_conservation_proof(&proof, intent)
 }
 
 fn combine_traces(intent: RowMajorMatrix<Val>, values: RowMajorMatrix<Val>) -> RowMajorMatrix<Val> {

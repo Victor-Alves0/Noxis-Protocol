@@ -133,6 +133,13 @@ impl Poseidon2P24OwnershipProof {
     pub const fn public_result(&self) -> &Poseidon2P24OwnershipExperimentResult {
         &self.public_result
     }
+
+    /// Local research commitment used to bind this ownership proof to a
+    /// separately verified value relation, when that binding was requested.
+    /// This proof remains opaque and has no transaction encoding.
+    pub const fn bound_note_commitment(&self) -> Option<BabyBearDigestV2> {
+        self.bound_note_commitment
+    }
 }
 
 #[derive(Clone, Copy)]

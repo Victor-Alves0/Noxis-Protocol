@@ -334,6 +334,10 @@ impl std::error::Error for CandidatePrivateTransferStarkPreflightError {}
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        CandidatePrivateTransferProofBundleVerifierV1,
+        prove_candidate_private_transfer_proof_bundle,
+    };
     use noxis_codec::PrivateTransferPacketV2;
     use noxis_poseidon2_privacy_reference::Poseidon2P24PrivacyReference;
     use noxis_poseidon2_reference::Poseidon2P24Reference;
@@ -384,6 +388,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "expensive cryptographic integration; run explicitly with --release"]
     fn executes_every_available_private_relation_for_one_statement() {
         let privacy = Poseidon2P24PrivacyReference::load_candidate().unwrap();
         let tree_reference = Poseidon2P24Reference::load_candidate().unwrap();
@@ -627,6 +632,48 @@ mod tests {
         assert_eq!(results.outputs[0].note_commitment, outputs[0].0.elements());
         assert_eq!(results.outputs[1].note_commitment, outputs[1].0.elements());
         assert_eq!(preflight.stark().statement_id(), statement.statement_id());
+
+        // Unlike the compatibility preflight above, this path retains the
+        // three opaque proof objects and independently verifies them again.
+        let bundle = prove_candidate_private_transfer_proof_bundle(
+            &statement,
+            &pre_tree,
+            &input_witnesses,
+            &output_witnesses,
+        )
+        .unwrap();
+        let bundle_results = CandidatePrivateTransferProofBundleVerifierV1::new()
+            .verify(&bundle, &statement, &pre_tree)
+            .unwrap();
+        assert_eq!(bundle.statement_id(), statement.statement_id());
+        assert_eq!(
+            bundle_results.intent_value.intent.intent_commitment,
+            statement.air_public_inputs().intent_commitment()
+        );
+        assert_eq!(
+            bundle_results.input_ownership[0].nullifier,
+            statement.air_public_inputs().intent().nullifiers()[0].elements()
+        );
+        assert_eq!(
+            bundle_results.input_ownership[1].nullifier,
+            statement.air_public_inputs().intent().nullifiers()[1].elements()
+        );
+
+        // Verification is tied to current state, not merely to a proof that
+        // was valid at some earlier time.
+        let mut changed_tree = pre_tree.clone();
+        changed_tree
+            .mark_spent(statement.air_public_inputs().intent().nullifiers()[0])
+            .unwrap();
+        assert!(matches!(
+            CandidatePrivateTransferProofBundleVerifierV1::new().verify(
+                &bundle,
+                &statement,
+                &changed_tree,
+            ),
+            Err(crate::CandidatePrivateTransferProofBundleError::PublicStatement(_))
+                | Err(crate::CandidatePrivateTransferProofBundleError::NxsmWitness(_))
+        ));
 
         let mut corrupted = preflight.stark().clone();
         let mut changed = corrupted.intent_result.intent_commitment.elements();

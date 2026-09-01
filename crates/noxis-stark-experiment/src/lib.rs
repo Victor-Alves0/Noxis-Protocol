@@ -54,8 +54,9 @@ pub use intent::{
     Poseidon2P24IntentExperimentResult, prove_and_verify_p24_intent, run_p24_intent_research_smoke,
 };
 pub use intent_value_conservation::{
-    Poseidon2P24IntentValueConservationExperimentResult,
-    prove_and_verify_p24_intent_value_conservation,
+    Poseidon2P24IntentValueConservationExperimentResult, Poseidon2P24IntentValueConservationProof,
+    prove_and_verify_p24_intent_value_conservation, prove_p24_intent_value_conservation,
+    verify_p24_intent_value_conservation_proof,
 };
 pub use intent_value_first_ownership::{
     Poseidon2P24IntentValueFirstOwnershipExperimentResult,

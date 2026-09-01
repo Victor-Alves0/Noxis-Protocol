@@ -16,7 +16,8 @@ use noxis_stark_experiment::{
     Poseidon2P24OwnershipProof, StarkExperimentError, prove_and_verify_p24_intent,
     prove_and_verify_p24_note_ownership_path32,
     prove_and_verify_p24_note_ownership_path32_bound_note_commitment,
-    prove_p24_note_ownership_path32, verify_p24_note_ownership_proof,
+    prove_p24_note_ownership_path32, prove_p24_note_ownership_path32_bound_note_commitment,
+    verify_p24_note_ownership_proof,
 };
 
 use crate::{
@@ -90,6 +91,13 @@ impl CandidateAnchoredOwnershipProofV1 {
     /// Public nullifier and note-root result bound by the opaque P24 proof.
     pub const fn public_result(&self) -> &Poseidon2P24OwnershipExperimentResult {
         self.ownership_proof.public_result()
+    }
+
+    /// Crate-local bridge proving which input-note commitment was shared with
+    /// a separately verified value relation. It is intentionally not a public
+    /// transaction or wallet accessor.
+    pub(crate) const fn note_commitment_binding(&self) -> Option<BabyBearDigestV2> {
+        self.ownership_proof.bound_note_commitment()
     }
 }
 
@@ -215,6 +223,40 @@ pub fn prove_candidate_anchored_ownership(
         ownership_witness.note_preimage,
         ownership_witness.leaf_position,
         ownership_witness.siblings,
+    )?;
+    let anchored = CandidateAnchoredOwnershipProofV1 {
+        ownership_proof,
+        input_index,
+        statement_id: statement.statement_id(),
+    };
+    verify_candidate_anchored_ownership(&anchored, statement, pre_tree, nxsm_witness)?;
+    Ok(anchored)
+}
+
+/// Produces one ownership proof while binding its private note opening to the
+/// input commitment emitted by a separately retained value proof.
+///
+/// This is crate-local because the commitment is composition material, not a
+/// public transaction field. The resulting proof is still independently
+/// verified by [`verify_candidate_anchored_ownership`].
+pub(crate) fn prove_candidate_anchored_ownership_bound_note_commitment(
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    pre_tree: &NullifierSparseTreeStateV1,
+    nxsm_witness: &CandidateNxsmNullifierTransitionWitnessV1,
+    input_index: u8,
+    ownership_witness: &CandidateAnchoredOwnershipWitnessV1,
+    input_note_commitment: BabyBearDigestV2,
+) -> Result<CandidateAnchoredOwnershipProofV1, CandidateAnchoredOwnershipError> {
+    validate_input_index(input_index)?;
+    statement.revalidate(pre_tree)?;
+    nxsm_witness.revalidate(statement.nullifier_transition())?;
+
+    let ownership_proof = prove_p24_note_ownership_path32_bound_note_commitment(
+        ownership_witness.nullifier_key,
+        ownership_witness.note_preimage,
+        ownership_witness.leaf_position,
+        ownership_witness.siblings,
+        input_note_commitment,
     )?;
     let anchored = CandidateAnchoredOwnershipProofV1 {
         ownership_proof,

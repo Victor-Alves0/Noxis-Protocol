@@ -85,11 +85,11 @@ It will follow an action-oriented boundary close to Penumbra and Orchard:
 6. let the ledger atomically reject duplicate or already-spent public
    nullifiers and only then mutate commitments and nullifier state.
 
-This may initially be a research-only in-memory bundle behind an explicit
-feature gate. It is not assigned a wire magic, `ProofVerifierId`, or consensus
-approval until serialization, verifier identity and failure behavior are
-fixed. Recursive compression remains the next optimization and portability
-gate, not the prerequisite for demonstrating one real local private transfer.
+This first step is now implemented as a research-only in-memory bundle; see
+[`PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md`](PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md).
+It has no wire magic, `ProofVerifierId`, or consensus approval. Recursive
+compression remains the next optimization and portability gate, not the
+prerequisite for demonstrating one real local private transfer.
 
 ## Why this is safer than host-side stitching
 
@@ -104,12 +104,15 @@ that proofs alone cannot establish against concurrent transactions.
 This study does not establish that:
 
 - Orchard, Penumbra, Aztec or SP1 primitives are suitable for direct reuse;
-- multiple Noxis research proofs are already accepted by the ledger;
+- the retained Noxis research proofs are already accepted by the ledger;
 - public nullifiers solve network-level transaction linkability;
 - SP1 compressed proving fits the local resource budget;
 - the Noxis hybrid post-quantum profile is compatible with any cited circuit;
 - the candidate bundle is ready for a public testnet.
 
-The next implementation artifact is a typed, in-memory research bundle and
-fail-closed verifier adapter. A new portable proof format comes only after that
-path executes end to end and its bindings are reviewed.
+The typed in-memory bundle and fail-closed local verifier adapter now exist and
+have passed the explicit release integration test. The next artifact is a
+typed private-ledger admission boundary that consumes the 64-byte private
+nullifiers without passing through the legacy 32-byte transfer model. A new
+portable proof format comes only after that local path executes end to end and
+its bindings are reviewed.
