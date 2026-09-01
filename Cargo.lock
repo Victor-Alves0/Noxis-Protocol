@@ -775,7 +775,12 @@ dependencies = [
  "noxis-crypto",
  "noxis-execution",
  "noxis-ledger",
+ "noxis-nullifier-tree-state",
+ "noxis-poseidon2-reference",
+ "noxis-privacy-types",
+ "noxis-private-state",
  "noxis-record-chain",
+ "noxis-tree-params",
  "noxis-types",
  "sha2",
 ]
