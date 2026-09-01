@@ -85,12 +85,19 @@ prover returned a result. This is a resource limitation, not a cryptographic
 failure or proof acceptance. It confirms that trace sharding alone is not
 sufficient on this machine.
 
-The next controlled local profile keeps the same guest, one proof request,
-public root and sharding thresholds, but enables SP1's `drop_ldes` option. SP1
+The next controlled local profile kept the same guest, one proof request,
+public root and sharding thresholds, but enabled SP1's `drop_ldes` option. SP1
 then drops committed low-degree-extension codewords after committing them and
 re-encodes them for the query phase. That deliberately exchanges more prover
 time for lower peak memory; it does not change the statement being proved.
-Only a completed local verification can promote this from an experiment to
+This profile also reached the WSL out-of-memory killer at roughly **21 GiB
+resident memory** before returning a proof. It therefore does not count as
+locally verified evidence.
+
+The spike now exposes the trace-area and trace-height thresholds as explicit
+local command options. A later controlled run can reduce them to force smaller
+internal shards while retaining the same guest statement and public root. Only
+a completed local verification can promote any such run from an experiment to
 evidence. Hosted proving is not a substitute for this correctness gate.
 
 ## Explicit non-claims

@@ -9,9 +9,9 @@ use sp1_sdk::{
 };
 
 const MEMBERSHIP_ELF: Elf = include_elf!("noxis-sp1-p24-membership-program");
-const LOCAL_SHARD_SIZE: usize = 500_000;
-const LOCAL_ELEMENT_THRESHOLD: u64 = 1 << 26;
-const LOCAL_HEIGHT_THRESHOLD: u64 = 1 << 20;
+const DEFAULT_LOCAL_SHARD_SIZE: usize = 500_000;
+const DEFAULT_LOCAL_ELEMENT_THRESHOLD: u64 = 1 << 26;
+const DEFAULT_LOCAL_HEIGHT_THRESHOLD: u64 = 1 << 20;
 // This lowers peak prover memory by recomputing codewords for the query phase.
 // It is a local proving-resource choice; it does not alter the guest relation.
 const LOCAL_DROP_LDES: bool = true;
@@ -30,8 +30,22 @@ struct Args {
     /// The full P24 relation is one guest program and one SP1 proof request;
     /// this limits per-shard prover memory, rather than stitching statements
     /// together in the host.
-    #[arg(long, default_value_t = LOCAL_SHARD_SIZE)]
+    #[arg(long, default_value_t = DEFAULT_LOCAL_SHARD_SIZE)]
     shard_size: usize,
+
+    /// Trace-area limit that causes SP1 to start a fresh internal shard.
+    ///
+    /// This is a local prover resource setting, not part of the guest
+    /// statement or the public output.
+    #[arg(long, default_value_t = DEFAULT_LOCAL_ELEMENT_THRESHOLD)]
+    element_threshold: u64,
+
+    /// Trace-height limit that causes SP1 to start a fresh internal shard.
+    ///
+    /// This is a local prover resource setting, not part of the guest
+    /// statement or the public output.
+    #[arg(long, default_value_t = DEFAULT_LOCAL_HEIGHT_THRESHOLD)]
+    height_threshold: u64,
 }
 
 fn fixture() -> (P24MembershipWitnessV1, BabyBearDigestV2) {
@@ -81,7 +95,7 @@ fn main() {
     println!("local SP1 shard size: {} cycles", args.shard_size);
     println!(
         "local SP1 trace thresholds: {} elements / {} rows",
-        LOCAL_ELEMENT_THRESHOLD, LOCAL_HEIGHT_THRESHOLD
+        args.element_threshold, args.height_threshold
     );
     println!(
         "local SP1 query codewords: {}",
@@ -95,8 +109,8 @@ fn main() {
     let client = ProverClient::from_env().with_opts(SP1CoreOpts {
         shard_size: args.shard_size,
         sharding_threshold: ShardingThreshold {
-            element_threshold: LOCAL_ELEMENT_THRESHOLD,
-            height_threshold: LOCAL_HEIGHT_THRESHOLD,
+            element_threshold: args.element_threshold,
+            height_threshold: args.height_threshold,
         },
         drop_ldes: LOCAL_DROP_LDES,
         ..Default::default()
