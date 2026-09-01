@@ -113,8 +113,9 @@ means every different length is rejected.
 The registry does not turn an in-memory type, hash preimage, CometBFT schema,
 fixture or filename into a protocol format. There is no selected private proof
 packet, wallet transaction, public P2P envelope, finality-proof API,
-authenticated checkpoint or durable private-state store. `NXPR v1` is only a
-strict in-memory record codec that rebuilds mutable `NXSM` state.
+authenticated checkpoint or durable private transition log. `NXPR v1` has a
+single-snapshot local store that rebuilds mutable `NXSM` state; it is not
+consensus durability.
 
 Before adding a format, the change needs:
 

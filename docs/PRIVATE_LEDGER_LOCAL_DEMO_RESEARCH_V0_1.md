@@ -54,11 +54,10 @@ they exist only to form the canonical private intent.
 
 The packet-bound preflight remains independently tested. Connecting validated
 recipient envelopes to this command is a later integration task, after a
-portable proof and private-state persistence design exist.
+portable proof and private transaction-log design exist.
 
 ## Next implementation gate
 
-Specify a durable private-state record and recovery model for the typed
-snapshot, `NXSM` tree and anchor. Only after recovery is crash-consistent
-should a private transaction command or ABCI admission path retain user-facing
-state.
+The candidate snapshot record/store and reopen path now exist. Next, specify a
+durable private transition log and recovery model before ABCI admission can
+retain user-facing state.

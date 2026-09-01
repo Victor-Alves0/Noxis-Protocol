@@ -84,7 +84,8 @@ This boundary does not yet provide:
 - portable proof bytes or a selected `ProofVerifierId`;
 - an `NXPT` submission command or wallet transaction builder;
 - recipient-envelope persistence or availability guarantees;
-- durable private snapshots, crash recovery or checkpoint integration;
+- a durable private transition log, crash recovery across interrupted writes or
+  checkpoint integration;
 - ABCI/mempool/consensus admission;
 - concurrent writer control for private state; or
 - production-approved privacy, post-quantum security or performance.
@@ -109,7 +110,7 @@ packet or retain private state after the process exits.
 
 ## Next implementation gate
 
-Design durable private-state records and crash recovery before connecting a
-private transaction path to ABCI or consensus. A future packet/wallet command
-must also bind actual recipient envelopes and portable proof bytes rather than
-reuse this in-memory fixture.
+Design a durable private transition log and interrupted-write recovery before
+connecting a private transaction path to ABCI or consensus. A future
+packet/wallet command must also bind actual recipient envelopes and portable
+proof bytes rather than reuse this in-memory fixture.

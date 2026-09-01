@@ -83,6 +83,6 @@ wallet benchmark.
 
 The typed private-ledger admission boundary now reconstructs `NXPU v1`, invokes
 this verifier and atomically applies both nullifiers and commitments without
-using the legacy 32-byte transfer model. It remains local and in memory;
-portable proof encoding, durable private state, verifier identity and consensus
-activation remain separate later gates.
+using the legacy 32-byte transfer model. The bundle itself remains local and
+in memory; portable proof encoding, durable private transition history,
+verifier identity and consensus activation remain separate later gates.
