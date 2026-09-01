@@ -67,19 +67,22 @@ checks rejection after the state changes. Run it explicitly in optimized mode:
 cargo test --release -p noxis-private-proof-contract transfer_preflight::tests::executes_every_available_private_relation_for_one_statement --lib -- --exact --ignored --nocapture
 ```
 
-On 2026-09-01 this command passed locally in **936.43 seconds** (about 15 minutes
-36 seconds), excluding the 33.53-second release compilation. Peak resident
-memory observed during the depth-32 ownership phases was about **4.45 GB**.
+On 2026-09-01 the bundle-only version of this command passed locally in
+**936.43 seconds** (about 15 minutes 36 seconds), excluding the 33.53-second
+release compilation. Peak resident memory observed during the depth-32
+ownership phases was about **4.45 GB**. After typed ledger admission was added,
+the expanded proof-to-commit-and-replay test passed in **1088.32 seconds**; see
+[`PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md`](PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md).
 
 An unoptimized debug run was intentionally stopped after approximately 181
 minutes while it was still making CPU progress. This is why the integration
 test is ignored by default and why debug timings must not be presented as a
 wallet benchmark.
 
-## Next implementation gate
+## Implemented next gate
 
-Define a typed private-ledger admission boundary that reconstructs `NXPU v1`
-from one candidate transaction, invokes this verifier, and atomically applies
-the two nullifiers and two output commitments without converting them through
-the legacy 32-byte transfer model. Portable proof encoding, verifier identity
-and consensus activation remain separate later gates.
+The typed private-ledger admission boundary now reconstructs `NXPU v1`, invokes
+this verifier and atomically applies both nullifiers and commitments without
+using the legacy 32-byte transfer model. It remains local and in memory;
+portable proof encoding, durable private state, verifier identity and consensus
+activation remain separate later gates.

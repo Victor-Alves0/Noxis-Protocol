@@ -92,13 +92,17 @@ executa toda a sequência; também testa rejeição ao alterar o commitment de
 intenção retido. Como o backend atual não agrega provas, o teste é
 computacionalmente mais caro que as verificações unitárias isoladas e é
 ignorado por padrão. Em 2026-09-01, a execução local em release, já incluindo
-o bundle que retém e revalida as provas opacas, passou em **936,43 segundos**.
-O build release adicional levou **33,53 segundos**. O pico observado durante
-as provas de posse de profundidade 32 foi de aproximadamente **4,45 GB** de
-memória residente. Uma execução debug foi interrompida após cerca de 181
-minutos ainda em progresso; ela não é um benchmark útil. Esses números são
-pesquisa local, não meta de desempenho nem garantia operacional. Ver
-[`PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md`](PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md).
+o bundle que retém e revalida as provas opacas, passou inicialmente em
+**936,43 segundos**. Após incluir admissão, mutação atômica e rejeição de replay
+no ledger privado tipado, o mesmo teste expandido passou em **1088,32 segundos**
+(cerca de 18 minutos e 8 segundos), além de 18,57 segundos de build incremental
+release. O pico observado durante as provas de posse de profundidade 32 foi de
+aproximadamente **4,45 GB** de memória residente. Uma execução debug foi
+interrompida após cerca de 181 minutos ainda em progresso; ela não é um
+benchmark útil. Esses números são pesquisa local, não meta de desempenho nem
+garantia operacional. Ver
+[`PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md`](PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md)
+e [`PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md`](PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md).
 
 ## Próximo passo correto
 

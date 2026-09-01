@@ -1,17 +1,21 @@
 //! Typed, in-memory composition of the currently executable private-transfer
 //! proof relations.
 //!
-//! This module deliberately stops before serialization and ledger admission.
-//! It retains three independently verifiable opaque proofs: one composed
+//! This module deliberately stops before proof serialization and network
+//! admission. It retains three independently verifiable opaque proofs: one composed
 //! intent/value proof and one ownership proof for each input. All three are
 //! bound to the exact same canonical `NXPU v1` statement. Nullifier freshness
-//! is re-derived from the supplied current state and remains an atomic ledger
-//! invariant rather than a claim trusted from the bundle.
+//! is re-derived from supplied current state and remains an atomic invariant
+//! of the typed in-memory private ledger rather than a claim trusted from the
+//! bundle.
 
 use std::fmt;
 
 use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
 use noxis_privacy_types::NoteCommitmentV2;
+use noxis_private_state::{
+    CandidatePrivateTransferAuthorizationError, CandidatePrivateTransferAuthorizer,
+};
 use noxis_stark_experiment::{
     Poseidon2P24IntentValueConservationExperimentResult, Poseidon2P24IntentValueConservationProof,
     Poseidon2P24OwnershipExperimentResult, StarkExperimentError,
@@ -80,11 +84,12 @@ pub struct CandidatePrivateTransferProofBundleResultsV1 {
 
 /// Fail-closed adapter for the typed local bundle.
 ///
-/// This is not yet `noxis_crypto::ProofVerifier`: the active ledger uses a
-/// portable byte proof and legacy 32-byte nullifiers, while `NXPU v1` uses
-/// opaque local proofs and 64-byte private nullifiers. Keeping this adapter
-/// separate prevents an accidental production bypass while those interfaces
-/// are reconciled explicitly.
+/// This is not yet `noxis_crypto::ProofVerifier`: the active public ledger uses
+/// a portable byte proof and legacy 32-byte nullifiers, while the candidate
+/// private ledger accepts this adapter over opaque local proofs and 64-byte
+/// private nullifiers. Keeping the interfaces separate prevents an accidental
+/// production bypass while proof serialization and consensus admission remain
+/// unresolved.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CandidatePrivateTransferProofBundleVerifierV1;
 
@@ -105,6 +110,33 @@ impl CandidatePrivateTransferProofBundleVerifierV1 {
         CandidatePrivateTransferProofBundleError,
     > {
         verify_candidate_private_transfer_proof_bundle(bundle, statement, current_tree)
+    }
+}
+
+impl CandidatePrivateTransferAuthorizer<CandidatePrivateTransferProofBundleV1>
+    for CandidatePrivateTransferProofBundleVerifierV1
+{
+    fn verify(
+        &self,
+        authorization: &CandidatePrivateTransferProofBundleV1,
+        current_anchor: &noxis_private_state::PrivateStateAnchorV2,
+        current_tree: &NullifierSparseTreeStateV1,
+        intent: &noxis_privacy_types::PrivateTransferIntentV2,
+    ) -> Result<(), CandidatePrivateTransferAuthorizationError> {
+        let statement = CandidatePrivateTransferProofPublicStatementV1::new(
+            current_anchor.clone(),
+            current_tree,
+            intent.clone(),
+        )
+        .map_err(|_| CandidatePrivateTransferAuthorizationError::Rejected)?;
+        CandidatePrivateTransferProofBundleVerifierV1::verify(
+            *self,
+            authorization,
+            &statement,
+            current_tree,
+        )
+        .map(|_| ())
+        .map_err(|_| CandidatePrivateTransferAuthorizationError::Rejected)
     }
 }
 

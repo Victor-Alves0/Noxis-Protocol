@@ -347,9 +347,12 @@ mod tests {
         TreeParametersId, TreeParametersV2,
     };
     use noxis_private_packet_validation::validate_candidate_private_transfer_packet_envelopes;
-    use noxis_private_state::{CandidatePrivateStateSnapshotV1, PrivateStateAnchorV2};
+    use noxis_private_state::{
+        CandidatePrivateLedgerError, CandidatePrivateLedgerStateV1,
+        CandidatePrivateStateSnapshotV1, CandidatePrivateTransferRequestV1, PrivateStateAnchorV2,
+    };
     use noxis_tree_params::CandidatePoseidon2P24ManifestV2;
-    use noxis_types::{AssetId, GenesisId, ValidationContextId};
+    use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId, ValidationContextId};
     use noxis_wallet_crypto::{
         CandidatePrivateOutputSlotV1, HybridPaymentAddressEntry, RecipientEnvelopeContext,
         candidate_ciphertext_digest_v1, encode_hybrid_recipient_envelope,
@@ -642,38 +645,58 @@ mod tests {
             &output_witnesses,
         )
         .unwrap();
-        let bundle_results = CandidatePrivateTransferProofBundleVerifierV1::new()
-            .verify(&bundle, &statement, &pre_tree)
-            .unwrap();
         assert_eq!(bundle.statement_id(), statement.statement_id());
-        assert_eq!(
-            bundle_results.intent_value.intent.intent_commitment,
-            statement.air_public_inputs().intent_commitment()
+        let mut private_ledger = CandidatePrivateLedgerStateV1::new(
+            statement.anchor().genesis_id(),
+            statement.anchor().validation_context_id(),
+            statement.anchor().note_tree_parameters(),
+            snapshot.clone(),
+            pre_tree.clone(),
+        )
+        .unwrap();
+        private_ledger
+            .register_asset(
+                AssetDefinition::new(AssetId::new([5; 32]), "NOX", AssetKind::Synthetic).unwrap(),
+            )
+            .unwrap();
+        let request = CandidatePrivateTransferRequestV1::new(
+            statement.air_public_inputs().intent().clone(),
+            bundle,
         );
-        assert_eq!(
-            bundle_results.input_ownership[0].nullifier,
-            statement.air_public_inputs().intent().nullifiers()[0].elements()
+        let receipt = private_ledger
+            .apply_transfer(
+                &request,
+                &CandidatePrivateTransferProofBundleVerifierV1::new(),
+            )
+            .unwrap();
+        assert_eq!(receipt.pre_state_id(), statement.anchor().state_id());
+        assert_eq!(receipt.post_state_id(), private_ledger.anchor().state_id());
+        assert_eq!(private_ledger.snapshot().commitments().len(), 4);
+        assert_eq!(private_ledger.nullifier_tree().spent_count(), 4);
+        assert!(
+            private_ledger
+                .nullifier_tree()
+                .is_spent(receipt.input_nullifiers()[0])
         );
-        assert_eq!(
-            bundle_results.input_ownership[1].nullifier,
-            statement.air_public_inputs().intent().nullifiers()[1].elements()
+        assert!(
+            private_ledger
+                .nullifier_tree()
+                .is_spent(receipt.input_nullifiers()[1])
         );
 
-        // Verification is tied to current state, not merely to a proof that
-        // was valid at some earlier time.
-        let mut changed_tree = pre_tree.clone();
-        changed_tree
-            .mark_spent(statement.air_public_inputs().intent().nullifiers()[0])
-            .unwrap();
+        // The same authorized request is stale after commit and must not
+        // mutate the already-committed state a second time.
+        let committed_anchor = private_ledger.anchor().clone();
         assert!(matches!(
-            CandidatePrivateTransferProofBundleVerifierV1::new().verify(
-                &bundle,
-                &statement,
-                &changed_tree,
+            private_ledger.apply_transfer(
+                &request,
+                &CandidatePrivateTransferProofBundleVerifierV1::new(),
             ),
-            Err(crate::CandidatePrivateTransferProofBundleError::PublicStatement(_))
-                | Err(crate::CandidatePrivateTransferProofBundleError::NxsmWitness(_))
+            Err(CandidatePrivateLedgerError::StateTransition(_))
         ));
+        assert_eq!(private_ledger.anchor(), &committed_anchor);
+        assert_eq!(private_ledger.snapshot().commitments().len(), 4);
+        assert_eq!(private_ledger.nullifier_tree().spent_count(), 4);
 
         let mut corrupted = preflight.stark().clone();
         let mut changed = corrupted.intent_result.intent_commitment.elements();

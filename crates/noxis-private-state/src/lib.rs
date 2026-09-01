@@ -14,9 +14,16 @@ use noxis_privacy_types::{MerkleRootV2, NoteCommitmentV2, NullifierV2, PrivacyTy
 use noxis_tree_params::{CandidatePoseidon2P24ManifestV2, Poseidon2P24CandidateError};
 use sha2::{Digest, Sha256};
 
+mod ledger;
 mod state_anchor;
 mod state_anchor_v2;
 mod transition_v2;
+
+pub use ledger::{
+    CandidatePrivateLedgerError, CandidatePrivateLedgerStateV1,
+    CandidatePrivateTransferAdmissionReceiptV1, CandidatePrivateTransferAuthorizationError,
+    CandidatePrivateTransferAuthorizer, CandidatePrivateTransferRequestV1,
+};
 
 pub use state_anchor::{
     PRIVATE_NULLIFIER_SET_COMMITMENT_DOMAIN, PRIVATE_STATE_ANCHOR_ENCODED_LENGTH,

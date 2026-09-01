@@ -178,9 +178,12 @@ is still transparent and therefore is not a privacy proof.
 The research proof contract now also has a typed in-memory bundle that retains
 the composed intent/value proof and both ownership proofs, then lets a separate
 fail-closed adapter verify them again against the same `NXPU v1` statement and
-current nullifier state. It deliberately has no byte encoding, ledger adapter
-or consensus activation; see
-[`docs/PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md`](docs/PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md).
+current nullifier state. That adapter now feeds an atomic in-memory private
+ledger boundary using native 64-byte nullifiers: the optimized integration test
+commits both outputs and rejects replay. It deliberately has no byte encoding,
+durable state, ABCI or consensus activation; see
+[`docs/PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md`](docs/PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md)
+and [`docs/PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md`](docs/PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md).
 
 To reproduce the separate complete `NXSM` local preflight, explicitly opt in:
 

@@ -37,8 +37,10 @@ operação e rejeita qualquer estado posterior alterado.
 Esta é uma transição **transparente, local e de pesquisa**. Ela não aceita uma
 prova STARK, não demonstra que o remetente possuía as entradas, não prova
 conservação de valor, não persiste estado, não armazena os envelopes/ciphertexts
-das novas notas, não resolve concorrência e não autoriza ledger, consenso ou
-rede. Um nó não deve chamá-la como regra de liquidação.
+das novas notas e não resolve concorrência. Um nó não deve chamá-la diretamente
+como regra de liquidação. A camada separada de admissão agora exige um
+autorizador antes de aplicar esta transição; ver
+[`PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md`](PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md).
 
 O estado de commitments precisa da transição para tornar a próxima âncora
 derivável; o armazenamento dos envelopes de destinatário será uma camada
@@ -56,9 +58,10 @@ cargo test -p noxis-private-state transition_v2::tests::rejects_an_output_commit
 Os testes cobrem aplicação, derivação de nova âncora, revalidação, tentativa de
 gasto repetido e tentativa de reintroduzir uma nota já existente.
 
-## Próximo passo
+## Camada autorizadora implementada
 
-Fazer uma prova selecionada autorizar esta mutação — ligando a posse das
-entradas, os outputs, conservação de valor e a transição `NXSM` ao mesmo estado
-antes/depois. Só depois de tal prova e de persistência revisada uma versão
-equivalente poderá ser considerada pelo nó.
+O bundle local de pesquisa já autoriza esta mutação por uma interface tipada e
+falha fechada, ligando posse, outputs e conservação ao mesmo estado anterior.
+Isso ainda não seleciona backend ou formato portátil. O próximo passo é expor
+um comando operacional local e então projetar persistência/recuperação privada
+antes de qualquer conexão com nó, ABCI ou consenso.

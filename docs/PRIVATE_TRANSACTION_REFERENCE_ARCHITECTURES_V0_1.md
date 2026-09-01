@@ -110,9 +110,10 @@ This study does not establish that:
 - the Noxis hybrid post-quantum profile is compatible with any cited circuit;
 - the candidate bundle is ready for a public testnet.
 
-The typed in-memory bundle and fail-closed local verifier adapter now exist and
-have passed the explicit release integration test. The next artifact is a
-typed private-ledger admission boundary that consumes the 64-byte private
-nullifiers without passing through the legacy 32-byte transfer model. A new
-portable proof format comes only after that local path executes end to end and
-its bindings are reviewed.
+The typed in-memory bundle, fail-closed verifier adapter and typed private-ledger
+admission boundary now exist. The release integration test proves, verifies,
+commits both 64-byte nullifiers and both outputs, then rejects replay without
+passing through the legacy 32-byte transfer model. See
+[`PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md`](PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md).
+A new portable proof format comes only after this local path and its bindings
+are reviewed.

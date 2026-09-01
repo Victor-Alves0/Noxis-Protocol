@@ -188,13 +188,15 @@ witness entre relações sequenciais. Ela ainda não inclui posse, nullifier ou
 envelope e não ativa privacidade. Ver
 [`STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md`](STARK_VALUE_CONSERVATION_RESEARCH_V0_1.md).
 
-**Transição local de estado privado:** `noxis-private-state` agora deriva,
-somente em memória, o estado posterior 2×2 a partir de `NXPS v2`, snapshot,
-árvore `NXSM` e intenção. Ela acrescenta os commitments de saída, marca os dois
-nullifiers, reconstrói a nova âncora e falha fechado contra gasto repetido ou
-commitment reintroduzido. Não consome prova, não persiste ciphertexts e não é
-regra de ledger. Ver
-[`PRIVATE_STATE_TRANSITION_CANDIDATE_V0_1.md`](PRIVATE_STATE_TRANSITION_CANDIDATE_V0_1.md).
+**Admissão local de estado privado:** `noxis-private-state` mantém a transição
+transparente 2×2 e agora também possui um ledger candidato separado em
+representação, invariantes e mutação. O adaptador do bundle reconstrói `NXPU`,
+verifica as três provas contra o estado atual e só então substitui snapshot,
+árvore `NXSM` e âncora de uma vez. O teste release aplica dois nullifiers de 64
+bytes, dois outputs e rejeita replay. O caminho ainda não persiste ciphertexts,
+não possui prova portátil e não participa de ABCI/consenso. Ver
+[`PRIVATE_STATE_TRANSITION_CANDIDATE_V0_1.md`](PRIVATE_STATE_TRANSITION_CANDIDATE_V0_1.md)
+e [`PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md`](PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md).
 
 **Abertura e preflight candidatos:** o crate isolado
 `noxis-note-opening` mantém localmente a abertura de 178 bytes, segredos sem
