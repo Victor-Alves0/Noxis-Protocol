@@ -49,6 +49,11 @@ bash scripts/run-wsl.sh --execute
 bash scripts/run-wsl.sh --prove
 ```
 
+The runner forwards optional local SP1 resource controls, for example
+`--element-threshold` and `--height-threshold`, after `--prove`. They only
+choose how the local prover partitions work; they do not change the guest
+statement, witness format, or public root.
+
 The script must report the root equality after execution, and the proof path
 must complete local verification before either result is counted as evidence.
 
