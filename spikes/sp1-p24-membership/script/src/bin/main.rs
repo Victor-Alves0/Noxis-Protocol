@@ -2,13 +2,16 @@ use clap::Parser;
 use noxis_poseidon2_core::root_from_note_path;
 use noxis_poseidon2_reference::{BabyBearDigestV2, Poseidon2P24Reference};
 use noxis_sp1_p24_membership_lib::{root_public_bytes, P24MembershipWitnessV1};
-use sp1_core_executor::SP1CoreOpts;
+use sp1_core_executor::{SP1CoreOpts, ShardingThreshold};
 use sp1_sdk::{
     blocking::{ProveRequest, Prover, ProverClient},
     include_elf, Elf, ProvingKey, SP1Stdin,
 };
 
 const MEMBERSHIP_ELF: Elf = include_elf!("noxis-sp1-p24-membership-program");
+const LOCAL_SHARD_SIZE: usize = 500_000;
+const LOCAL_ELEMENT_THRESHOLD: u64 = 1 << 26;
+const LOCAL_HEIGHT_THRESHOLD: u64 = 1 << 20;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -24,7 +27,7 @@ struct Args {
     /// The full P24 relation is one guest program and one SP1 proof request;
     /// this limits per-shard prover memory, rather than stitching statements
     /// together in the host.
-    #[arg(long, default_value_t = 500_000)]
+    #[arg(long, default_value_t = LOCAL_SHARD_SIZE)]
     shard_size: usize,
 }
 
@@ -73,9 +76,17 @@ fn main() {
     println!("relation: private note commitment + depth-32 sibling path");
     println!("public root: {}", hex::encode(expected));
     println!("local SP1 shard size: {} cycles", args.shard_size);
+    println!(
+        "local SP1 trace thresholds: {} elements / {} rows",
+        LOCAL_ELEMENT_THRESHOLD, LOCAL_HEIGHT_THRESHOLD
+    );
 
     let client = ProverClient::from_env().with_opts(SP1CoreOpts {
         shard_size: args.shard_size,
+        sharding_threshold: ShardingThreshold {
+            element_threshold: LOCAL_ELEMENT_THRESHOLD,
+            height_threshold: LOCAL_HEIGHT_THRESHOLD,
+        },
         ..Default::default()
     });
     if args.execute {

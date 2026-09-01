@@ -17,9 +17,11 @@ bash scripts/run-wsl.sh --execute
 bash scripts/run-wsl.sh --prove
 ```
 
-The local runner uses 500,000 cycles per internal SP1 shard by default. This
-is a prover-resource setting: SP1 still receives one guest program and one
-proof request, rather than relying on any host-side statement stitching.
+The local runner uses 500,000 cycles per internal SP1 shard by default and
+sets conservative trace-area limits (67,108,864 elements and 1,048,576 rows)
+that actually trigger SP1's native sharding. This is a prover-resource setting:
+SP1 still receives one guest program and one proof request, rather than relying
+on any host-side statement stitching.
 
 This is research evidence, not a production proof backend or a private
 transfer. It does not yet bind an address/key, nullifier, note-opening cipher,

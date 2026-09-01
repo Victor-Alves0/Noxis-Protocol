@@ -73,9 +73,11 @@ segment roots. Merely proving two halves and having a host compare them would
 not prove one private membership relation and is therefore not acceptable.
 
 Before designing a new guest relation, the spike also evaluates SP1's native
-`shard_size` resource option at 500,000 cycles. That partitions one proof
-request internally; it is not host-side statement stitching and does not
-change the P24 relation or its public root.
+sharding profile: a 500,000-cycle allocation estimate plus explicit
+67,108,864-element and 1,048,576-row trace thresholds. `shard_size` alone does
+not force a split; the thresholds define the actual split boundary. This
+partitions one proof request internally; it is not host-side statement
+stitching and does not change the P24 relation or its public root.
 
 The first sharded local attempt was interrupted when WSL restarted after the
 earlier out-of-memory runs. It has no proof result yet: it is neither a passed
