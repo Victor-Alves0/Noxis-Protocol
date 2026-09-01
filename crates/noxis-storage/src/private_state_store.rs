@@ -394,4 +394,19 @@ mod tests {
         ));
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
+
+    #[test]
+    fn initialization_never_overwrites_an_existing_private_state() {
+        let path = path();
+        let store = PrivateStateStoreV1::initialize(&path, state()).unwrap();
+        drop(store);
+        assert!(matches!(
+            PrivateStateStoreV1::initialize(&path, state()),
+            Err(PrivateStateStoreError::AlreadyInitialized(_))
+        ));
+        let reopened = PrivateStateStoreV1::open(&path).unwrap();
+        assert_eq!(reopened.state().snapshot().commitments().len(), 2);
+        drop(reopened);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
 }
