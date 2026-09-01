@@ -46,13 +46,18 @@ SP1 is exercised only in the supported local WSL environment:
 cd spikes/sp1-p24-membership
 bash scripts/check-wsl.sh
 bash scripts/run-wsl.sh --execute
-bash scripts/run-wsl.sh --prove
+bash scripts/run-wsl.sh --prove --proof-mode compressed
 ```
 
 The runner forwards optional local SP1 resource controls, for example
 `--element-threshold` and `--height-threshold`, after `--prove`. They only
 choose how the local prover partitions work; they do not change the guest
 statement, witness format, or public root.
+
+`Compressed` is the default proof mode because it is the actual recursive
+composition experiment: SP1 reduces the core shard proofs into one
+constant-size proof. `--proof-mode core` remains available only for bounded
+diagnostics; SP1 documents that core proof size grows with execution length.
 
 The script must report the root equality after execution, and the proof path
 must complete local verification before either result is counted as evidence.
@@ -66,16 +71,10 @@ independent Noxis P24 reference path. The first direct evaluator required
 reduced this to **15,680,422 cycles** while retaining the same root and all
 reference-vector checks.
 
-The local SP1 core-proof attempt is **not yet accepted evidence**: it was
-terminated by the WSL out-of-memory killer at roughly 21 GiB resident memory.
-This happened both before and after the cycle reductions. The command remains
-in the spike to make the constraint reproducible, but this document does not
-claim a locally verified P24 membership proof.
-
-The next technical direction is a genuinely bound segmented/recursive design:
-it must keep each path segment private and cryptographically bind adjacent
-segment roots. Merely proving two halves and having a host compare them would
-not prove one private membership relation and is therefore not acceptable.
+The first local SP1 core-proof attempts were terminated by the WSL
+out-of-memory killer at roughly 21 GiB resident memory. This happened both
+before and after the cycle reductions. Those failed runs remain useful resource
+evidence, but are not proof acceptance.
 
 Before designing a new guest relation, the spike also evaluates SP1's native
 sharding profile: a 500,000-cycle allocation estimate plus explicit
@@ -100,10 +99,25 @@ resident memory** before returning a proof. It therefore does not count as
 locally verified evidence.
 
 The spike now exposes the trace-area and trace-height thresholds as explicit
-local command options. A later controlled run can reduce them to force smaller
-internal shards while retaining the same guest statement and public root. Only
-a completed local verification can promote any such run from an experiment to
-evidence. Hosted proving is not a substitute for this correctness gate.
+local command options. A controlled core run reduced them to **16,777,216
+elements** and **262,144 rows**, retained the 500,000-cycle estimate and
+`drop_ldes`, and completed local proof verification on 2026-08-31. Its wall
+time was approximately **43 minutes 29 seconds**, including about 30 seconds
+of release-build startup. The observed WSL use rose to roughly 18 GiB without
+swap before the prover printed `core proof accepted and locally verified`.
+The verified public root was the same 64-byte reference root shown above.
+
+This is accepted evidence for the isolated P24 membership relation under one
+local core-proof run. It is not yet a reproducibility result, backend selection,
+or evidence for any wider private-transfer statement. Hosted proving is not a
+substitute for the local correctness gate.
+
+All resource results above used SP1's default **core** proof mode. Inspection
+of the pinned SP1 6.5.0 SDK and prover showed that this mode collects a proof
+whose size grows with the number of cycles. It does not exercise SP1's
+recursive reduction tree. The next meaningful resource measurement therefore
+uses `--proof-mode compressed`; changing the proof pipeline does not change
+the guest, private witness, or public root.
 
 ## Explicit non-claims
 

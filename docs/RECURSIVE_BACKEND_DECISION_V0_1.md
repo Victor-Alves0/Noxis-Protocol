@@ -38,8 +38,21 @@ depth-32 path yield one public candidate root. Both are evaluation artifacts.
 Neither supplies the statement, parameter-ID, key/address, note-opening or
 nullifier bindings required by acceptance gate 3.
 
-The P24 guest has passed local execution against the independent reference, but
-its direct core-proof attempt exceeds the available 21 GiB WSL memory budget.
-It therefore does not satisfy acceptance gate 4. Any next experiment must use
-a cryptographically bound segmented or recursive construction, rather than
-calling host-side stitching a proof.
+The P24 guest has passed local execution against the independent reference.
+Initial direct core-proof profiles exceeded the available 21 GiB WSL memory
+budget, but a smaller trace-threshold profile completed and locally verified
+one core proof in approximately 43 minutes 29 seconds. This is proof evidence
+for the isolated relation, not backend promotion.
+
+Source inspection of the pinned SP1 6.5.0 SDK established that `Core` is the
+default and grows with execution length, while `Compressed` recursively reduces
+the arriving core shards into one constant-size proof. The next backend
+measurement therefore uses the explicit compressed pipeline. Host-side
+statement stitching is still not accepted as recursion.
+
+The separate
+[private-transaction reference study](PRIVATE_TRANSACTION_REFERENCE_ARCHITECTURES_V0_1.md)
+also establishes that recursion is not a prerequisite for the first bounded
+private-transfer integration. Independently verified spend/value relations may
+be bound to the same canonical `NXPU` statement and admitted atomically before
+proof compression becomes a wire-format or performance gate.

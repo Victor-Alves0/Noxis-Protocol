@@ -1,11 +1,11 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use noxis_poseidon2_core::root_from_note_path;
 use noxis_poseidon2_reference::{BabyBearDigestV2, Poseidon2P24Reference};
 use noxis_sp1_p24_membership_lib::{root_public_bytes, P24MembershipWitnessV1};
 use sp1_core_executor::{SP1CoreOpts, ShardingThreshold};
 use sp1_sdk::{
     blocking::{ProveRequest, Prover, ProverClient},
-    include_elf, Elf, ProvingKey, SP1Stdin,
+    include_elf, Elf, ProvingKey, SP1ProofMode, SP1Stdin,
 };
 
 const MEMBERSHIP_ELF: Elf = include_elf!("noxis-sp1-p24-membership-program");
@@ -16,6 +16,23 @@ const DEFAULT_LOCAL_HEIGHT_THRESHOLD: u64 = 1 << 20;
 // It is a local proving-resource choice; it does not alter the guest relation.
 const LOCAL_DROP_LDES: bool = true;
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CliProofMode {
+    /// A proof per core shard. Its total size grows with execution length.
+    Core,
+    /// Recursively reduce core shards into one constant-size SP1 proof.
+    Compressed,
+}
+
+impl CliProofMode {
+    const fn as_sp1(self) -> SP1ProofMode {
+        match self {
+            Self::Core => SP1ProofMode::Core,
+            Self::Compressed => SP1ProofMode::Compressed,
+        }
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -24,6 +41,13 @@ struct Args {
 
     #[arg(long)]
     prove: bool,
+
+    /// SP1 proof pipeline used after executing the unchanged guest relation.
+    ///
+    /// Compressed is the relevant recursion experiment: it reduces the core
+    /// shards inside SP1 instead of returning a linearly growing core proof.
+    #[arg(long, value_enum, default_value_t = CliProofMode::Compressed)]
+    proof_mode: CliProofMode,
 
     /// Maximum cycles per internal SP1 shard in the local CPU prover.
     ///
@@ -105,6 +129,9 @@ fn main() {
             "retained"
         }
     );
+    if args.prove {
+        println!("SP1 proof mode: {:?}", args.proof_mode);
+    }
 
     let client = ProverClient::from_env().with_opts(SP1CoreOpts {
         shard_size: args.shard_size,
@@ -124,12 +151,19 @@ fn main() {
         let pk = client.setup(MEMBERSHIP_ELF).expect("failed to setup elf");
         let proof = client
             .prove(&pk, stdin)
+            .mode(args.proof_mode.as_sp1())
             .run()
             .expect("failed to generate proof");
         assert_eq!(proof.public_values.as_slice(), expected);
         client
             .verify(&proof, pk.verifying_key(), None)
             .expect("failed to verify proof");
-        println!("core proof accepted and locally verified");
+        println!(
+            "{} proof accepted and locally verified",
+            match args.proof_mode {
+                CliProofMode::Core => "core",
+                CliProofMode::Compressed => "compressed",
+            }
+        );
     }
 }
