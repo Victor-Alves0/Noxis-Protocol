@@ -102,6 +102,7 @@ means every different length is rejected.
 | `candidate corpus / NXSV / v1` | External KAT evidence for `NXSM`. | ≤ 1 MiB; ≤ 128 records. | BE, BabyBear `u32le`, exact `NXSM` parent; strict parser; evidence only. | [`NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md`](NULLIFIER_SPARSE_EXTERNAL_KATS_V0_1.md); `noxis-tree-params`. |
 | `candidate anchor / NXPS / v1` | First private-state anchor. | Exact 220 bytes. | BE plus BabyBear `u32le`; SHA-256 state ID `NOXIS/PRIVATE-STATE-ID/V1\\0` and nullifier-set commitment `NOXIS/PRIVATE-NULLIFIER-SET/V1\\0`; encoder-only local artifact, not received wire. | [`PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md`](PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md); `noxis-private-state`. |
 | `candidate anchor / NXPS / v2` | Typed private-state anchor including `NXSM`. | Exact 288 bytes. | BE plus BabyBear `u32le`; SHA-256 state ID `NOXIS/PRIVATE-STATE-ID/V2\\0`; encoder-only and incompatible with v1. | [`PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md`](PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md); `noxis-private-state`. |
+| `candidate state record / NXPR / v1` | Complete in-memory private-ledger snapshot. | Commitments ≤ 1,024; nullifiers ≤ 2,048; assets ≤ 4,096; ticker ≤ 16 bytes. | BE counts and fields; SHA-256 checksum under `NOXIS/PRIVATE-STATE-RECORD/V1\\0`; commitments retain append order, nullifiers and assets have strict canonical order. | Exact fail-closed decoder rebuilds snapshot, `NXSM` and `NXPS v2`, checks encoded state ID and re-encoding equality; no storage activation. | [`PRIVATE_STATE_RECORD_CANDIDATE_V0_1.md`](PRIVATE_STATE_RECORD_CANDIDATE_V0_1.md); `noxis-private-state`. |
 | `candidate relation / NXNT / v1` | Public two-nullifier `NXSM` transition. | Exact 408 bytes. | BE plus BabyBear `u32le`, domain-separated ID; encoder-only. Promotion needs decoder/fuzz review. | [`PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md`](PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md); `noxis-private-proof-contract`. |
 | `candidate statement / NXPU / v1` | Unified public private-transfer statement. | Exact 1,440 bytes. | BE plus nested candidate frames/BabyBear `u32le`; SHA-256 statement ID `NOXIS/PRIVATE-TRANSFER-PROOF-PUBLIC-STATEMENT-ID/V1\\0`; encoder-only, not proof or transaction. | [`PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md`](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md); `noxis-private-proof-contract`. |
 | `candidate AIR profile / NXAR / v1` | AIR constraint-profile candidate. | Exact 152 bytes. | BE fixed checksum/ID construction; exact fail-closed parser; no executable AIR follows. | [`PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md`](PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md); `noxis-private-proof-contract`. |
@@ -112,7 +113,8 @@ means every different length is rejected.
 The registry does not turn an in-memory type, hash preimage, CometBFT schema,
 fixture or filename into a protocol format. There is no selected private proof
 packet, wallet transaction, public P2P envelope, finality-proof API,
-authenticated checkpoint or serialized mutable `NXSM` state.
+authenticated checkpoint or durable private-state store. `NXPR v1` is only a
+strict in-memory record codec that rebuilds mutable `NXSM` state.
 
 Before adding a format, the change needs:
 

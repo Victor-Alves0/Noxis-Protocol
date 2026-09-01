@@ -102,6 +102,7 @@ impl CandidatePrivateTransferAdmissionReceiptV1 {
 ///
 /// Assets are public policy metadata. The cryptographic state consists of the
 /// ordered note snapshot, 64-byte nullifier sparse tree and their typed anchor.
+#[derive(Clone, Debug)]
 pub struct CandidatePrivateLedgerStateV1 {
     pub(crate) assets: BTreeMap<AssetId, AssetDefinition>,
     pub(crate) snapshot: CandidatePrivateStateSnapshotV1,
@@ -148,5 +149,10 @@ impl CandidatePrivateLedgerStateV1 {
 
     pub fn asset(&self, asset_id: AssetId) -> Option<&AssetDefinition> {
         self.assets.get(&asset_id)
+    }
+
+    /// Public asset-policy entries in their canonical ascending asset-ID order.
+    pub fn assets(&self) -> impl ExactSizeIterator<Item = &AssetDefinition> {
+        self.assets.values()
     }
 }

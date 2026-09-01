@@ -15,6 +15,7 @@ use noxis_tree_params::{CandidatePoseidon2P24ManifestV2, Poseidon2P24CandidateEr
 use sha2::{Digest, Sha256};
 
 mod ledger;
+mod private_state_record;
 mod state_anchor;
 mod state_anchor_v2;
 mod transition_v2;
@@ -23,6 +24,12 @@ pub use ledger::{
     CandidatePrivateLedgerError, CandidatePrivateLedgerStateV1,
     CandidatePrivateTransferAdmissionReceiptV1, CandidatePrivateTransferAuthorizationError,
     CandidatePrivateTransferAuthorizer, CandidatePrivateTransferRequestV1,
+};
+pub use private_state_record::{
+    CandidatePrivateStateRecordError, PRIVATE_STATE_RECORD_CHECKSUM_DOMAIN,
+    PRIVATE_STATE_RECORD_MAGIC, PRIVATE_STATE_RECORD_MAX_ASSETS,
+    PRIVATE_STATE_RECORD_MAX_NULLIFIERS, PRIVATE_STATE_RECORD_VERSION,
+    decode_candidate_private_ledger_state, encode_candidate_private_ledger_state,
 };
 
 pub use state_anchor::{

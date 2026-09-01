@@ -46,6 +46,7 @@ $formatVersionEvidence = @(
     @{ Identity = 'candidate corpus / NXSV / v1'; Source = 'crates/noxis-tree-params/src/nullifier_sparse_corpus_v1.rs'; Pattern = 'P24_NULLIFIER_SPARSE_VECTOR_VERSION:\s*u16\s*=\s*1' }
     @{ Identity = 'candidate anchor / NXPS / v1'; Source = 'crates/noxis-private-state/src/state_anchor.rs'; Pattern = 'const VERSION:\s*u16\s*=\s*1' }
     @{ Identity = 'candidate anchor / NXPS / v2'; Source = 'crates/noxis-private-state/src/state_anchor_v2.rs'; Pattern = 'const VERSION:\s*u16\s*=\s*2' }
+    @{ Identity = 'candidate state record / NXPR / v1'; Source = 'crates/noxis-private-state/src/private_state_record.rs'; Pattern = 'PRIVATE_STATE_RECORD_VERSION:\s*u16\s*=\s*1' }
     @{ Identity = 'candidate relation / NXNT / v1'; Source = 'crates/noxis-private-proof-contract/src/nxsm_transition.rs'; Pattern = 'const VERSION:\s*u16\s*=\s*1' }
     @{ Identity = 'candidate statement / NXPU / v1'; Source = 'crates/noxis-private-proof-contract/src/public_statement.rs'; Pattern = 'const VERSION:\s*u16\s*=\s*1' }
     @{ Identity = 'candidate AIR profile / NXAR / v1'; Source = 'crates/noxis-private-proof-contract/src/air_profile.rs'; Pattern = 'const VERSION:\s*u16\s*=\s*1' }
