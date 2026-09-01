@@ -82,6 +82,13 @@ earlier out-of-memory runs. It has no proof result yet: it is neither a passed
 proof nor a cryptographic failure. A clean WSL run must complete and locally
 verify the proof before this option can count toward the promotion gates.
 
+A second clean-session sharded attempt also ended in a WSL restart before the
+prover returned a result. Further retries are intentionally deferred: the
+resource environment, rather than the relation's public-output check, is now
+the repeated limiter. Retesting requires a stable local WSL allocation with
+headroom above the current 21 GiB limit, or another locally controlled proving
+machine. Hosted proving is not a substitute for this correctness gate.
+
 ## Explicit non-claims
 
 This spike does not yet bind:
