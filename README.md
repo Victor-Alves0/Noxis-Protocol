@@ -185,6 +185,17 @@ durable state, ABCI or consensus activation; see
 [`docs/PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md`](docs/PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md)
 and [`docs/PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md`](docs/PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md).
 
+Run that exact private proof-to-ledger path locally with an optimized build:
+
+```powershell
+cargo run --release -p noxis-private-proof-contract --bin noxis-private-ledger-demo
+```
+
+It proves and admits a deterministic 2x2 private research transfer, then
+rejects its replay. It is deliberately separate from the node demo: it has no
+packet bytes, wallet, persistence, ABCI or consensus. See
+[`docs/PRIVATE_LEDGER_LOCAL_DEMO_RESEARCH_V0_1.md`](docs/PRIVATE_LEDGER_LOCAL_DEMO_RESEARCH_V0_1.md).
+
 To reproduce the separate complete `NXSM` local preflight, explicitly opt in:
 
 ```powershell

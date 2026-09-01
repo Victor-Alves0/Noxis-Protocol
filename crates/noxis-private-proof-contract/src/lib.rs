@@ -16,6 +16,7 @@ use sha2::{Digest, Sha256};
 mod air_profile;
 mod anchored_ownership;
 mod inner_receipt;
+mod local_ledger_demo;
 mod nxsm_transition;
 mod nxsm_witness;
 mod output_notes;
@@ -50,6 +51,10 @@ pub use inner_receipt::{
     CANDIDATE_INNER_RELATION_RECEIPT_ID_DOMAIN, CandidateInnerRelationKindV1,
     CandidateInnerRelationReceiptIdV1, candidate_inner_relation_receipt_id,
     candidate_inner_relation_receipt_id_from_statement_id,
+};
+pub use local_ledger_demo::{
+    CandidatePrivateLedgerDemoError, CandidatePrivateLedgerDemoReportV1,
+    run_candidate_private_ledger_demo,
 };
 pub use nxsm_transition::{
     CANDIDATE_NXSM_NULLIFIER_TRANSITION_ENCODED_LENGTH,

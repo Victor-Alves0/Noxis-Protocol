@@ -93,10 +93,23 @@ It also does not alter `noxis-ledger`'s legacy 32-byte public transfer. The two
 models remain explicit rather than silently converting security-critical
 values between incompatible widths.
 
+## Executable local demo
+
+An optimized command now drives the proof-to-commit boundary directly:
+
+```powershell
+cargo run --release -p noxis-private-proof-contract --bin noxis-private-ledger-demo
+```
+
+It produces the retained proof bundle, admits its fixed research transfer and
+then proves that the same request is rejected. See
+[the local private-ledger demo](PRIVATE_LEDGER_LOCAL_DEMO_RESEARCH_V0_1.md) for
+the command, expected output and limits. It intentionally does not yet build a
+packet or retain private state after the process exits.
+
 ## Next implementation gate
 
-Add a lightweight local command that builds the already-supported candidate
-packet and drives this typed admission boundary while keeping proof generation
-explicitly release-only. After that operational command exists, design durable
-private-state records and crash recovery before connecting the path to ABCI or
-consensus.
+Design durable private-state records and crash recovery before connecting a
+private transaction path to ABCI or consensus. A future packet/wallet command
+must also bind actual recipient envelopes and portable proof bytes rather than
+reuse this in-memory fixture.
