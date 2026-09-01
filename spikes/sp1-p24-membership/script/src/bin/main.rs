@@ -12,6 +12,9 @@ const MEMBERSHIP_ELF: Elf = include_elf!("noxis-sp1-p24-membership-program");
 const LOCAL_SHARD_SIZE: usize = 500_000;
 const LOCAL_ELEMENT_THRESHOLD: u64 = 1 << 26;
 const LOCAL_HEIGHT_THRESHOLD: u64 = 1 << 20;
+// This lowers peak prover memory by recomputing codewords for the query phase.
+// It is a local proving-resource choice; it does not alter the guest relation.
+const LOCAL_DROP_LDES: bool = true;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -80,6 +83,14 @@ fn main() {
         "local SP1 trace thresholds: {} elements / {} rows",
         LOCAL_ELEMENT_THRESHOLD, LOCAL_HEIGHT_THRESHOLD
     );
+    println!(
+        "local SP1 query codewords: {}",
+        if LOCAL_DROP_LDES {
+            "recomputed to reduce peak memory"
+        } else {
+            "retained"
+        }
+    );
 
     let client = ProverClient::from_env().with_opts(SP1CoreOpts {
         shard_size: args.shard_size,
@@ -87,6 +98,7 @@ fn main() {
             element_threshold: LOCAL_ELEMENT_THRESHOLD,
             height_threshold: LOCAL_HEIGHT_THRESHOLD,
         },
+        drop_ldes: LOCAL_DROP_LDES,
         ..Default::default()
     });
     if args.execute {

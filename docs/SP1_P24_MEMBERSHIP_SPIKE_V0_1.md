@@ -79,17 +79,19 @@ not force a split; the thresholds define the actual split boundary. This
 partitions one proof request internally; it is not host-side statement
 stitching and does not change the P24 relation or its public root.
 
-The first sharded local attempt was interrupted when WSL restarted after the
-earlier out-of-memory runs. It has no proof result yet: it is neither a passed
-proof nor a cryptographic failure. A clean WSL run must complete and locally
-verify the proof before this option can count toward the promotion gates.
+The corrected sharded profile was run in a clean WSL session. It still reached
+the local out-of-memory killer at about **21 GiB resident memory** before the
+prover returned a result. This is a resource limitation, not a cryptographic
+failure or proof acceptance. It confirms that trace sharding alone is not
+sufficient on this machine.
 
-A second clean-session sharded attempt also ended in a WSL restart before the
-prover returned a result. Further retries are intentionally deferred: the
-resource environment, rather than the relation's public-output check, is now
-the repeated limiter. Retesting requires a stable local WSL allocation with
-headroom above the current 21 GiB limit, or another locally controlled proving
-machine. Hosted proving is not a substitute for this correctness gate.
+The next controlled local profile keeps the same guest, one proof request,
+public root and sharding thresholds, but enables SP1's `drop_ldes` option. SP1
+then drops committed low-degree-extension codewords after committing them and
+re-encodes them for the query phase. That deliberately exchanges more prover
+time for lower peak memory; it does not change the statement being proved.
+Only a completed local verification can promote this from an experiment to
+evidence. Hosted proving is not a substitute for this correctness gate.
 
 ## Explicit non-claims
 
