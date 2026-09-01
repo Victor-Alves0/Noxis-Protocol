@@ -37,3 +37,9 @@ more meaningful tree subrelation: a private note commitment and a private
 depth-32 path yield one public candidate root. Both are evaluation artifacts.
 Neither supplies the statement, parameter-ID, key/address, note-opening or
 nullifier bindings required by acceptance gate 3.
+
+The P24 guest has passed local execution against the independent reference, but
+its direct core-proof attempt exceeds the available 21 GiB WSL memory budget.
+It therefore does not satisfy acceptance gate 4. Any next experiment must use
+a cryptographically bound segmented or recursive construction, rather than
+calling host-side stitching a proof.

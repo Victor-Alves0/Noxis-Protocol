@@ -52,6 +52,26 @@ bash scripts/run-wsl.sh --prove
 The script must report the root equality after execution, and the proof path
 must complete local verification before either result is counted as evidence.
 
+## Measured status
+
+The isolated guest has executed locally and its 64-byte public root matched the
+independent Noxis P24 reference path. The first direct evaluator required
+50,546,572 cycles. Two semantics-preserving optimizations (the canonical
+`J + diagonal` internal layer and single-subtraction BabyBear addition)
+reduced this to **15,680,422 cycles** while retaining the same root and all
+reference-vector checks.
+
+The local SP1 core-proof attempt is **not yet accepted evidence**: it was
+terminated by the WSL out-of-memory killer at roughly 21 GiB resident memory.
+This happened both before and after the cycle reductions. The command remains
+in the spike to make the constraint reproducible, but this document does not
+claim a locally verified P24 membership proof.
+
+The next technical direction is a genuinely bound segmented/recursive design:
+it must keep each path segment private and cryptographically bind adjacent
+segment roots. Merely proving two halves and having a host compare them would
+not prove one private membership relation and is therefore not acceptable.
+
 ## Explicit non-claims
 
 This spike does not yet bind:
