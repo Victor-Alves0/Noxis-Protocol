@@ -409,4 +409,18 @@ mod tests {
         drop(reopened);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
+
+    #[test]
+    fn incomplete_temporary_sibling_never_changes_recovery_target() {
+        let path = path();
+        let store = PrivateStateStoreV1::initialize(&path, state()).unwrap();
+        let expected = store.state().anchor().state_id();
+        drop(store);
+        let temporary = temporary_path(&path);
+        fs::write(&temporary, b"NXPR\x00").unwrap();
+        let reopened = PrivateStateStoreV1::open(&path).unwrap();
+        assert_eq!(reopened.state().anchor().state_id(), expected);
+        drop(reopened);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
 }
