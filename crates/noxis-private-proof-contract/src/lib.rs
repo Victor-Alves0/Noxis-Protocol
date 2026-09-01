@@ -54,7 +54,7 @@ pub use inner_receipt::{
 };
 pub use local_ledger_demo::{
     CandidatePrivateLedgerDemoError, CandidatePrivateLedgerDemoReportV1,
-    run_candidate_private_ledger_demo,
+    run_candidate_private_ledger_demo, run_candidate_private_ledger_persistent_demo,
 };
 pub use nxsm_transition::{
     CANDIDATE_NXSM_NULLIFIER_TRANSITION_ENCODED_LENGTH,

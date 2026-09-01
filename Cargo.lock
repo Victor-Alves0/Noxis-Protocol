@@ -696,6 +696,7 @@ dependencies = [
  "noxis-private-packet-validation",
  "noxis-private-state",
  "noxis-stark-experiment",
+ "noxis-storage",
  "noxis-tree-params",
  "noxis-types",
  "noxis-wallet-crypto",

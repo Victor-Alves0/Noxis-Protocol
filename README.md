@@ -193,8 +193,16 @@ cargo run --release -p noxis-private-proof-contract --bin noxis-private-ledger-d
 
 It proves and admits a deterministic 2x2 private research transfer, then
 rejects its replay. It is deliberately separate from the node demo: it has no
-packet bytes, wallet, persistence, ABCI or consensus. See
+packet bytes, wallet, ABCI or consensus. By default it is in-memory; its
+optional local snapshot persistence is described below. See
 [`docs/PRIVATE_LEDGER_LOCAL_DEMO_RESEARCH_V0_1.md`](docs/PRIVATE_LEDGER_LOCAL_DEMO_RESEARCH_V0_1.md).
+
+Pass `--data-dir PATH` after the binary separator to persist its resulting
+candidate private snapshot and prove recovery on reopen:
+
+```powershell
+cargo run --release -p noxis-private-proof-contract --bin noxis-private-ledger-demo -- --data-dir .\target\noxis-private-demo
+```
 
 To reproduce the separate complete `NXSM` local preflight, explicitly opt in:
 

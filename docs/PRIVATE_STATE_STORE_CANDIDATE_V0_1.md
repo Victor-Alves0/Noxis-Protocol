@@ -38,7 +38,12 @@ claimed as consensus durability.
 
 ## Next gate
 
-Add a small private-state lifecycle command that initializes this store, runs a
-private demo transition, reopens it and reports the recovered anchor. A real
-wallet command still waits for portable proofs, packet binding and recipient
-envelope persistence.
+The proof-backed local demo now accepts `--data-dir PATH` and persists its
+accepted candidate transition through this store before reopening it:
+
+```powershell
+cargo run --release -p noxis-private-proof-contract --bin noxis-private-ledger-demo -- --data-dir .\target\noxis-private-demo
+```
+
+A real wallet command still waits for portable proofs, packet binding and
+recipient-envelope persistence.

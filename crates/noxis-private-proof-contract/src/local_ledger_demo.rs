@@ -20,6 +20,7 @@ use noxis_private_state::{
     CandidatePrivateTransferAdmissionReceiptV1, CandidatePrivateTransferRequestV1,
     PrivateStateAnchorV2,
 };
+use noxis_storage::PrivateStateStoreV1;
 use noxis_tree_params::CandidatePoseidon2P24ManifestV2;
 use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId, StateId, ValidationContextId};
 
@@ -40,6 +41,7 @@ pub struct CandidatePrivateLedgerDemoReportV1 {
     final_commitment_count: usize,
     initial_spent_nullifier_count: u64,
     final_spent_nullifier_count: u64,
+    recovered_state_id: Option<StateId>,
 }
 
 impl CandidatePrivateLedgerDemoReportV1 {
@@ -66,6 +68,9 @@ impl CandidatePrivateLedgerDemoReportV1 {
     pub const fn final_spent_nullifier_count(&self) -> u64 {
         self.final_spent_nullifier_count
     }
+    pub const fn recovered_state_id(&self) -> Option<StateId> {
+        self.recovered_state_id
+    }
 }
 
 /// Runs the full proof-to-commit-and-replay sequence with deterministic
@@ -75,6 +80,19 @@ impl CandidatePrivateLedgerDemoReportV1 {
 /// backend creates and verifies three independent local STARK proofs.
 pub fn run_candidate_private_ledger_demo()
 -> Result<CandidatePrivateLedgerDemoReportV1, CandidatePrivateLedgerDemoError> {
+    run_candidate_private_ledger_demo_at(None)
+}
+
+/// Runs the same proof-backed demonstration through a durable local snapshot.
+pub fn run_candidate_private_ledger_persistent_demo(
+    path: impl AsRef<std::path::Path>,
+) -> Result<CandidatePrivateLedgerDemoReportV1, CandidatePrivateLedgerDemoError> {
+    run_candidate_private_ledger_demo_at(Some(path.as_ref()))
+}
+
+fn run_candidate_private_ledger_demo_at(
+    persistent_path: Option<&std::path::Path>,
+) -> Result<CandidatePrivateLedgerDemoReportV1, CandidatePrivateLedgerDemoError> {
     let privacy = attempt(Poseidon2P24PrivacyReference::load_candidate())?;
     let tree_reference = attempt(Poseidon2P24Reference::load_candidate())?;
     let first_key = core::array::from_fn(|index| (index as u8).wrapping_mul(13).wrapping_add(3));
@@ -222,27 +240,62 @@ pub fn run_candidate_private_ledger_demo()
         statement.air_public_inputs().intent().clone(),
         bundle,
     );
-    let accepted = attempt(ledger.apply_transfer(
-        &request,
-        &CandidatePrivateTransferProofBundleVerifierV1::new(),
-    ))?;
-    let final_commitment_count = ledger.snapshot().commitments().len();
-    let final_spent_nullifier_count = ledger.nullifier_tree().spent_count();
-    match ledger.apply_transfer(
-        &request,
-        &CandidatePrivateTransferProofBundleVerifierV1::new(),
-    ) {
-        Err(CandidatePrivateLedgerError::StateTransition(_)) => {}
-        Err(error) => {
-            return Err(CandidatePrivateLedgerDemoError::new(format!(
-                "replay was rejected for an unexpected reason: {error}"
-            )));
-        }
-        Ok(_) => {
-            return Err(CandidatePrivateLedgerDemoError::new(
-                "replay was incorrectly accepted".to_owned(),
-            ));
-        }
+    let (
+        accepted,
+        final_commitment_count,
+        final_spent_nullifier_count,
+        replay_rejected,
+        recovered_state_id,
+    ) = if let Some(path) = persistent_path {
+        let mut store = attempt(PrivateStateStoreV1::initialize(path, ledger))?;
+        let accepted = attempt(store.apply_transfer(
+            &request,
+            &CandidatePrivateTransferProofBundleVerifierV1::new(),
+        ))?;
+        let counts = (
+            store.state().snapshot().commitments().len(),
+            store.state().nullifier_tree().spent_count(),
+        );
+        let replay_rejected = matches!(
+            store.apply_transfer(
+                &request,
+                &CandidatePrivateTransferProofBundleVerifierV1::new(),
+            ),
+            Err(noxis_storage::PrivateStateStoreError::Ledger(
+                CandidatePrivateLedgerError::StateTransition(_)
+            ))
+        );
+        drop(store);
+        let reopened = attempt(PrivateStateStoreV1::open(path))?;
+        (
+            accepted,
+            counts.0,
+            counts.1,
+            replay_rejected,
+            Some(reopened.state().anchor().state_id()),
+        )
+    } else {
+        let accepted = attempt(ledger.apply_transfer(
+            &request,
+            &CandidatePrivateTransferProofBundleVerifierV1::new(),
+        ))?;
+        let counts = (
+            ledger.snapshot().commitments().len(),
+            ledger.nullifier_tree().spent_count(),
+        );
+        let replay_rejected = matches!(
+            ledger.apply_transfer(
+                &request,
+                &CandidatePrivateTransferProofBundleVerifierV1::new(),
+            ),
+            Err(CandidatePrivateLedgerError::StateTransition(_))
+        );
+        (accepted, counts.0, counts.1, replay_rejected, None)
+    };
+    if !replay_rejected {
+        return Err(CandidatePrivateLedgerDemoError::new(
+            "replay was not rejected as a stale state transition".to_owned(),
+        ));
     }
     Ok(CandidatePrivateLedgerDemoReportV1 {
         initial_state_id,
@@ -251,6 +304,7 @@ pub fn run_candidate_private_ledger_demo()
         final_commitment_count,
         initial_spent_nullifier_count,
         final_spent_nullifier_count,
+        recovered_state_id,
     })
 }
 
