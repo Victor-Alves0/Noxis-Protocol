@@ -77,6 +77,11 @@ Before designing a new guest relation, the spike also evaluates SP1's native
 request internally; it is not host-side statement stitching and does not
 change the P24 relation or its public root.
 
+The first sharded local attempt was interrupted when WSL restarted after the
+earlier out-of-memory runs. It has no proof result yet: it is neither a passed
+proof nor a cryptographic failure. A clean WSL run must complete and locally
+verify the proof before this option can count toward the promotion gates.
+
 ## Explicit non-claims
 
 This spike does not yet bind:
