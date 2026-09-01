@@ -72,6 +72,11 @@ it must keep each path segment private and cryptographically bind adjacent
 segment roots. Merely proving two halves and having a host compare them would
 not prove one private membership relation and is therefore not acceptable.
 
+Before designing a new guest relation, the spike also evaluates SP1's native
+`shard_size` resource option at 500,000 cycles. That partitions one proof
+request internally; it is not host-side statement stitching and does not
+change the P24 relation or its public root.
+
 ## Explicit non-claims
 
 This spike does not yet bind:

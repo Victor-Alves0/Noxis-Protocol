@@ -2,6 +2,7 @@ use clap::Parser;
 use noxis_poseidon2_core::root_from_note_path;
 use noxis_poseidon2_reference::{BabyBearDigestV2, Poseidon2P24Reference};
 use noxis_sp1_p24_membership_lib::{root_public_bytes, P24MembershipWitnessV1};
+use sp1_core_executor::SP1CoreOpts;
 use sp1_sdk::{
     blocking::{ProveRequest, Prover, ProverClient},
     include_elf, Elf, ProvingKey, SP1Stdin,
@@ -17,6 +18,14 @@ struct Args {
 
     #[arg(long)]
     prove: bool,
+
+    /// Maximum cycles per internal SP1 shard in the local CPU prover.
+    ///
+    /// The full P24 relation is one guest program and one SP1 proof request;
+    /// this limits per-shard prover memory, rather than stitching statements
+    /// together in the host.
+    #[arg(long, default_value_t = 500_000)]
+    shard_size: usize,
 }
 
 fn fixture() -> (P24MembershipWitnessV1, BabyBearDigestV2) {
@@ -63,8 +72,12 @@ fn main() {
     println!("Noxis SP1 P24 membership spike");
     println!("relation: private note commitment + depth-32 sibling path");
     println!("public root: {}", hex::encode(expected));
+    println!("local SP1 shard size: {} cycles", args.shard_size);
 
-    let client = ProverClient::from_env();
+    let client = ProverClient::from_env().with_opts(SP1CoreOpts {
+        shard_size: args.shard_size,
+        ..Default::default()
+    });
     if args.execute {
         let (output, report) = client.execute(MEMBERSHIP_ELF, stdin).run().unwrap();
         assert_eq!(output.as_slice(), expected);

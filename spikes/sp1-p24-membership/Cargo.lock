@@ -2064,6 +2064,7 @@ dependencies = [
  "noxis-poseidon2-reference",
  "noxis-sp1-p24-membership-lib",
  "sp1-build",
+ "sp1-core-executor",
  "sp1-sdk",
 ]
 
