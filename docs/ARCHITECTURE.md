@@ -33,7 +33,7 @@ Dependencies point inward. Domain types never depend on storage, transport, cryp
 | `noxis-consensus` | canonical BFT validator sets, block commitments, quorum and finality-certificate verification boundary | sockets, peer discovery, key storage, a homegrown consensus state machine |
 | `noxis-execution` | deterministic no-I/O execution of an ordered block and `AppHash` calculation | filesystem I/O, network engine, finality claim |
 | `noxis-config` | validated genesis, validation context and consensus configuration binding | filesystem, environment parsing, networking |
-| `noxis-storage` | atomic `NXCB` block append, sync, replay coordination and tail recovery; legacy per-record storage | protocol rules, network transport, genesis policy |
+| `noxis-storage` | atomic `NXCB` block append, sync, replay coordination and tail recovery; legacy per-record storage; candidate `NXPR` private-state snapshot publication/reopen | protocol rules, network transport, genesis policy |
 | `noxis-comet-abci` | Comet height mapping, strict v0.38 TCP/protobuf framing, volatile mempool/proposal/finalization lifecycle and the sole durable `Commit` boundary | validator private keys, Comet finality proof, P2P/network claims |
 | `noxis-node` | dependency composition and future service startup | protocol rules |
 

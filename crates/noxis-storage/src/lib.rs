@@ -38,11 +38,13 @@ use std::{
 pub mod block_journal;
 pub mod checkpoint_store;
 mod persistent_execution;
+pub mod private_state_store;
 pub mod record_log;
 
 pub use persistent_execution::{
     DurableBlockReceipt, PersistentExecution, PersistentExecutionError,
 };
+pub use private_state_store::{PrivateStateStoreError, PrivateStateStoreV1};
 
 use noxis_checkpoint::{Checkpoint, CheckpointError};
 use noxis_codec::{CodecError, decode_transaction, encode_transaction, transaction_intent_id};

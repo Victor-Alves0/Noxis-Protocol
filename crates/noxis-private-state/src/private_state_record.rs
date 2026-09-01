@@ -26,6 +26,12 @@ pub const PRIVATE_STATE_RECORD_CHECKSUM_DOMAIN: &[u8] = b"NOXIS/PRIVATE-STATE-RE
 pub const PRIVATE_STATE_RECORD_MAX_ASSETS: usize = 4_096;
 /// Candidate snapshot nullifier bound, separate from the note-count limit.
 pub const PRIVATE_STATE_RECORD_MAX_NULLIFIERS: usize = 2_048;
+/// Largest possible complete `NXPR v1` record under its declared limits.
+pub const PRIVATE_STATE_RECORD_MAX_BYTES: usize = HEADER_LENGTH
+    + crate::CANDIDATE_PRIVATE_STATE_MAX_NOTES * 64
+    + PRIVATE_STATE_RECORD_MAX_NULLIFIERS * 64
+    + PRIVATE_STATE_RECORD_MAX_ASSETS * (32 + 1 + 1 + 16)
+    + CHECKSUM_LENGTH;
 
 const HEADER_LENGTH: usize = 4 + 2 + 2 + 32 + 32 + 32 + 32 + 4 + 4 + 2;
 const CHECKSUM_LENGTH: usize = 32;

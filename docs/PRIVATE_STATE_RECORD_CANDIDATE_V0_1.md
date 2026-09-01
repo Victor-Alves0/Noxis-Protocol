@@ -53,7 +53,8 @@ storage writer one complete atomic value to publish. It does not itself call
 the filesystem, acquire a writer lock, recover partial writes or acknowledge a
 transaction.
 
-The next implementation gate is a single-writer storage component that writes
-an `NXPR` candidate to a temporary sibling file, synchronizes it, atomically
-publishes it and reopens it fail-closed. Its recovery semantics must be
-specified separately before any wallet, packet or ABCI caller can rely on it.
+The candidate single-writer storage component now performs that publication and
+reopens `NXPR` fail-closed; see
+[PRIVATE_STATE_STORE_CANDIDATE_V0_1.md](PRIVATE_STATE_STORE_CANDIDATE_V0_1.md).
+It remains a local single-snapshot research store, not a durable private
+transaction log or an ABCI/consensus authority.

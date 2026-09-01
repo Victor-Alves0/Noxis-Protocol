@@ -27,7 +27,7 @@ pub use ledger::{
 };
 pub use private_state_record::{
     CandidatePrivateStateRecordError, PRIVATE_STATE_RECORD_CHECKSUM_DOMAIN,
-    PRIVATE_STATE_RECORD_MAGIC, PRIVATE_STATE_RECORD_MAX_ASSETS,
+    PRIVATE_STATE_RECORD_MAGIC, PRIVATE_STATE_RECORD_MAX_ASSETS, PRIVATE_STATE_RECORD_MAX_BYTES,
     PRIVATE_STATE_RECORD_MAX_NULLIFIERS, PRIVATE_STATE_RECORD_VERSION,
     decode_candidate_private_ledger_state, encode_candidate_private_ledger_state,
 };
