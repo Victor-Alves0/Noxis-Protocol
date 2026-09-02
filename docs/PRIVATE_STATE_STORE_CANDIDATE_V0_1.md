@@ -45,5 +45,6 @@ accepted candidate transition through this store before reopening it:
 cargo run --release -p noxis-private-proof-contract --bin noxis-private-ledger-demo -- --data-dir .\target\noxis-private-demo
 ```
 
-A real wallet command still waits for portable proofs, packet binding and
-recipient-envelope persistence.
+The [private-state journal design](PRIVATE_STATE_JOURNAL_DESIGN_V0_1.md)
+defines the next storage layer. A real wallet command still waits for portable
+proofs, packet binding and recipient-envelope persistence.
