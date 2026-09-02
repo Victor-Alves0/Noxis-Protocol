@@ -70,6 +70,14 @@ against the supplied current `NXSM` state. Only then can it return the typed
 bundle used by the local private ledger. A stale anchor or spent nullifier is
 therefore rejected by the same existing state-bound verifier.
 
+For callers that should not manipulate proof types at all,
+`admit_candidate_private_proof_bundle_envelope` is the only local byte-to-ledger
+orchestration API. It takes `(mutable ledger, typed intent, NXPP bytes)`,
+reconstructs `NXPU` from the current ledger state, decodes and verifies the
+envelope, then calls the ledger's atomic transition boundary. The intent is
+deliberately typed and supplied separately: `NXPP` carries only the statement
+ID, not a duplicate public transaction frame.
+
 ## Required evidence and remaining gates
 
 The focused unit test covers malformed framing before P3 deserialization. The
@@ -92,6 +100,10 @@ freshly generated raw proof chunks totaled **4,967,527 bytes** and the exact
 244 bytes). P3 proof serialization varies slightly across generated proofs,
 so this is supporting evidence rather than a new maximum; both observed runs
 remain inside the 8 MiB candidate raw-proof cap.
+
+The same command subsequently exercised the public byte-to-ledger admission
+API in **1014.98 seconds**, with 4,967,982 raw proof bytes and a 4,968,226-byte
+envelope. It accepted the first admission and rejected replay after commit.
 
 Before promotion beyond this local research boundary, the project still needs
 adversarial maximum-size deserialization and verification benchmarks, fuzzing,

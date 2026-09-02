@@ -20,6 +20,14 @@ The proof-contract adapter implements that authorization interface for
 statement from current ledger state and the request intent, then independently
 verifies the retained intent/value proof and both ownership proofs.
 
+`admit_candidate_private_proof_bundle_envelope` is the companion byte-entry
+API for `NXPP v1`. It accepts a typed intent and envelope bytes, reconstructs
+the statement from the ledger's current anchor/tree, strictly decodes and
+verifies the envelope, then delegates only to the same atomic ledger mutation
+boundary. It does not accept caller-supplied roots, state IDs, proof results or
+an already-authorized flag. The final ledger authorizer independently verifies
+again immediately before mutation.
+
 ## Atomic admission sequence
 
 The implementation is separated internally into `ledger/model.rs`,
@@ -54,9 +62,9 @@ They cover:
 - rejection of an unknown asset before authorization; and
 - replay rejection without a second mutation.
 
-The full optimized integration creates the real proof bundle, uses its
-fail-closed authorizer adapter, commits the private transition and rejects the
-same request after commit:
+The full optimized integration creates the real proof bundle, serializes it as
+`NXPP`, uses the byte-entry API to decode/verify/commit the private transition
+and rejects the same bytes and intent after commit:
 
 ```powershell
 cargo test --release -p noxis-private-proof-contract transfer_preflight::tests::executes_every_available_private_relation_for_one_statement --lib -- --exact --ignored --nocapture
@@ -66,6 +74,12 @@ On 2026-09-01 that end-to-end local path passed in **1088.32 seconds** (about
 18 minutes 8 seconds), excluding an 18.57-second incremental release build.
 This is correctness evidence for the current research backend, not a wallet
 performance target.
+
+On 2026-09-02, the `NXPP` byte-entry variant passed in **1014.98 seconds**.
+It generated 4,967,982 raw proof bytes and a 4,968,226-byte envelope, then
+admitted it through `admit_candidate_private_proof_bundle_envelope` and
+rejected replay of those same bytes after the commit. Generated P3 proof sizes
+vary slightly; neither measurement is a protocol maximum.
 
 ## What is now functional
 
@@ -81,11 +95,13 @@ transaction path.
 
 This boundary does not yet provide:
 
-- portable proof bytes or a selected `ProofVerifierId`;
+- a selected `ProofVerifierId` or production proof suite; `NXPP` is portable
+  only inside the pinned local research profile;
 - an `NXPT` submission command or wallet transaction builder;
 - recipient-envelope persistence or availability guarantees;
-- a durable private transition log, crash recovery across interrupted writes or
-  checkpoint integration;
+- a durable proof-envelope history or recovery of an interrupted proof
+  submission; `NXPL` already journals complete post-state snapshots locally,
+  but it deliberately does not retain proofs or act as consensus history;
 - ABCI/mempool/consensus admission;
 - concurrent writer control for private state; or
 - production-approved privacy, post-quantum security or performance.
@@ -110,7 +126,7 @@ packet or retain private state after the process exits.
 
 ## Next implementation gate
 
-Design a durable private transition log and interrupted-write recovery before
-connecting a private transaction path to ABCI or consensus. A future
-packet/wallet command must also bind actual recipient envelopes and portable
-proof bytes rather than reuse this in-memory fixture.
+Design a durable, authenticated private transaction-history boundary and
+interrupted-submission recovery before connecting this path to ABCI or
+consensus. A future packet/wallet command must also bind actual recipient
+envelopes and a selected proof profile rather than reuse this research fixture.

@@ -20,6 +20,7 @@ mod local_ledger_demo;
 mod nxsm_transition;
 mod nxsm_witness;
 mod output_notes;
+mod proof_bundle_admission;
 mod proof_bundle_envelope;
 mod proof_transport_budget;
 mod public_inputs;
@@ -71,6 +72,9 @@ pub use output_notes::{
     CandidateOutputNotesPreflightV1, revalidate_candidate_intent_output_notes_preflight,
     revalidate_candidate_output_notes_preflight, run_candidate_intent_output_notes_preflight,
     run_candidate_output_notes_preflight,
+};
+pub use proof_bundle_admission::{
+    CandidatePrivateProofBundleAdmissionError, admit_candidate_private_proof_bundle_envelope,
 };
 pub use proof_bundle_envelope::{
     CANDIDATE_PRIVATE_PROOF_BUNDLE_ENVELOPE_CHECKSUM_DOMAIN,

@@ -335,7 +335,7 @@ impl std::error::Error for CandidatePrivateTransferStarkPreflightError {}
 #[cfg(test)]
 mod tests {
     use crate::{
-        CandidatePrivateProofBundleEnvelopeV1, CandidatePrivateTransferProofBundleVerifierV1,
+        CandidatePrivateProofBundleEnvelopeV1, admit_candidate_private_proof_bundle_envelope,
         prove_candidate_private_transfer_proof_bundle,
     };
     use noxis_codec::PrivateTransferPacketV2;
@@ -348,8 +348,7 @@ mod tests {
     };
     use noxis_private_packet_validation::validate_candidate_private_transfer_packet_envelopes;
     use noxis_private_state::{
-        CandidatePrivateLedgerError, CandidatePrivateLedgerStateV1,
-        CandidatePrivateStateSnapshotV1, CandidatePrivateTransferRequestV1, PrivateStateAnchorV2,
+        CandidatePrivateLedgerStateV1, CandidatePrivateStateSnapshotV1, PrivateStateAnchorV2,
     };
     use noxis_tree_params::CandidatePoseidon2P24ManifestV2;
     use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId, ValidationContextId};
@@ -660,13 +659,6 @@ mod tests {
             "candidate proof bundle envelope bytes: {}",
             envelope_bytes.len()
         );
-        let decoded_bundle = CandidatePrivateProofBundleEnvelopeV1::decode_and_verify(
-            &envelope_bytes,
-            &statement,
-            &pre_tree,
-        )
-        .unwrap();
-        assert_eq!(decoded_bundle.statement_id(), statement.statement_id());
         let mut private_ledger = CandidatePrivateLedgerStateV1::new(
             statement.anchor().genesis_id(),
             statement.anchor().validation_context_id(),
@@ -680,16 +672,12 @@ mod tests {
                 AssetDefinition::new(AssetId::new([5; 32]), "NOX", AssetKind::Synthetic).unwrap(),
             )
             .unwrap();
-        let request = CandidatePrivateTransferRequestV1::new(
+        let receipt = admit_candidate_private_proof_bundle_envelope(
+            &mut private_ledger,
             statement.air_public_inputs().intent().clone(),
-            decoded_bundle,
-        );
-        let receipt = private_ledger
-            .apply_transfer(
-                &request,
-                &CandidatePrivateTransferProofBundleVerifierV1::new(),
-            )
-            .unwrap();
+            &envelope_bytes,
+        )
+        .unwrap();
         assert_eq!(receipt.pre_state_id(), statement.anchor().state_id());
         assert_eq!(receipt.post_state_id(), private_ledger.anchor().state_id());
         assert_eq!(private_ledger.snapshot().commitments().len(), 4);
@@ -708,13 +696,14 @@ mod tests {
         // The same authorized request is stale after commit and must not
         // mutate the already-committed state a second time.
         let committed_anchor = private_ledger.anchor().clone();
-        assert!(matches!(
-            private_ledger.apply_transfer(
-                &request,
-                &CandidatePrivateTransferProofBundleVerifierV1::new(),
-            ),
-            Err(CandidatePrivateLedgerError::StateTransition(_))
-        ));
+        assert!(
+            admit_candidate_private_proof_bundle_envelope(
+                &mut private_ledger,
+                statement.air_public_inputs().intent().clone(),
+                &envelope_bytes,
+            )
+            .is_err()
+        );
         assert_eq!(private_ledger.anchor(), &committed_anchor);
         assert_eq!(private_ledger.snapshot().commitments().len(), 4);
         assert_eq!(private_ledger.nullifier_tree().spent_count(), 4);
