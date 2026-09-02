@@ -678,6 +678,7 @@ mod tests {
             &envelope_bytes,
         )
         .unwrap();
+        assert_ne!(receipt.envelope_id().as_bytes(), [0; 32]);
         assert_eq!(receipt.pre_state_id(), statement.anchor().state_id());
         assert_eq!(receipt.post_state_id(), private_ledger.anchor().state_id());
         assert_eq!(private_ledger.snapshot().commitments().len(), 4);

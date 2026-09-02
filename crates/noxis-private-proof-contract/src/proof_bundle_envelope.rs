@@ -26,6 +26,12 @@ pub const CANDIDATE_PRIVATE_PROOF_BUNDLE_ENVELOPE_VERSION: u16 = 1;
 /// SHA-256 checksum domain for the exact `NXPP v1` bytes before the checksum.
 pub const CANDIDATE_PRIVATE_PROOF_BUNDLE_ENVELOPE_CHECKSUM_DOMAIN: &[u8] =
     b"NOXIS/CANDIDATE-PRIVATE-PROOF-BUNDLE-ENVELOPE-CHECKSUM/V1\0";
+/// SHA-256 domain for a local identity of exact `NXPP v1` bytes.
+///
+/// This is a local receipt correlation handle, not a transaction ID,
+/// consensus identity or permission to disclose an envelope.
+pub const CANDIDATE_PRIVATE_PROOF_BUNDLE_ENVELOPE_ID_DOMAIN: &[u8] =
+    b"NOXIS/CANDIDATE-PRIVATE-PROOF-BUNDLE-ENVELOPE-ID/V1\0";
 
 const MAGIC: [u8; 4] = *b"NXPP";
 const FLAGS: u16 = 0;
@@ -44,6 +50,28 @@ const FIXED_OVERHEAD_BYTES: usize = PROOF_CHUNKS_OFFSET + CHECKSUM_LENGTH;
 /// have been independently checked.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CandidatePrivateProofBundleEnvelopeV1;
+
+/// Local identity of exact `NXPP v1` bytes after successful admission.
+///
+/// It has no decoder and cannot authenticate, authorize or recreate the
+/// envelope. Repeated byte-for-byte submissions have the same value.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct CandidatePrivateProofBundleEnvelopeIdV1([u8; 32]);
+
+impl CandidatePrivateProofBundleEnvelopeIdV1 {
+    pub const fn as_bytes(self) -> [u8; 32] {
+        self.0
+    }
+}
+
+impl fmt::Display for CandidatePrivateProofBundleEnvelopeIdV1 {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for byte in self.0 {
+            write!(formatter, "{byte:02x}")?;
+        }
+        Ok(())
+    }
+}
 
 impl CandidatePrivateProofBundleEnvelopeV1 {
     /// Canonically serializes a typed in-memory bundle under this research
@@ -228,6 +256,15 @@ fn checksum(bytes: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
+pub(crate) fn candidate_private_proof_bundle_envelope_id(
+    bytes: &[u8],
+) -> CandidatePrivateProofBundleEnvelopeIdV1 {
+    let mut hasher = Sha256::new();
+    hasher.update(CANDIDATE_PRIVATE_PROOF_BUNDLE_ENVELOPE_ID_DOMAIN);
+    hasher.update(bytes);
+    CandidatePrivateProofBundleEnvelopeIdV1(hasher.finalize().into())
+}
+
 /// Fail-closed `NXPP v1` framing, reconstruction and verification errors.
 #[derive(Debug)]
 pub enum CandidatePrivateProofBundleEnvelopeError {
@@ -359,6 +396,16 @@ mod tests {
             parse_frame(&changed, &statement),
             Err(CandidatePrivateProofBundleEnvelopeError::ChecksumMismatch)
         ));
+    }
+
+    #[test]
+    fn envelope_identity_is_domain_separated_and_binds_exact_bytes() {
+        let first = candidate_private_proof_bundle_envelope_id(b"candidate-envelope");
+        let second = candidate_private_proof_bundle_envelope_id(b"candidate-envelope");
+        let changed = candidate_private_proof_bundle_envelope_id(b"candidate-envelope!");
+        assert_eq!(first, second);
+        assert_ne!(first, changed);
+        assert_ne!(first.as_bytes(), [0; 32]);
     }
 
     fn statement_fixture() -> CandidatePrivateTransferProofPublicStatementV1 {

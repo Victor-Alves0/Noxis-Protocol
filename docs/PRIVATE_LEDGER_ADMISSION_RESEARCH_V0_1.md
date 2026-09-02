@@ -34,6 +34,11 @@ clone/journal/publish mutation method. The durable record is therefore the
 post-state already verified by the ledger; `NXPP` bytes and proof material are
 deliberately not retained as a transaction log.
 
+Both byte-entry APIs return a local
+[submission receipt](PRIVATE_PROOF_SUBMISSION_RECEIPT_CANDIDATE_V0_1.md) only
+after commit. Its envelope hash supports local operator correlation without
+introducing an unreviewed durable transaction history.
+
 ## Atomic admission sequence
 
 The implementation is separated internally into `ledger/model.rs`,

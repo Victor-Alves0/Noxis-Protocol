@@ -83,6 +83,12 @@ function uses `PrivateStateStoreV1`'s existing single-writer `NXPL` journal
 path. It persists a verified post-state and supports reopen/recovery; it does
 not turn `NXPP` into durable transaction or proof history.
 
+After a successful local admission, the API returns a separate
+[submission receipt](PRIVATE_PROOF_SUBMISSION_RECEIPT_CANDIDATE_V0_1.md) whose
+envelope ID is a domain-separated SHA-256 hash of the exact bytes. That ID is
+local and correlatable; it is deliberately outside the `NXPP` layout and is
+not a public transaction identifier.
+
 ## Required evidence and remaining gates
 
 The focused unit test covers malformed framing before P3 deserialization. The

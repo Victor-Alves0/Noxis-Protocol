@@ -16,8 +16,7 @@ use noxis_privacy_types::{
     PrivateTransferOutputV2, TreeParametersId, TreeParametersV2,
 };
 use noxis_private_state::{
-    CandidatePrivateLedgerStateV1, CandidatePrivateStateSnapshotV1,
-    CandidatePrivateTransferAdmissionReceiptV1, PrivateStateAnchorV2,
+    CandidatePrivateLedgerStateV1, CandidatePrivateStateSnapshotV1, PrivateStateAnchorV2,
 };
 use noxis_storage::PrivateStateStoreV1;
 use noxis_tree_params::CandidatePoseidon2P24ManifestV2;
@@ -25,8 +24,8 @@ use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId, StateId, Valid
 
 use crate::{
     CandidateAnchoredOwnershipWitnessV1, CandidateOutputNoteWitnessV1,
-    CandidatePrivateProofBundleEnvelopeV1, CandidatePrivateTransferProofPublicStatementV1,
-    admit_candidate_private_proof_bundle_envelope,
+    CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleEnvelopeV1,
+    CandidatePrivateTransferProofPublicStatementV1, admit_candidate_private_proof_bundle_envelope,
     admit_candidate_private_proof_bundle_envelope_to_store,
     prove_candidate_private_transfer_proof_bundle,
 };
@@ -37,7 +36,7 @@ const DEMO_ASSET: AssetId = AssetId::new([5; 32]);
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CandidatePrivateLedgerDemoReportV1 {
     initial_state_id: StateId,
-    accepted: CandidatePrivateTransferAdmissionReceiptV1,
+    accepted: CandidatePrivateProofBundleAdmissionReceiptV1,
     initial_commitment_count: usize,
     final_commitment_count: usize,
     initial_spent_nullifier_count: u64,
@@ -51,7 +50,7 @@ impl CandidatePrivateLedgerDemoReportV1 {
         self.initial_state_id
     }
 
-    pub const fn accepted(&self) -> &CandidatePrivateTransferAdmissionReceiptV1 {
+    pub const fn accepted(&self) -> &CandidatePrivateProofBundleAdmissionReceiptV1 {
         &self.accepted
     }
 

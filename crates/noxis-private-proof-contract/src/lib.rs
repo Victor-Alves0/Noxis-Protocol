@@ -74,13 +74,15 @@ pub use output_notes::{
     run_candidate_output_notes_preflight,
 };
 pub use proof_bundle_admission::{
-    CandidatePrivateProofBundleAdmissionError, admit_candidate_private_proof_bundle_envelope,
+    CandidatePrivateProofBundleAdmissionError, CandidatePrivateProofBundleAdmissionReceiptV1,
+    admit_candidate_private_proof_bundle_envelope,
     admit_candidate_private_proof_bundle_envelope_to_store,
 };
 pub use proof_bundle_envelope::{
     CANDIDATE_PRIVATE_PROOF_BUNDLE_ENVELOPE_CHECKSUM_DOMAIN,
+    CANDIDATE_PRIVATE_PROOF_BUNDLE_ENVELOPE_ID_DOMAIN,
     CANDIDATE_PRIVATE_PROOF_BUNDLE_ENVELOPE_VERSION, CandidatePrivateProofBundleEnvelopeError,
-    CandidatePrivateProofBundleEnvelopeV1,
+    CandidatePrivateProofBundleEnvelopeIdV1, CandidatePrivateProofBundleEnvelopeV1,
 };
 pub use proof_transport_budget::{
     CANDIDATE_PRIVATE_PROOF_TRANSPORT_MAX_ENVELOPE_BYTES,

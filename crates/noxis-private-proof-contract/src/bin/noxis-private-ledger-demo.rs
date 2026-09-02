@@ -36,6 +36,10 @@ fn main() {
                 "candidate proof bundle envelope bytes: {}",
                 report.proof_envelope_bytes()
             );
+            println!(
+                "candidate proof bundle envelope ID: {}",
+                report.accepted().envelope_id()
+            );
             println!("pre-state ID: {}", report.initial_state_id());
             println!("post-state ID: {}", report.accepted().post_state_id());
             println!(

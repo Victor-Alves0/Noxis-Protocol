@@ -15,12 +15,50 @@ use noxis_private_state::{
 };
 use noxis_storage::{PrivateStateStoreError, PrivateStateStoreV1};
 
+use crate::proof_bundle_envelope::candidate_private_proof_bundle_envelope_id;
 use crate::{
-    CandidatePrivateProofBundleEnvelopeError, CandidatePrivateProofBundleEnvelopeV1,
-    CandidatePrivateTransferProofBundleVerifierV1,
+    CandidatePrivateProofBundleEnvelopeError, CandidatePrivateProofBundleEnvelopeIdV1,
+    CandidatePrivateProofBundleEnvelopeV1, CandidatePrivateTransferProofBundleVerifierV1,
     CandidatePrivateTransferProofPublicStatementError,
     CandidatePrivateTransferProofPublicStatementV1,
 };
+
+/// Public local receipt returned only after one `NXPP` envelope has passed
+/// verification and the corresponding private-ledger state transition has
+/// committed. It retains no proof, note, nullifier key, ciphertext or witness.
+///
+/// This receipt is in-memory evidence for a future history design. It is not a
+/// transaction format, persistent log entry, network identity or finality
+/// proof.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CandidatePrivateProofBundleAdmissionReceiptV1 {
+    envelope_id: CandidatePrivateProofBundleEnvelopeIdV1,
+    ledger_receipt: CandidatePrivateTransferAdmissionReceiptV1,
+}
+
+impl CandidatePrivateProofBundleAdmissionReceiptV1 {
+    pub const fn envelope_id(&self) -> CandidatePrivateProofBundleEnvelopeIdV1 {
+        self.envelope_id
+    }
+    pub const fn ledger_receipt(&self) -> &CandidatePrivateTransferAdmissionReceiptV1 {
+        &self.ledger_receipt
+    }
+    pub const fn pre_state_id(&self) -> noxis_types::StateId {
+        self.ledger_receipt.pre_state_id()
+    }
+    pub const fn post_state_id(&self) -> noxis_types::StateId {
+        self.ledger_receipt.post_state_id()
+    }
+    pub const fn asset_id(&self) -> noxis_types::AssetId {
+        self.ledger_receipt.asset_id()
+    }
+    pub const fn input_nullifiers(&self) -> &[noxis_privacy_types::NullifierV2; 2] {
+        self.ledger_receipt.input_nullifiers()
+    }
+    pub const fn output_commitments(&self) -> &[noxis_privacy_types::NoteCommitmentV2; 2] {
+        self.ledger_receipt.output_commitments()
+    }
+}
 
 /// Parses, independently verifies and atomically admits one local `NXPP v1`
 /// envelope against the exact present candidate ledger state.
@@ -35,7 +73,9 @@ pub fn admit_candidate_private_proof_bundle_envelope(
     ledger: &mut CandidatePrivateLedgerStateV1,
     intent: PrivateTransferIntentV2,
     envelope_bytes: &[u8],
-) -> Result<CandidatePrivateTransferAdmissionReceiptV1, CandidatePrivateProofBundleAdmissionError> {
+) -> Result<CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleAdmissionError>
+{
+    let envelope_id = candidate_private_proof_bundle_envelope_id(envelope_bytes);
     let statement = CandidatePrivateTransferProofPublicStatementV1::new(
         ledger.anchor().clone(),
         ledger.nullifier_tree(),
@@ -47,10 +87,14 @@ pub fn admit_candidate_private_proof_bundle_envelope(
         ledger.nullifier_tree(),
     )?;
     let request = CandidatePrivateTransferRequestV1::new(intent, bundle);
-    Ok(ledger.apply_transfer(
+    let ledger_receipt = ledger.apply_transfer(
         &request,
         &CandidatePrivateTransferProofBundleVerifierV1::new(),
-    )?)
+    )?;
+    Ok(CandidatePrivateProofBundleAdmissionReceiptV1 {
+        envelope_id,
+        ledger_receipt,
+    })
 }
 
 /// Parses, verifies and durably admits one local `NXPP v1` envelope through
@@ -65,7 +109,9 @@ pub fn admit_candidate_private_proof_bundle_envelope_to_store(
     store: &mut PrivateStateStoreV1,
     intent: PrivateTransferIntentV2,
     envelope_bytes: &[u8],
-) -> Result<CandidatePrivateTransferAdmissionReceiptV1, CandidatePrivateProofBundleAdmissionError> {
+) -> Result<CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleAdmissionError>
+{
+    let envelope_id = candidate_private_proof_bundle_envelope_id(envelope_bytes);
     let state = store.state();
     let statement = CandidatePrivateTransferProofPublicStatementV1::new(
         state.anchor().clone(),
@@ -78,10 +124,14 @@ pub fn admit_candidate_private_proof_bundle_envelope_to_store(
         state.nullifier_tree(),
     )?;
     let request = CandidatePrivateTransferRequestV1::new(intent, bundle);
-    Ok(store.apply_transfer(
+    let ledger_receipt = store.apply_transfer(
         &request,
         &CandidatePrivateTransferProofBundleVerifierV1::new(),
-    )?)
+    )?;
+    Ok(CandidatePrivateProofBundleAdmissionReceiptV1 {
+        envelope_id,
+        ledger_receipt,
+    })
 }
 
 /// Errors from the local `NXPP` byte-to-ledger admission boundary.
