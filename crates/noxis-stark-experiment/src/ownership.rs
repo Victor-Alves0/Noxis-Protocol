@@ -1514,6 +1514,7 @@ mod tests {
         assert_eq!(result.trace_rows, TRACE_ROWS);
 
         let encoded = proof.encode_pinned_research_bytes().unwrap();
+        println!("pinned ownership proof bytes: {}", encoded.len());
         let decoded = Poseidon2P24OwnershipProof::decode_pinned_research_bytes(
             &encoded,
             proof.public_result().clone(),

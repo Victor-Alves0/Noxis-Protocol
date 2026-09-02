@@ -99,3 +99,11 @@ rejected:
 ```powershell
 cargo test --release -p noxis-stark-experiment ownership::tests::ownership_stark_binds_one_private_key_note_position_leaf_and_path_to_the_public_root --lib -- --exact --nocapture
 ```
+
+On 2026-09-02 this test emitted **1,066,268 bytes** for one serialized
+depth-32 ownership proof. The fixed two-input relation therefore needs more
+than 2 MiB for ownership proofs alone, before the intent/value proof or public
+metadata. The current `NXPT v1` 2 MiB opaque-proof cap is consequently known
+to be insufficient for this research bundle and must not be used as its future
+transport budget. A bounded envelope needs full-bundle measurements and an
+explicit denial-of-service review before selecting a replacement limit.
