@@ -13,6 +13,7 @@ use noxis_private_state::{
     CandidatePrivateLedgerError, CandidatePrivateLedgerStateV1,
     CandidatePrivateTransferAdmissionReceiptV1, CandidatePrivateTransferRequestV1,
 };
+use noxis_storage::{PrivateStateStoreError, PrivateStateStoreV1};
 
 use crate::{
     CandidatePrivateProofBundleEnvelopeError, CandidatePrivateProofBundleEnvelopeV1,
@@ -52,6 +53,37 @@ pub fn admit_candidate_private_proof_bundle_envelope(
     )?)
 }
 
+/// Parses, verifies and durably admits one local `NXPP v1` envelope through
+/// the existing single-writer `NXPL` private-state store.
+///
+/// The function does not write envelope bytes or proof material to disk. It
+/// reuses the store's only mutation path, which journals the complete verified
+/// post-state before publishing its cache. On success, reopening the store
+/// recovers the resulting anchor; on every parse, verification or storage
+/// error, the original in-memory and durable state remain the authority.
+pub fn admit_candidate_private_proof_bundle_envelope_to_store(
+    store: &mut PrivateStateStoreV1,
+    intent: PrivateTransferIntentV2,
+    envelope_bytes: &[u8],
+) -> Result<CandidatePrivateTransferAdmissionReceiptV1, CandidatePrivateProofBundleAdmissionError> {
+    let state = store.state();
+    let statement = CandidatePrivateTransferProofPublicStatementV1::new(
+        state.anchor().clone(),
+        state.nullifier_tree(),
+        intent.clone(),
+    )?;
+    let bundle = CandidatePrivateProofBundleEnvelopeV1::decode_and_verify(
+        envelope_bytes,
+        &statement,
+        state.nullifier_tree(),
+    )?;
+    let request = CandidatePrivateTransferRequestV1::new(intent, bundle);
+    Ok(store.apply_transfer(
+        &request,
+        &CandidatePrivateTransferProofBundleVerifierV1::new(),
+    )?)
+}
+
 /// Errors from the local `NXPP` byte-to-ledger admission boundary.
 ///
 /// Each variant leaves the supplied ledger unchanged: parsing and proof
@@ -62,6 +94,7 @@ pub enum CandidatePrivateProofBundleAdmissionError {
     PublicStatement(CandidatePrivateTransferProofPublicStatementError),
     Envelope(CandidatePrivateProofBundleEnvelopeError),
     Ledger(CandidatePrivateLedgerError),
+    Store(PrivateStateStoreError),
 }
 
 impl From<CandidatePrivateTransferProofPublicStatementError>
@@ -79,6 +112,11 @@ impl From<CandidatePrivateProofBundleEnvelopeError> for CandidatePrivateProofBun
 impl From<CandidatePrivateLedgerError> for CandidatePrivateProofBundleAdmissionError {
     fn from(value: CandidatePrivateLedgerError) -> Self {
         Self::Ledger(value)
+    }
+}
+impl From<PrivateStateStoreError> for CandidatePrivateProofBundleAdmissionError {
+    fn from(value: PrivateStateStoreError) -> Self {
+        Self::Store(value)
     }
 }
 impl fmt::Display for CandidatePrivateProofBundleAdmissionError {

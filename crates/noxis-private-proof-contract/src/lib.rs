@@ -75,6 +75,7 @@ pub use output_notes::{
 };
 pub use proof_bundle_admission::{
     CandidatePrivateProofBundleAdmissionError, admit_candidate_private_proof_bundle_envelope,
+    admit_candidate_private_proof_bundle_envelope_to_store,
 };
 pub use proof_bundle_envelope::{
     CANDIDATE_PRIVATE_PROOF_BUNDLE_ENVELOPE_CHECKSUM_DOMAIN,

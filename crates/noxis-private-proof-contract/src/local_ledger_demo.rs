@@ -16,9 +16,8 @@ use noxis_privacy_types::{
     PrivateTransferOutputV2, TreeParametersId, TreeParametersV2,
 };
 use noxis_private_state::{
-    CandidatePrivateLedgerError, CandidatePrivateLedgerStateV1, CandidatePrivateStateSnapshotV1,
-    CandidatePrivateTransferAdmissionReceiptV1, CandidatePrivateTransferRequestV1,
-    PrivateStateAnchorV2,
+    CandidatePrivateLedgerStateV1, CandidatePrivateStateSnapshotV1,
+    CandidatePrivateTransferAdmissionReceiptV1, PrivateStateAnchorV2,
 };
 use noxis_storage::PrivateStateStoreV1;
 use noxis_tree_params::CandidatePoseidon2P24ManifestV2;
@@ -26,7 +25,9 @@ use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId, StateId, Valid
 
 use crate::{
     CandidateAnchoredOwnershipWitnessV1, CandidateOutputNoteWitnessV1,
-    CandidatePrivateTransferProofBundleVerifierV1, CandidatePrivateTransferProofPublicStatementV1,
+    CandidatePrivateProofBundleEnvelopeV1, CandidatePrivateTransferProofPublicStatementV1,
+    admit_candidate_private_proof_bundle_envelope,
+    admit_candidate_private_proof_bundle_envelope_to_store,
     prove_candidate_private_transfer_proof_bundle,
 };
 
@@ -41,6 +42,7 @@ pub struct CandidatePrivateLedgerDemoReportV1 {
     final_commitment_count: usize,
     initial_spent_nullifier_count: u64,
     final_spent_nullifier_count: u64,
+    proof_envelope_bytes: usize,
     recovered_state_id: Option<StateId>,
 }
 
@@ -67,6 +69,9 @@ impl CandidatePrivateLedgerDemoReportV1 {
 
     pub const fn final_spent_nullifier_count(&self) -> u64 {
         self.final_spent_nullifier_count
+    }
+    pub const fn proof_envelope_bytes(&self) -> usize {
+        self.proof_envelope_bytes
     }
     pub const fn recovered_state_id(&self) -> Option<StateId> {
         self.recovered_state_id
@@ -220,6 +225,9 @@ fn run_candidate_private_ledger_demo_at(
         &input_witnesses,
         &output_witnesses,
     ))?;
+    let envelope_bytes = attempt(CandidatePrivateProofBundleEnvelopeV1::encode(
+        &bundle, &statement,
+    ))?;
 
     let mut ledger = attempt(CandidatePrivateLedgerStateV1::new(
         statement.anchor().genesis_id(),
@@ -236,10 +244,6 @@ fn run_candidate_private_ledger_demo_at(
     let initial_state_id = ledger.anchor().state_id();
     let initial_commitment_count = ledger.snapshot().commitments().len();
     let initial_spent_nullifier_count = ledger.nullifier_tree().spent_count();
-    let request = CandidatePrivateTransferRequestV1::new(
-        statement.air_public_inputs().intent().clone(),
-        bundle,
-    );
     let (
         accepted,
         final_commitment_count,
@@ -248,23 +252,21 @@ fn run_candidate_private_ledger_demo_at(
         recovered_state_id,
     ) = if let Some(path) = persistent_path {
         let mut store = attempt(PrivateStateStoreV1::initialize(path, ledger))?;
-        let accepted = attempt(store.apply_transfer(
-            &request,
-            &CandidatePrivateTransferProofBundleVerifierV1::new(),
+        let accepted = attempt(admit_candidate_private_proof_bundle_envelope_to_store(
+            &mut store,
+            statement.air_public_inputs().intent().clone(),
+            &envelope_bytes,
         ))?;
         let counts = (
             store.state().snapshot().commitments().len(),
             store.state().nullifier_tree().spent_count(),
         );
-        let replay_rejected = matches!(
-            store.apply_transfer(
-                &request,
-                &CandidatePrivateTransferProofBundleVerifierV1::new(),
-            ),
-            Err(noxis_storage::PrivateStateStoreError::Ledger(
-                CandidatePrivateLedgerError::StateTransition(_)
-            ))
-        );
+        let replay_rejected = admit_candidate_private_proof_bundle_envelope_to_store(
+            &mut store,
+            statement.air_public_inputs().intent().clone(),
+            &envelope_bytes,
+        )
+        .is_err();
         drop(store);
         let reopened = attempt(PrivateStateStoreV1::open(path))?;
         (
@@ -275,21 +277,21 @@ fn run_candidate_private_ledger_demo_at(
             Some(reopened.state().anchor().state_id()),
         )
     } else {
-        let accepted = attempt(ledger.apply_transfer(
-            &request,
-            &CandidatePrivateTransferProofBundleVerifierV1::new(),
+        let accepted = attempt(admit_candidate_private_proof_bundle_envelope(
+            &mut ledger,
+            statement.air_public_inputs().intent().clone(),
+            &envelope_bytes,
         ))?;
         let counts = (
             ledger.snapshot().commitments().len(),
             ledger.nullifier_tree().spent_count(),
         );
-        let replay_rejected = matches!(
-            ledger.apply_transfer(
-                &request,
-                &CandidatePrivateTransferProofBundleVerifierV1::new(),
-            ),
-            Err(CandidatePrivateLedgerError::StateTransition(_))
-        );
+        let replay_rejected = admit_candidate_private_proof_bundle_envelope(
+            &mut ledger,
+            statement.air_public_inputs().intent().clone(),
+            &envelope_bytes,
+        )
+        .is_err();
         (accepted, counts.0, counts.1, replay_rejected, None)
     };
     if !replay_rejected {
@@ -304,6 +306,7 @@ fn run_candidate_private_ledger_demo_at(
         final_commitment_count,
         initial_spent_nullifier_count,
         final_spent_nullifier_count,
+        proof_envelope_bytes: envelope_bytes.len(),
         recovered_state_id,
     })
 }

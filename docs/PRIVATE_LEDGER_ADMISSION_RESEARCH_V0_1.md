@@ -28,6 +28,12 @@ boundary. It does not accept caller-supplied roots, state IDs, proof results or
 an already-authorized flag. The final ledger authorizer independently verifies
 again immediately before mutation.
 
+`admit_candidate_private_proof_bundle_envelope_to_store` applies the identical
+verification sequence to `PrivateStateStoreV1`. It then calls the store's sole
+clone/journal/publish mutation method. The durable record is therefore the
+post-state already verified by the ledger; `NXPP` bytes and proof material are
+deliberately not retained as a transaction log.
+
 ## Atomic admission sequence
 
 The implementation is separated internally into `ledger/model.rs`,
@@ -80,6 +86,11 @@ It generated 4,967,982 raw proof bytes and a 4,968,226-byte envelope, then
 admitted it through `admit_candidate_private_proof_bundle_envelope` and
 rejected replay of those same bytes after the commit. Generated P3 proof sizes
 vary slightly; neither measurement is a protocol maximum.
+
+The same day, the runnable persistent demo admitted a 4,968,208-byte `NXPP`
+through `PrivateStateStoreV1`, rejected its replay and reopened the exact
+post-state from the `NXPL`-backed store. It is evidence of local verified
+post-state durability, not durable transaction history or consensus replay.
 
 ## What is now functional
 

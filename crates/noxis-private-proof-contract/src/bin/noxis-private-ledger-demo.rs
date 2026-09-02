@@ -32,6 +32,10 @@ fn main() {
     match result {
         Ok(report) => {
             println!("private transfer proof bundle ... accepted");
+            println!(
+                "candidate proof bundle envelope bytes: {}",
+                report.proof_envelope_bytes()
+            );
             println!("pre-state ID: {}", report.initial_state_id());
             println!("post-state ID: {}", report.accepted().post_state_id());
             println!(
@@ -44,7 +48,7 @@ fn main() {
                 report.initial_spent_nullifier_count(),
                 report.final_spent_nullifier_count()
             );
-            println!("submitted same private transfer ... rejected: StateTransition");
+            println!("submitted same private transfer bytes ... rejected: stale state");
             if let Some(recovered) = report.recovered_state_id() {
                 println!("reopened private state ... recovered: {recovered}");
             }

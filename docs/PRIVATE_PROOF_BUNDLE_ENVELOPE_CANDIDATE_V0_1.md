@@ -78,6 +78,11 @@ envelope, then calls the ledger's atomic transition boundary. The intent is
 deliberately typed and supplied separately: `NXPP` carries only the statement
 ID, not a duplicate public transaction frame.
 
+The corresponding `admit_candidate_private_proof_bundle_envelope_to_store`
+function uses `PrivateStateStoreV1`'s existing single-writer `NXPL` journal
+path. It persists a verified post-state and supports reopen/recovery; it does
+not turn `NXPP` into durable transaction or proof history.
+
 ## Required evidence and remaining gates
 
 The focused unit test covers malformed framing before P3 deserialization. The
