@@ -81,6 +81,8 @@ On 2026-09-02, the same full release test measured **4,968,511 bytes** of raw
 pinned-research proof objects: 2,836,034 for intent/value, 1,066,377 for the
 first ownership proof and 1,066,100 for the second. This is one research-case
 measurement, not a maximum, protocol size limit or network-ready envelope.
+The deliberately separate [candidate transport budget](PRIVATE_PROOF_TRANSPORT_BUDGET_CANDIDATE_V0_1.md)
+uses that evidence for a bounded future envelope without changing `NXPT v1`.
 
 An unoptimized debug run was intentionally stopped after approximately 181
 minutes while it was still making CPU progress. This is why the integration

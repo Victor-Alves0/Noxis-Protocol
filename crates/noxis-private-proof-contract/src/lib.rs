@@ -20,6 +20,7 @@ mod local_ledger_demo;
 mod nxsm_transition;
 mod nxsm_witness;
 mod output_notes;
+mod proof_transport_budget;
 mod public_inputs;
 mod public_statement;
 mod transfer_bundle;
@@ -69,6 +70,14 @@ pub use output_notes::{
     CandidateOutputNotesPreflightV1, revalidate_candidate_intent_output_notes_preflight,
     revalidate_candidate_output_notes_preflight, run_candidate_intent_output_notes_preflight,
     run_candidate_output_notes_preflight,
+};
+pub use proof_transport_budget::{
+    CANDIDATE_PRIVATE_PROOF_TRANSPORT_MAX_ENVELOPE_BYTES,
+    CANDIDATE_PRIVATE_PROOF_TRANSPORT_MAX_OVERHEAD_BYTES,
+    CANDIDATE_PRIVATE_PROOF_TRANSPORT_MAX_PROOF_BYTES,
+    CANDIDATE_PRIVATE_PROOF_TRANSPORT_MEASURED_HEADROOM_BYTES,
+    CandidatePrivateProofTransportBudgetError, CandidatePrivateProofTransportBudgetV1,
+    MEASURED_PRIVATE_PROOF_BUNDLE_BYTES,
 };
 pub use public_inputs::{
     CandidatePrivateTransferAirPublicInputsError, CandidatePrivateTransferAirPublicInputsV1,
