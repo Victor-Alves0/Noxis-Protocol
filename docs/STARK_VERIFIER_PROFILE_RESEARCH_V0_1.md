@@ -18,9 +18,15 @@ cargo test --release -p noxis-stark-experiment p24_research_proof_round_trips_to
 ```
 
 This is useful evidence that the experimental proof object has a serializable
-representation in the pinned dependency set. It is intentionally a test-only
-round trip: no bytes are emitted by a Noxis public API, persisted, accepted by
-the ledger, or sent over the network.
+representation in the pinned dependency set. The two retained proof wrappers
+used by the private-transfer research path now expose the same capability as
+explicit `encode_pinned_research_bytes` and `decode_pinned_research_bytes`
+helpers. They serialize only the opaque Plonky3 object; callers still need to
+retain and verify its public-result metadata and exact relation context.
+
+This is not a Noxis proof artifact: those helpers emit no Noxis magic, do not
+commit to a selected verifier/profile identifier, do not persist bytes, and
+are not accepted by the ledger or network.
 
 A second test writes those raw test bytes to a temporary file and starts a
 fresh child test process to deserialize and verify them. It establishes a
@@ -82,3 +88,14 @@ portable proof system.
    then perform adversarial testing and an external review.
 
 Until every condition is met, the crypto service gate remains fail-closed.
+
+## Reproduction
+
+The following release test constructs a real depth-32 ownership proof, encodes
+the opaque proof bytes, reconstructs it under a fresh high-degree research
+configuration, verifies it, and then confirms that altered public metadata is
+rejected:
+
+```powershell
+cargo test --release -p noxis-stark-experiment ownership::tests::ownership_stark_binds_one_private_key_note_position_leaf_and_path_to_the_public_root --lib -- --exact --nocapture
+```

@@ -1371,6 +1371,8 @@ pub enum StarkExperimentError {
     ValueConservationOutputOverflow,
     ValueConservationMismatch,
     OwnershipNoteCommitmentMismatch,
+    PinnedResearchProofEncode,
+    PinnedResearchProofDecode,
     VerificationFailed,
     ProverThreadFailed,
 }
@@ -1518,6 +1520,12 @@ impl std::fmt::Display for StarkExperimentError {
             }
             Self::OwnershipNoteCommitmentMismatch => formatter
                 .write_str("ownership note does not match its supplied research commitment"),
+            Self::PinnedResearchProofEncode => formatter.write_str(
+                "could not encode a proof with the pinned research serialization dependency",
+            ),
+            Self::PinnedResearchProofDecode => formatter.write_str(
+                "could not decode a proof with the pinned research serialization dependency",
+            ),
             Self::VerificationFailed => {
                 formatter.write_str("Plonky3 rejected the research STARK proof")
             }

@@ -42,8 +42,11 @@ spent. Atomic mutation remains a ledger responsibility.
 
 ## Deliberate non-claims
 
-This boundary has no encoder or decoder and therefore introduces no new wire
-magic or storage format. It is not:
+The bundle itself has no encoder or decoder and therefore introduces no new
+wire magic or storage format. Its two underlying Plonky3 wrapper types now
+offer pinned-research byte helpers, but those helpers retain separate public
+metadata and do not form a bundle, transaction, verifier profile or Noxis
+artifact. The bundle is not:
 
 - a `noxis_crypto::ProofVerifier` implementation;
 - a byte proof accepted by `noxis-ledger`;

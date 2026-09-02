@@ -111,10 +111,10 @@ pub struct Poseidon2P24OwnershipExperimentResult {
 
 /// In-memory hiding-FRI proof for the private ownership relation.
 ///
-/// The Plonky3 proof remains deliberately opaque. This separates a local
-/// prover from a local verifier without inventing a network or storage format
-/// before the candidate, proof parameters and serialization profile are
-/// selected and independently reviewed.
+/// The Plonky3 proof remains deliberately opaque. Its pinned-research byte
+/// helpers support feasibility testing only; they do not invent a Noxis
+/// network or storage format before proof parameters and a serialization
+/// profile are selected and independently reviewed.
 pub struct Poseidon2P24OwnershipProof {
     /// The exact local Plonky3 configuration that committed to this proof.
     /// It remains opaque together with the proof and is not a selected
@@ -139,6 +139,32 @@ impl Poseidon2P24OwnershipProof {
     /// This proof remains opaque and has no transaction encoding.
     pub const fn bound_note_commitment(&self) -> Option<BabyBearDigestV2> {
         self.bound_note_commitment
+    }
+
+    /// Encodes only the opaque Plonky3 object through the currently pinned
+    /// research dependency. These bytes require separately retained public
+    /// result metadata and are not a Noxis wire or storage format.
+    pub fn encode_pinned_research_bytes(&self) -> Result<Vec<u8>, StarkExperimentError> {
+        postcard::to_allocvec(&self.proof)
+            .map_err(|_| StarkExperimentError::PinnedResearchProofEncode)
+    }
+
+    /// Rebuilds an in-memory ownership proof under a fresh local high-degree
+    /// research profile. The supplied metadata is untrusted until
+    /// [`verify_p24_note_ownership_proof`] succeeds.
+    pub fn decode_pinned_research_bytes(
+        bytes: &[u8],
+        public_result: Poseidon2P24OwnershipExperimentResult,
+        bound_note_commitment: Option<BabyBearDigestV2>,
+    ) -> Result<Self, StarkExperimentError> {
+        let proof = postcard::from_bytes(bytes)
+            .map_err(|_| StarkExperimentError::PinnedResearchProofDecode)?;
+        Ok(Self {
+            config: make_high_degree_hiding_config(),
+            proof,
+            public_result,
+            bound_note_commitment,
+        })
     }
 }
 
@@ -1486,6 +1512,15 @@ mod tests {
         }
         assert_eq!(result.root, root);
         assert_eq!(result.trace_rows, TRACE_ROWS);
+
+        let encoded = proof.encode_pinned_research_bytes().unwrap();
+        let decoded = Poseidon2P24OwnershipProof::decode_pinned_research_bytes(
+            &encoded,
+            proof.public_result().clone(),
+            proof.bound_note_commitment(),
+        )
+        .unwrap();
+        assert_eq!(verify_p24_note_ownership_proof(&decoded).unwrap(), result);
 
         proof.public_result.root[0] = proof.public_result.root[0].wrapping_add(1);
         assert!(matches!(

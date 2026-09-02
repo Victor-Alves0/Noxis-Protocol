@@ -53,10 +53,10 @@ pub struct Poseidon2P24IntentValueConservationExperimentResult {
 
 /// Opaque in-memory proof for the composed intent/value relation.
 ///
-/// The exact Plonky3 configuration remains attached to the proof. There is no
-/// encoder, decoder, verifier key, network frame or production suite ID yet.
-/// A verifier must also supply the exact canonical intent whose bytes are part
-/// of the public input.
+/// The exact Plonky3 configuration remains attached to the proof. The pinned
+/// research byte helpers are intentionally below any Noxis envelope, verifier
+/// key, network frame or production suite ID. A verifier must also supply the
+/// exact canonical intent whose bytes are part of the public input.
 pub struct Poseidon2P24IntentValueConservationProof {
     config: crate::Config,
     proof: Proof<crate::Config>,
@@ -67,6 +67,31 @@ impl Poseidon2P24IntentValueConservationProof {
     /// Public commitments and trace shape retained beside the opaque proof.
     pub const fn public_result(&self) -> &Poseidon2P24IntentValueConservationExperimentResult {
         &self.public_result
+    }
+
+    /// Encodes only the opaque Plonky3 object through the currently pinned
+    /// research dependency. The accompanying public result remains a separate
+    /// caller responsibility, and these bytes are not a Noxis wire format.
+    pub fn encode_pinned_research_bytes(&self) -> Result<Vec<u8>, StarkExperimentError> {
+        postcard::to_allocvec(&self.proof)
+            .map_err(|_| StarkExperimentError::PinnedResearchProofEncode)
+    }
+
+    /// Rebuilds an in-memory proof using a freshly constructed local research
+    /// verifier configuration. The caller supplies the public result that
+    /// verification will bind; call [`verify_p24_intent_value_conservation_proof`]
+    /// before accepting it for any local action.
+    pub fn decode_pinned_research_bytes(
+        bytes: &[u8],
+        public_result: Poseidon2P24IntentValueConservationExperimentResult,
+    ) -> Result<Self, StarkExperimentError> {
+        let proof = postcard::from_bytes(bytes)
+            .map_err(|_| StarkExperimentError::PinnedResearchProofDecode)?;
+        Ok(Self {
+            config: make_hiding_config(),
+            proof,
+            public_result,
+        })
     }
 }
 
