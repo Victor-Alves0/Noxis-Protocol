@@ -38,11 +38,19 @@ use std::{
 pub mod block_journal;
 pub mod checkpoint_store;
 mod persistent_execution;
+pub mod private_state_journal;
 pub mod private_state_store;
 pub mod record_log;
 
 pub use persistent_execution::{
     DurableBlockReceipt, PersistentExecution, PersistentExecutionError,
+};
+pub use private_state_journal::{
+    PRIVATE_STATE_JOURNAL_CHECKSUM_LENGTH, PRIVATE_STATE_JOURNAL_HEADER_LENGTH,
+    PRIVATE_STATE_JOURNAL_MAGIC, PRIVATE_STATE_JOURNAL_MAX_PAYLOAD_LENGTH,
+    PRIVATE_STATE_JOURNAL_PAYLOAD_PREFIX_LENGTH, PRIVATE_STATE_JOURNAL_VERSION,
+    PrivateStateJournalError, PrivateStateJournalIncompleteTail, PrivateStateJournalRecoveryScan,
+    PrivateStateJournalV1, StoredPrivateState,
 };
 pub use private_state_store::{PrivateStateStoreError, PrivateStateStoreV1};
 

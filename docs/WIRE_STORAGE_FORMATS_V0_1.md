@@ -103,6 +103,7 @@ means every different length is rejected.
 | `candidate anchor / NXPS / v1` | First private-state anchor. | Exact 220 bytes. | BE plus BabyBear `u32le`; SHA-256 state ID `NOXIS/PRIVATE-STATE-ID/V1\\0` and nullifier-set commitment `NOXIS/PRIVATE-NULLIFIER-SET/V1\\0`; encoder-only local artifact, not received wire. | [`PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md`](PRIVATE_STATE_ANCHOR_CANDIDATE_V0_1.md); `noxis-private-state`. |
 | `candidate anchor / NXPS / v2` | Typed private-state anchor including `NXSM`. | Exact 288 bytes. | BE plus BabyBear `u32le`; SHA-256 state ID `NOXIS/PRIVATE-STATE-ID/V2\\0`; encoder-only and incompatible with v1. | [`PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md`](PRIVATE_STATE_NXSM_ANCHOR_CANDIDATE_V0_1.md); `noxis-private-state`. |
 | `candidate state record / NXPR / v1` | Complete local private-ledger snapshot. | Commitments ≤ 1,024; nullifiers ≤ 2,048; assets ≤ 4,096; ticker ≤ 16 bytes. | BE counts and fields; SHA-256 checksum under `NOXIS/PRIVATE-STATE-RECORD/V1\\0`; commitments retain append order, nullifiers and assets have strict canonical order. | Exact fail-closed decoder rebuilds snapshot, `NXSM` and `NXPS v2`, checks encoded state ID and re-encoding equality; candidate single-snapshot storage only. | [`PRIVATE_STATE_RECORD_CANDIDATE_V0_1.md`](PRIVATE_STATE_RECORD_CANDIDATE_V0_1.md); `noxis-private-state`. |
+| `candidate private-state journal / NXPL / v1` | Append-only local sequence of complete private post-state snapshots; it does not retain proof witnesses. | Frame payload ≤ `76 + NXPR_MAX`; CRC-32 outer frame. | BE frame header and sequence; every complete nested `NXPR` is strictly rebuilt, its resulting `StateId` is bound in the outer payload, and entries are one-based with a direct predecessor link. | A corrupt complete frame fails closed; a structurally plausible final partial frame is exposed for explicit re-scan-and-truncate only. The first predecessor needs a separately retained authenticated base state. Candidate local storage only; no consensus/replay-proof claim. | [`PRIVATE_STATE_JOURNAL_DESIGN_V0_1.md`](PRIVATE_STATE_JOURNAL_DESIGN_V0_1.md); `noxis-storage`. |
 | `candidate relation / NXNT / v1` | Public two-nullifier `NXSM` transition. | Exact 408 bytes. | BE plus BabyBear `u32le`, domain-separated ID; encoder-only. Promotion needs decoder/fuzz review. | [`PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md`](PRIVATE_TRANSFER_NXSM_TRANSITION_CANDIDATE_V0_1.md); `noxis-private-proof-contract`. |
 | `candidate statement / NXPU / v1` | Unified public private-transfer statement. | Exact 1,440 bytes. | BE plus nested candidate frames/BabyBear `u32le`; SHA-256 statement ID `NOXIS/PRIVATE-TRANSFER-PROOF-PUBLIC-STATEMENT-ID/V1\\0`; encoder-only, not proof or transaction. | [`PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md`](PRIVATE_TRANSFER_PUBLIC_STATEMENT_CANDIDATE_V0_1.md); `noxis-private-proof-contract`. |
 | `candidate AIR profile / NXAR / v1` | AIR constraint-profile candidate. | Exact 152 bytes. | BE fixed checksum/ID construction; exact fail-closed parser; no executable AIR follows. | [`PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md`](PRIVATE_TRANSFER_AIR_PROFILE_CANDIDATE_V0_1.md); `noxis-private-proof-contract`. |
@@ -113,9 +114,11 @@ means every different length is rejected.
 The registry does not turn an in-memory type, hash preimage, CometBFT schema,
 fixture or filename into a protocol format. There is no selected private proof
 packet, wallet transaction, public P2P envelope, finality-proof API,
-authenticated checkpoint or durable private transition log. `NXPR v1` has a
-single-snapshot local store that rebuilds mutable `NXSM` state; it is not
-consensus durability.
+authenticated checkpoint or consensus-owned durable private transition log.
+`NXPR v1` has a single-snapshot local store that rebuilds mutable `NXSM`
+state. `NXPL v1` is a candidate local post-state journal and detects its
+bounded frame/chain corruption, but cannot replay authorization proofs and is
+not consensus durability.
 
 Before adding a format, the change needs:
 

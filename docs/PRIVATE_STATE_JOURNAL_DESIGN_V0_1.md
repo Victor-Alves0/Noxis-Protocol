@@ -12,9 +12,9 @@ transactions and relies on the public verifier interface. The current private
 proof bundle is an opaque in-memory value with no canonical proof bytes, so a
 future journal must not pretend it can replay or independently reauthorize it.
 
-## Candidate `NXPL v1` direction
+## Candidate `NXPL v1` implementation boundary
 
-The proposed private journal is append-only. Each frame would contain exactly
+The implemented local private journal is append-only. Each frame contains exactly
 one complete canonical **post-transition `NXPR` snapshot**, plus only public
 chain metadata:
 
@@ -58,10 +58,16 @@ For one accepted private transfer:
 If the cache publication fails after a durable journal entry, reopening must
 rebuild from the journal instead of treating the old cache as authority.
 
-## Implementation gates
+## Implementation status and remaining gates
 
-Before implementation, add a `NXPL` registry row and source-version guard.
-Tests must cover multiple transitions/reopen, post-restart replay rejection,
-every-byte final-tail truncation, mid-history corruption, cache/journal
-divergence and writer exclusion. The private proof bundle needs a separate
-portable-proof design before journal replay can reverify authorization.
+`NXPL` now has a registry row, source-version guard and tests for a recovered
+two-entry chain ending in a real private transition, predecessor/base mismatch, checksum corruption and a
+verified incomplete-tail truncation. It remains deliberately separate from
+`PrivateStateStoreV1`: joining a replaceable cache and an append-only journal
+needs one crash-recovery authority and one shared writer lock, which is the
+next integration step rather than a silent coupling.
+
+The remaining tests/design are post-restart replay rejection, every-byte
+final-tail truncation, mid-history corruption, cache/journal divergence and
+writer exclusion. The private proof bundle also needs a portable-proof design
+before journal recovery can reverify authorization.
