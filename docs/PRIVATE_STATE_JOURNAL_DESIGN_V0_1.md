@@ -61,13 +61,13 @@ rebuild from the journal instead of treating the old cache as authority.
 ## Implementation status and remaining gates
 
 `NXPL` now has a registry row, source-version guard and tests for a recovered
-two-entry chain ending in a real private transition, predecessor/base mismatch, checksum corruption and a
-verified incomplete-tail truncation. It remains deliberately separate from
-`PrivateStateStoreV1`: joining a replaceable cache and an append-only journal
-needs one crash-recovery authority and one shared writer lock, which is the
-next integration step rather than a silent coupling.
+two-entry chain ending in a real private transition, predecessor/base mismatch,
+checksum corruption and a verified incomplete-tail truncation. It is integrated
+with `PrivateStateStoreV1` under the store's one writer lock: an immutable base
+snapshot binds the first predecessor, and the journal repairs a stale
+or corrupt replaceable cache after a successful journal append.
 
 The remaining tests/design are post-restart replay rejection, every-byte
-final-tail truncation, mid-history corruption, cache/journal divergence and
-writer exclusion. The private proof bundle also needs a portable-proof design
-before journal recovery can reverify authorization.
+final-tail truncation, mid-history corruption and a filesystem fault-injection
+matrix. The private proof bundle also needs a portable-proof design before
+journal recovery can reverify authorization.
