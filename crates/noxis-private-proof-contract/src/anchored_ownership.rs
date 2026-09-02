@@ -108,6 +108,21 @@ impl CandidateAnchoredOwnershipProofV1 {
     ) -> Result<usize, CandidateAnchoredOwnershipError> {
         Ok(self.ownership_proof.encode_pinned_research_bytes()?.len())
     }
+
+    /// Returns the raw research proof together with its mandatory local
+    /// input-note binding for the candidate bundle envelope.
+    pub(crate) fn pinned_research_transport_part(
+        &self,
+    ) -> Result<(Vec<u8>, BabyBearDigestV2), CandidateAnchoredOwnershipError> {
+        let note_commitment = self
+            .ownership_proof
+            .bound_note_commitment()
+            .ok_or(CandidateAnchoredOwnershipError::MissingNoteCommitmentBinding)?;
+        Ok((
+            self.ownership_proof.encode_pinned_research_bytes()?,
+            note_commitment,
+        ))
+    }
 }
 
 /// Public receipt of a sequential two-input ownership preflight.
@@ -274,6 +289,29 @@ pub(crate) fn prove_candidate_anchored_ownership_bound_note_commitment(
     };
     verify_candidate_anchored_ownership(&anchored, statement, pre_tree, nxsm_witness)?;
     Ok(anchored)
+}
+
+/// Rebuilds one opaque ownership proof for the candidate local bundle
+/// envelope. The caller must still invoke the bundle verifier against the
+/// supplied statement and current tree before using the result.
+pub(crate) fn decode_candidate_anchored_ownership_bound_note_commitment(
+    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    input_index: u8,
+    bytes: &[u8],
+    public_result: Poseidon2P24OwnershipExperimentResult,
+    note_commitment: BabyBearDigestV2,
+) -> Result<CandidateAnchoredOwnershipProofV1, CandidateAnchoredOwnershipError> {
+    validate_input_index(input_index)?;
+    let ownership_proof = Poseidon2P24OwnershipProof::decode_pinned_research_bytes(
+        bytes,
+        public_result,
+        Some(note_commitment),
+    )?;
+    Ok(CandidateAnchoredOwnershipProofV1 {
+        ownership_proof,
+        input_index,
+        statement_id: statement.statement_id(),
+    })
 }
 
 /// Verifies an opaque P24 ownership proof and every public/local cross-binding
@@ -615,6 +653,7 @@ pub enum CandidateAnchoredOwnershipError {
     NullifierMismatch,
     IntentCommitmentMismatch,
     DuplicateNullifier,
+    MissingNoteCommitmentBinding,
 }
 
 impl From<CandidatePrivateTransferProofPublicStatementError> for CandidateAnchoredOwnershipError {

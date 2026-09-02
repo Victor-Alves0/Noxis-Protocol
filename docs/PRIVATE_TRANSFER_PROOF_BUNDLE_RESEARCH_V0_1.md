@@ -42,11 +42,12 @@ spent. Atomic mutation remains a ledger responsibility.
 
 ## Deliberate non-claims
 
-The bundle itself has no encoder or decoder and therefore introduces no new
-wire magic or storage format. Its two underlying Plonky3 wrapper types now
-offer pinned-research byte helpers, but those helpers retain separate public
-metadata and do not form a bundle, transaction, verifier profile or Noxis
-artifact. The bundle is not:
+The bundle is now carried only by the separate, local
+[`NXPP v1` candidate envelope](PRIVATE_PROOF_BUNDLE_ENVELOPE_CANDIDATE_V0_1.md).
+That envelope strictly frames bytes, reconstructs the three research objects
+and independently verifies them before returning a usable bundle; it is still
+not a transaction, verifier profile or selected Noxis artifact. The bundle is
+not:
 
 - a `noxis_crypto::ProofVerifier` implementation;
 - a byte proof accepted by `noxis-ledger`;
@@ -83,6 +84,9 @@ first ownership proof and 1,066,100 for the second. This is one research-case
 measurement, not a maximum, protocol size limit or network-ready envelope.
 The deliberately separate [candidate transport budget](PRIVATE_PROOF_TRANSPORT_BUDGET_CANDIDATE_V0_1.md)
 uses that evidence for a bounded future envelope without changing `NXPT v1`.
+The subsequent `NXPP` release round trip completed in 991.30 seconds with a
+fresh 4,967,527-byte raw bundle and a 4,967,771-byte complete envelope; see
+[the envelope evidence](PRIVATE_PROOF_BUNDLE_ENVELOPE_CANDIDATE_V0_1.md).
 
 An unoptimized debug run was intentionally stopped after approximately 181
 minutes while it was still making CPU progress. This is why the integration

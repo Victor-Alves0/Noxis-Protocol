@@ -335,7 +335,7 @@ impl std::error::Error for CandidatePrivateTransferStarkPreflightError {}
 #[cfg(test)]
 mod tests {
     use crate::{
-        CandidatePrivateTransferProofBundleVerifierV1,
+        CandidatePrivateProofBundleEnvelopeV1, CandidatePrivateTransferProofBundleVerifierV1,
         prove_candidate_private_transfer_proof_bundle,
     };
     use noxis_codec::PrivateTransferPacketV2;
@@ -654,6 +654,19 @@ mod tests {
             proof_lengths[2],
             proof_lengths.into_iter().sum::<usize>(),
         );
+        let envelope_bytes =
+            CandidatePrivateProofBundleEnvelopeV1::encode(&bundle, &statement).unwrap();
+        println!(
+            "candidate proof bundle envelope bytes: {}",
+            envelope_bytes.len()
+        );
+        let decoded_bundle = CandidatePrivateProofBundleEnvelopeV1::decode_and_verify(
+            &envelope_bytes,
+            &statement,
+            &pre_tree,
+        )
+        .unwrap();
+        assert_eq!(decoded_bundle.statement_id(), statement.statement_id());
         let mut private_ledger = CandidatePrivateLedgerStateV1::new(
             statement.anchor().genesis_id(),
             statement.anchor().validation_context_id(),
@@ -669,7 +682,7 @@ mod tests {
             .unwrap();
         let request = CandidatePrivateTransferRequestV1::new(
             statement.air_public_inputs().intent().clone(),
-            bundle,
+            decoded_bundle,
         );
         let receipt = private_ledger
             .apply_transfer(

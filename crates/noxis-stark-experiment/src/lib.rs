@@ -54,9 +54,9 @@ pub use intent::{
     Poseidon2P24IntentExperimentResult, prove_and_verify_p24_intent, run_p24_intent_research_smoke,
 };
 pub use intent_value_conservation::{
-    Poseidon2P24IntentValueConservationExperimentResult, Poseidon2P24IntentValueConservationProof,
-    prove_and_verify_p24_intent_value_conservation, prove_p24_intent_value_conservation,
-    verify_p24_intent_value_conservation_proof,
+    P24_INTENT_VALUE_CONSERVATION_TRACE_ROWS, Poseidon2P24IntentValueConservationExperimentResult,
+    Poseidon2P24IntentValueConservationProof, prove_and_verify_p24_intent_value_conservation,
+    prove_p24_intent_value_conservation, verify_p24_intent_value_conservation_proof,
 };
 pub use intent_value_first_ownership::{
     Poseidon2P24IntentValueFirstOwnershipExperimentResult,
@@ -73,7 +73,7 @@ pub use nxsm::{
     run_p24_nxsm_absence_path512_sequential_preflight, verify_p24_nxsm_absence_prefix8_proof,
 };
 pub use ownership::{
-    Poseidon2P24OwnershipExperimentResult, Poseidon2P24OwnershipProof,
+    P24_OWNERSHIP_TRACE_ROWS, Poseidon2P24OwnershipExperimentResult, Poseidon2P24OwnershipProof,
     prove_and_verify_p24_note_ownership, prove_and_verify_p24_note_ownership_path2,
     prove_and_verify_p24_note_ownership_path32,
     prove_and_verify_p24_note_ownership_path32_bound_note_commitment,

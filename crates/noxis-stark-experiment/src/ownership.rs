@@ -52,6 +52,10 @@ const TOTAL_PHASES: usize =
 const TOTAL_STEPS: usize = TOTAL_PHASES * P24_ROUNDS;
 /// `TOTAL_STEPS` needs 4260 rows; the FRI trace is a power of two.
 pub(crate) const TRACE_ROWS: usize = 8192;
+/// Fixed trace height of the depth-32 ownership research relation.
+///
+/// This is public profile shape only, not a portable verifier selection.
+pub const P24_OWNERSHIP_TRACE_ROWS: usize = TRACE_ROWS;
 const ROUND_SELECTOR_OFFSET: usize = P24_WIDTH;
 const PHASE_SELECTOR_OFFSET: usize = ROUND_SELECTOR_OFFSET + P24_ROUNDS;
 const DONE_OFFSET: usize = PHASE_SELECTOR_OFFSET + TOTAL_PHASES;

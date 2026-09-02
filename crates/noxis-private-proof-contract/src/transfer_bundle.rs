@@ -17,12 +17,17 @@ use noxis_private_state::{
     CandidatePrivateTransferAuthorizationError, CandidatePrivateTransferAuthorizer,
 };
 use noxis_stark_experiment::{
-    Poseidon2P24IntentValueConservationExperimentResult, Poseidon2P24IntentValueConservationProof,
-    Poseidon2P24OwnershipExperimentResult, StarkExperimentError,
+    P24_INTENT_VALUE_CONSERVATION_TRACE_ROWS, P24_OWNERSHIP_TRACE_ROWS,
+    Poseidon2P24IntentExperimentResult, Poseidon2P24IntentValueConservationExperimentResult,
+    Poseidon2P24IntentValueConservationProof, Poseidon2P24OwnershipExperimentResult,
+    Poseidon2P24ValueConservationExperimentResult, StarkExperimentError,
     prove_p24_intent_value_conservation, verify_p24_intent_value_conservation_proof,
 };
 
-use crate::anchored_ownership::prove_candidate_anchored_ownership_bound_note_commitment;
+use crate::anchored_ownership::{
+    decode_candidate_anchored_ownership_bound_note_commitment,
+    prove_candidate_anchored_ownership_bound_note_commitment,
+};
 use crate::{
     CandidateAnchoredOwnershipError, CandidateAnchoredOwnershipProofV1,
     CandidateAnchoredOwnershipWitnessV1, CandidateInnerRelationKindV1,
@@ -64,6 +69,15 @@ pub struct CandidatePrivateTransferProofBundleV1 {
     input_ownership: [CandidateAnchoredOwnershipProofV1; 2],
 }
 
+/// Crate-local proof chunks and public input commitments needed to rebuild a
+/// candidate bundle after strict envelope framing. This is intentionally not
+/// public: callers receive a usable bundle only after full verification.
+pub(crate) struct CandidatePrivateTransferProofBundleTransportPartsV1 {
+    pub(crate) intent_value_proof: Vec<u8>,
+    pub(crate) input_ownership_proofs: [Vec<u8>; 2],
+    pub(crate) input_note_commitments: [noxis_poseidon2_reference::BabyBearDigestV2; 2],
+}
+
 impl CandidatePrivateTransferProofBundleV1 {
     pub const fn statement_id(&self) -> CandidatePrivateTransferProofPublicStatementIdV1 {
         self.statement_id
@@ -84,6 +98,71 @@ impl CandidatePrivateTransferProofBundleV1 {
             self.input_ownership[0].pinned_research_proof_length()?,
             self.input_ownership[1].pinned_research_proof_length()?,
         ])
+    }
+
+    pub(crate) fn pinned_research_transport_parts(
+        &self,
+    ) -> Result<
+        CandidatePrivateTransferProofBundleTransportPartsV1,
+        CandidatePrivateTransferProofBundleError,
+    > {
+        let first = self.input_ownership[0].pinned_research_transport_part()?;
+        let second = self.input_ownership[1].pinned_research_transport_part()?;
+        Ok(CandidatePrivateTransferProofBundleTransportPartsV1 {
+            intent_value_proof: self.intent_value.encode_pinned_research_bytes()?,
+            input_ownership_proofs: [first.0, second.0],
+            input_note_commitments: [first.1, second.1],
+        })
+    }
+
+    pub(crate) fn decode_pinned_research_transport_parts(
+        statement: &CandidatePrivateTransferProofPublicStatementV1,
+        input_note_commitments: [noxis_poseidon2_reference::BabyBearDigestV2; 2],
+        intent_value_proof_bytes: &[u8],
+        input_ownership_proof_bytes: [&[u8]; 2],
+    ) -> Result<Self, CandidatePrivateTransferProofBundleError> {
+        let intent = statement.air_public_inputs().intent();
+        let intent_value = Poseidon2P24IntentValueConservationProof::decode_pinned_research_bytes(
+            intent_value_proof_bytes,
+            Poseidon2P24IntentValueConservationExperimentResult {
+                intent: Poseidon2P24IntentExperimentResult {
+                    intent_commitment: statement.air_public_inputs().intent_commitment(),
+                    trace_rows: P24_INTENT_VALUE_CONSERVATION_TRACE_ROWS,
+                },
+                values: Poseidon2P24ValueConservationExperimentResult {
+                    note_commitments: [
+                        input_note_commitments[0],
+                        input_note_commitments[1],
+                        intent.outputs()[0].commitment().elements(),
+                        intent.outputs()[1].commitment().elements(),
+                    ],
+                    asset_id: intent.asset_id().0,
+                    trace_rows: P24_INTENT_VALUE_CONSERVATION_TRACE_ROWS,
+                },
+                trace_rows: P24_INTENT_VALUE_CONSERVATION_TRACE_ROWS,
+            },
+        )?;
+        let decode_ownership = |index: usize| {
+            let ownership_result = Poseidon2P24OwnershipExperimentResult {
+                nullifier: intent.nullifiers()[index].elements(),
+                root: statement.anchor().note_root().elements(),
+                trace_rows: P24_OWNERSHIP_TRACE_ROWS,
+            };
+            decode_candidate_anchored_ownership_bound_note_commitment(
+                statement,
+                index as u8,
+                input_ownership_proof_bytes[index],
+                ownership_result,
+                input_note_commitments[index],
+            )
+        };
+        let input_ownership = [decode_ownership(0)?, decode_ownership(1)?];
+        Ok(Self {
+            statement_id: statement.statement_id(),
+            receipts: expected_receipts(statement),
+            intent_value,
+            input_ownership,
+        })
     }
 }
 

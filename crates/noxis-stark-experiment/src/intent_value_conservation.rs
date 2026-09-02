@@ -39,6 +39,12 @@ const TRACE_ROWS: usize = INTENT_TRACE_ROWS;
 const TRACE_WIDTH: usize = INTENT_TRACE_WIDTH + VALUE_TRACE_WIDTH;
 const PUBLIC_VALUES: usize = INTENT_PUBLIC_VALUES + VALUE_PUBLIC_VALUES;
 
+/// Fixed trace height of the composed intent/value research relation.
+///
+/// This exposes only public profile shape so an enclosing candidate artifact
+/// can reconstruct its verifier inputs; it does not select that profile.
+pub const P24_INTENT_VALUE_CONSERVATION_TRACE_ROWS: usize = TRACE_ROWS;
+
 /// Public evidence retained after the composed local experiment succeeds.
 /// Values, note preimages and proof material are never returned.
 #[derive(Clone, Debug, Eq, PartialEq)]

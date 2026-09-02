@@ -52,6 +52,7 @@ $formatVersionEvidence = @(
     @{ Identity = 'candidate statement / NXPU / v1'; Source = 'crates/noxis-private-proof-contract/src/public_statement.rs'; Pattern = 'const VERSION:\s*u16\s*=\s*1' }
     @{ Identity = 'candidate AIR profile / NXAR / v1'; Source = 'crates/noxis-private-proof-contract/src/air_profile.rs'; Pattern = 'const VERSION:\s*u16\s*=\s*1' }
     @{ Identity = 'candidate deployment / NXPD / v1'; Source = 'crates/noxis-private-proof-contract/src/lib.rs'; Pattern = 'const VERSION:\s*u16\s*=\s*1' }
+    @{ Identity = 'candidate local proof envelope / NXPP / v1'; Source = 'crates/noxis-private-proof-contract/src/proof_bundle_envelope.rs'; Pattern = 'CANDIDATE_PRIVATE_PROOF_BUNDLE_ENVELOPE_VERSION:\s*u16\s*=\s*1' }
 )
 
 $sourceMagics = [System.Collections.Generic.HashSet[string]]::new()
