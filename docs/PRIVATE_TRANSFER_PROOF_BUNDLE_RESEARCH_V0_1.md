@@ -77,6 +77,11 @@ ownership phases was about **4.45 GB**. After typed ledger admission was added,
 the expanded proof-to-commit-and-replay test passed in **1088.32 seconds**; see
 [`PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md`](PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md).
 
+On 2026-09-02, the same full release test measured **4,968,511 bytes** of raw
+pinned-research proof objects: 2,836,034 for intent/value, 1,066,377 for the
+first ownership proof and 1,066,100 for the second. This is one research-case
+measurement, not a maximum, protocol size limit or network-ready envelope.
+
 An unoptimized debug run was intentionally stopped after approximately 181
 minutes while it was still making CPU progress. This is why the integration
 test is ignored by default and why debug timings must not be presented as a

@@ -99,6 +99,15 @@ impl CandidateAnchoredOwnershipProofV1 {
     pub(crate) const fn note_commitment_binding(&self) -> Option<BabyBearDigestV2> {
         self.ownership_proof.bound_note_commitment()
     }
+
+    /// Byte length of the opaque proof under the pinned research serializer.
+    /// This is a measurement aid for a future bounded bundle envelope; it is
+    /// neither a transaction encoding nor a claim of portable verification.
+    pub(crate) fn pinned_research_proof_length(
+        &self,
+    ) -> Result<usize, CandidateAnchoredOwnershipError> {
+        Ok(self.ownership_proof.encode_pinned_research_bytes()?.len())
+    }
 }
 
 /// Public receipt of a sequential two-input ownership preflight.

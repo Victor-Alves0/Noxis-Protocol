@@ -72,6 +72,19 @@ impl CandidatePrivateTransferProofBundleV1 {
     pub const fn receipts(&self) -> &CandidatePrivateTransferProofBundleReceiptsV1 {
         &self.receipts
     }
+
+    /// Returns raw pinned-research byte lengths for the intent/value proof and
+    /// both ownership proofs. It deliberately does not create a bundle format;
+    /// the measurements establish a defensible future transport budget.
+    pub fn pinned_research_proof_lengths(
+        &self,
+    ) -> Result<[usize; 3], CandidatePrivateTransferProofBundleError> {
+        Ok([
+            self.intent_value.encode_pinned_research_bytes()?.len(),
+            self.input_ownership[0].pinned_research_proof_length()?,
+            self.input_ownership[1].pinned_research_proof_length()?,
+        ])
+    }
 }
 
 /// Public results reconstructed only after every retained proof and

@@ -646,6 +646,14 @@ mod tests {
         )
         .unwrap();
         assert_eq!(bundle.statement_id(), statement.statement_id());
+        let proof_lengths = bundle.pinned_research_proof_lengths().unwrap();
+        println!(
+            "pinned bundle proof bytes: intent-value={}, ownership-0={}, ownership-1={}, total={}",
+            proof_lengths[0],
+            proof_lengths[1],
+            proof_lengths[2],
+            proof_lengths.into_iter().sum::<usize>(),
+        );
         let mut private_ledger = CandidatePrivateLedgerStateV1::new(
             statement.anchor().genesis_id(),
             statement.anchor().validation_context_id(),

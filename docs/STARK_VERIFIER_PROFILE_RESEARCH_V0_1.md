@@ -107,3 +107,10 @@ metadata. The current `NXPT v1` 2 MiB opaque-proof cap is consequently known
 to be insufficient for this research bundle and must not be used as its future
 transport budget. A bounded envelope needs full-bundle measurements and an
 explicit denial-of-service review before selecting a replacement limit.
+
+The complete release bundle measurement on the same date was **4,968,511
+bytes** of raw proof objects: 2,836,034 for the intent/value relation,
+1,066,377 for ownership slot zero and 1,066,100 for ownership slot one. This
+is evidence from one fixed research statement, not a maximum or a selected
+network budget. The future envelope must account separately for bounded public
+metadata, framing/checksum overhead and adversarial-size review.
