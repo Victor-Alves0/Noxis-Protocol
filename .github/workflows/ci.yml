@@ -38,6 +38,24 @@ jobs:
       - name: Run lints
         run: cargo +1.93.0 clippy --workspace --all-targets --locked -- -D warnings
 
+  nxpp-fuzz-smoke:
+    name: NXPP parser fuzz smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Install nightly Rust for sanitizer instrumentation
+        run: rustup toolchain install nightly --profile minimal
+
+      - name: Install the pinned fuzz runner
+        run: cargo +stable install cargo-fuzz --version 0.13.2 --locked
+
+      - name: Run bounded NXPP framing campaign
+        working-directory: fuzz
+        run: cargo +nightly fuzz run nxpp-framing -- -runs=25000 -max_len=65536
+
   cometbft-e2e:
     name: CometBFT v0.38 process integration
     runs-on: ubuntu-24.04

@@ -1,0 +1,23 @@
+[package]
+name = "noxis-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+rust-version = "1.93"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+noxis-private-proof-contract = { path = "../crates/noxis-private-proof-contract" }
+sha2 = "0.10.9"
+
+[[bin]]
+name = "nxpp-framing"
+path = "fuzz_targets/nxpp_framing.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

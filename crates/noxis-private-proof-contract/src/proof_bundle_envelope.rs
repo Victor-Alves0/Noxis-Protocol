@@ -136,7 +136,7 @@ impl CandidatePrivateProofBundleEnvelopeV1 {
         current_tree: &NullifierSparseTreeStateV1,
     ) -> Result<CandidatePrivateTransferProofBundleV1, CandidatePrivateProofBundleEnvelopeError>
     {
-        let frame = parse_frame(bytes, statement)?;
+        let frame = parse_frame(bytes, statement.statement_id().as_bytes())?;
         let bundle = CandidatePrivateTransferProofBundleV1::decode_pinned_research_transport_parts(
             statement,
             frame.input_note_commitments,
@@ -145,6 +145,21 @@ impl CandidatePrivateProofBundleEnvelopeV1 {
         )?;
         crate::verify_candidate_private_transfer_proof_bundle(&bundle, statement, current_tree)?;
         Ok(bundle)
+    }
+
+    /// Strictly validates only the bounded outer `NXPP v1` frame and its
+    /// expected statement binding.
+    ///
+    /// This intentionally does not deserialize or verify any proof chunk. It
+    /// is suitable for parser fuzzing and for callers that need a cheap
+    /// fail-closed framing boundary before choosing whether to invoke the
+    /// expensive research proof backend. It neither authenticates a proof nor
+    /// makes this local research envelope a transaction or protocol format.
+    pub fn validate_framing(
+        bytes: &[u8],
+        expected_statement_id: [u8; 32],
+    ) -> Result<(), CandidatePrivateProofBundleEnvelopeError> {
+        parse_frame(bytes, expected_statement_id).map(|_| ())
     }
 }
 
@@ -155,7 +170,7 @@ struct ParsedFrame<'a> {
 
 fn parse_frame<'a>(
     bytes: &'a [u8],
-    statement: &CandidatePrivateTransferProofPublicStatementV1,
+    expected_statement_id: [u8; 32],
 ) -> Result<ParsedFrame<'a>, CandidatePrivateProofBundleEnvelopeError> {
     if bytes.len() < FIXED_OVERHEAD_BYTES {
         return Err(CandidatePrivateProofBundleEnvelopeError::Truncated);
@@ -183,7 +198,7 @@ fn parse_frame<'a>(
     if bytes[DEPLOYMENT_ID_OFFSET..STATEMENT_ID_OFFSET] != expected_deployment_id {
         return Err(CandidatePrivateProofBundleEnvelopeError::DeploymentIdMismatch);
     }
-    if bytes[STATEMENT_ID_OFFSET..INPUT_COMMITMENTS_OFFSET] != statement.statement_id().as_bytes() {
+    if bytes[STATEMENT_ID_OFFSET..INPUT_COMMITMENTS_OFFSET] != expected_statement_id {
         return Err(CandidatePrivateProofBundleEnvelopeError::StatementIdMismatch);
     }
     let input_note_commitments: [Result<BabyBearDigestV2, PrivacyTypesError>; 2] =
@@ -363,37 +378,58 @@ mod tests {
         let checksum_start = canonical.len() - CHECKSUM_LENGTH;
         let value = checksum(&canonical[..checksum_start]);
         canonical[checksum_start..].copy_from_slice(&value);
-        assert!(parse_frame(&canonical, &statement).is_ok());
+        assert!(
+            CandidatePrivateProofBundleEnvelopeV1::validate_framing(
+                &canonical,
+                statement.statement_id().as_bytes(),
+            )
+            .is_ok()
+        );
 
         let mut changed = canonical.clone();
         changed[0] ^= 1;
         assert!(matches!(
-            parse_frame(&changed, &statement),
+            CandidatePrivateProofBundleEnvelopeV1::validate_framing(
+                &changed,
+                statement.statement_id().as_bytes(),
+            ),
             Err(CandidatePrivateProofBundleEnvelopeError::InvalidMagic)
         ));
         let mut changed = canonical.clone();
         changed[6] = 1;
         assert!(matches!(
-            parse_frame(&changed, &statement),
+            CandidatePrivateProofBundleEnvelopeV1::validate_framing(
+                &changed,
+                statement.statement_id().as_bytes(),
+            ),
             Err(CandidatePrivateProofBundleEnvelopeError::NonCanonicalFlags)
         ));
         let mut changed = canonical.clone();
         changed[PROOF_LENGTHS_OFFSET..PROOF_LENGTHS_OFFSET + 4]
             .copy_from_slice(&0_u32.to_be_bytes());
         assert!(matches!(
-            parse_frame(&changed, &statement),
+            CandidatePrivateProofBundleEnvelopeV1::validate_framing(
+                &changed,
+                statement.statement_id().as_bytes(),
+            ),
             Err(CandidatePrivateProofBundleEnvelopeError::EmptyProofChunk { index: 0 })
         ));
         let mut changed = canonical.clone();
         changed.push(0);
         assert!(matches!(
-            parse_frame(&changed, &statement),
+            CandidatePrivateProofBundleEnvelopeV1::validate_framing(
+                &changed,
+                statement.statement_id().as_bytes(),
+            ),
             Err(CandidatePrivateProofBundleEnvelopeError::DeclaredLengthMismatch { .. })
         ));
         let mut changed = canonical;
         changed[PROOF_CHUNKS_OFFSET] ^= 1;
         assert!(matches!(
-            parse_frame(&changed, &statement),
+            CandidatePrivateProofBundleEnvelopeV1::validate_framing(
+                &changed,
+                statement.statement_id().as_bytes(),
+            ),
             Err(CandidatePrivateProofBundleEnvelopeError::ChecksumMismatch)
         ));
     }
