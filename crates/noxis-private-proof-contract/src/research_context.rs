@@ -24,6 +24,12 @@ pub const CANDIDATE_PRIVATE_RESEARCH_VERIFIER_DESCRIPTOR_ENCODED_LENGTH: usize =
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CandidatePrivateResearchVerifierDescriptorV1;
 
+impl Default for CandidatePrivateResearchVerifierDescriptorV1 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CandidatePrivateResearchVerifierDescriptorV1 {
     pub const fn new() -> Self {
         Self
@@ -57,6 +63,22 @@ impl CandidatePrivateResearchVerifierDescriptorV1 {
         hasher.update(CANDIDATE_PRIVATE_RESEARCH_VERIFIER_DESCRIPTOR_ID_DOMAIN);
         hasher.update(self.encode()?);
         Ok(hasher.finalize().into())
+    }
+
+    /// Accepts only the byte-for-byte canonical local descriptor. This does
+    /// not make the descriptor a network format; it gives callers a strict
+    /// boundary when comparing independently recorded local profile bytes.
+    pub fn decode(bytes: &[u8]) -> Result<Self, CandidatePrivateResearchContextError> {
+        if bytes.len() != CANDIDATE_PRIVATE_RESEARCH_VERIFIER_DESCRIPTOR_ENCODED_LENGTH {
+            return Err(CandidatePrivateResearchContextError::DescriptorLength {
+                actual: bytes.len(),
+                expected: CANDIDATE_PRIVATE_RESEARCH_VERIFIER_DESCRIPTOR_ENCODED_LENGTH,
+            });
+        }
+        if bytes != Self::new().encode()? {
+            return Err(CandidatePrivateResearchContextError::NonCanonicalDescriptor);
+        }
+        Ok(Self)
     }
 }
 
@@ -105,6 +127,11 @@ pub fn require_candidate_private_research_validation_context(
 #[derive(Debug)]
 pub enum CandidatePrivateResearchContextError {
     Deployment(PrivateTransferProofDeploymentError),
+    DescriptorLength {
+        actual: usize,
+        expected: usize,
+    },
+    NonCanonicalDescriptor,
     Mismatch {
         expected: ValidationContextId,
         actual: ValidationContextId,
@@ -139,6 +166,16 @@ mod tests {
         );
         assert_eq!(bytes[..2], 1_u16.to_be_bytes());
         assert_ne!(descriptor.id().unwrap(), [0; 32]);
+        assert_eq!(
+            CandidatePrivateResearchVerifierDescriptorV1::decode(&bytes).unwrap(),
+            descriptor
+        );
+        let mut changed = bytes;
+        changed[0] ^= 1;
+        assert!(matches!(
+            CandidatePrivateResearchVerifierDescriptorV1::decode(&changed),
+            Err(CandidatePrivateResearchContextError::NonCanonicalDescriptor)
+        ));
         let context = candidate_private_research_validation_context_id().unwrap();
         assert_ne!(context.0, [0; 32]);
         require_candidate_private_research_validation_context(context).unwrap();
