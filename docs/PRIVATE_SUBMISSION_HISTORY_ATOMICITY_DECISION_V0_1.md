@@ -147,10 +147,12 @@ renames or appends to the source; the selected v1 recovery path may still
 truncate only its verified incomplete final tail. A release test preserves the
 complete v1 journal bytes and checks the target/base after reopen.
 
-This is deliberately not an automatic open-time upgrade, directory swap,
-retention-policy engine or operator CLI. A failed destination remains for
-investigation and must not be reused; the original source remains the recovery
-evidence until an explicit operator policy chooses otherwise.
+This is deliberately not an automatic open-time upgrade, directory swap or
+retention-policy engine. The separate operator CLI documents the same rules. A
+failed destination remains for investigation and must not be reused; the
+original source remains the recovery evidence until an explicit operator
+policy chooses otherwise. The release corpus includes both a preexisting
+partial target and a corrupt source that must fail before target creation.
 
 ## Implementation gates and current boundary
 

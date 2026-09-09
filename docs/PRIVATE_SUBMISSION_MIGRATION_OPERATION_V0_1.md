@@ -54,6 +54,8 @@ That is a v1 recovery action, not a conversion of historic data.
 | --- | --- |
 | Command rejects the source | Keep it unchanged; investigate its v1 recovery error. |
 | Command rejects the target | Do not reuse that target. Preserve it for investigation or create a new empty target after identifying the failure. |
+| Target already exists or contains only an interrupted cache | The command refuses it before copying state. Keep the complete source authoritative and select a fresh target after investigating the partial directory. |
+| Source v1 journal is corrupt | No target is created. Preserve the source bytes and investigate the v1 recovery failure. |
 | Source and target paths match | Choose a new target. In-place migration is forbidden. |
 | State IDs differ after reopen | Treat the target as invalid and retain the source as authority. |
 
@@ -65,4 +67,6 @@ deployment runbook.
 
 Release tests prove the source v1 journal remains byte-for-byte unchanged for a
 complete source, the destination reopens at the same final state and contains
-no fabricated history. See the [atomicity decision](PRIVATE_SUBMISSION_HISTORY_ATOMICITY_DECISION_V0_1.md).
+no fabricated history. The corpus also rejects a preexisting partial target
+without changing a complete source, and rejects a corrupt source before it can
+create a target. See the [atomicity decision](PRIVATE_SUBMISSION_HISTORY_ATOMICITY_DECISION_V0_1.md).

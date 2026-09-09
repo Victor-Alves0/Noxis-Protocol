@@ -785,4 +785,73 @@ mod tests {
         ));
         fs::remove_dir_all(source_path.parent().unwrap()).unwrap();
     }
+
+    #[test]
+    fn migration_refuses_a_partial_existing_target_without_changing_complete_source() {
+        let source_path = path();
+        let target_path = source_path.parent().unwrap().join("partial-target.nxpr");
+        {
+            let mut source = crate::PrivateStateStoreV1::initialize(&source_path, state()).unwrap();
+            let request = CandidatePrivateTransferRequestV1::new(intent(source.state()), ());
+            source.apply_transfer(&request, &AcceptAll).unwrap();
+        }
+        let source_journal_path = journal_path(&source_path);
+        let source_before = fs::read(&source_journal_path).unwrap();
+        // A cache-only v2 target models an interrupted target initialization.
+        let target = PrivateSubmissionStoreV2::initialize(&target_path, state()).unwrap();
+        let target_state_id = target.state().anchor().state_id();
+        drop(target);
+
+        assert!(matches!(
+            crate::migrate_private_state_store_v1_to_submission_store_v2(
+                &source_path,
+                &target_path
+            ),
+            Err(crate::PrivateSubmissionMigrationError::Target(
+                PrivateSubmissionStoreError::AlreadyInitialized(_)
+            ))
+        ));
+        assert_eq!(fs::read(&source_journal_path).unwrap(), source_before);
+        assert_eq!(
+            PrivateSubmissionStoreV2::open(&target_path)
+                .unwrap()
+                .state()
+                .anchor()
+                .state_id(),
+            target_state_id
+        );
+        fs::remove_dir_all(source_path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn migration_rejects_corrupt_source_before_creating_a_target() {
+        let source_path = path();
+        let target_path = source_path.parent().unwrap().join("unused-target.nxpr");
+        {
+            let mut source = crate::PrivateStateStoreV1::initialize(&source_path, state()).unwrap();
+            let request = CandidatePrivateTransferRequestV1::new(intent(source.state()), ());
+            source.apply_transfer(&request, &AcceptAll).unwrap();
+        }
+        let source_journal_path = journal_path(&source_path);
+        let mut corrupt = fs::read(&source_journal_path).unwrap();
+        corrupt[0] ^= 0xff;
+        fs::write(&source_journal_path, &corrupt).unwrap();
+
+        assert!(matches!(
+            crate::migrate_private_state_store_v1_to_submission_store_v2(
+                &source_path,
+                &target_path
+            ),
+            Err(crate::PrivateSubmissionMigrationError::Source(
+                crate::PrivateStateStoreError::Journal(
+                    crate::PrivateStateJournalError::InvalidMagic { .. }
+                )
+            ))
+        ));
+        assert_eq!(fs::read(&source_journal_path).unwrap(), corrupt);
+        assert!(!target_path.exists());
+        assert!(!base_path(&target_path).exists());
+        assert!(!journal_path(&target_path).exists());
+        fs::remove_dir_all(source_path.parent().unwrap()).unwrap();
+    }
 }
