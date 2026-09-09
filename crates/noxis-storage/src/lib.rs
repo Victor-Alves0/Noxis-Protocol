@@ -41,6 +41,7 @@ mod persistent_execution;
 pub mod private_state_journal;
 pub mod private_state_store;
 pub mod private_submission_journal;
+pub mod private_submission_migration;
 pub mod private_submission_store;
 pub mod record_log;
 
@@ -62,6 +63,10 @@ pub use private_submission_journal::{
     PrivateSubmissionJournalError, PrivateSubmissionJournalIncompleteTail,
     PrivateSubmissionJournalRecoveryScan, PrivateSubmissionJournalV2, PrivateSubmissionMetadataV1,
     StoredPrivateSubmissionV2,
+};
+pub use private_submission_migration::{
+    PrivateSubmissionMigrationError, PrivateSubmissionMigrationReceiptV1,
+    migrate_private_state_store_v1_to_submission_store_v2,
 };
 pub use private_submission_store::{PrivateSubmissionStoreError, PrivateSubmissionStoreV2};
 

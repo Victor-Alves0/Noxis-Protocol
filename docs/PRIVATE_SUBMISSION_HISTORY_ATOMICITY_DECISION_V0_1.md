@@ -138,8 +138,19 @@ separate offline operation, not an open-time guess:
 4. retain the original v1 directory as migration evidence until an explicit
    retention policy authorizes removal.
 
-The exact directory swap, failure injection matrix and operator tool are
-implementation gates; no migration code is authorized by this decision alone.
+`migrate_private_state_store_v1_to_submission_store_v2(source, target)` now
+implements this constrained offline copy. It opens the v1 source through its
+normal recovery path, rejects an in-place target, initializes a distinct v2
+destination with an authenticated base, reopens that target and confirms that
+it has the same final state with **zero** v2 receipt frames. It never deletes,
+renames or appends to the source; the selected v1 recovery path may still
+truncate only its verified incomplete final tail. A release test preserves the
+complete v1 journal bytes and checks the target/base after reopen.
+
+This is deliberately not an automatic open-time upgrade, directory swap,
+retention-policy engine or operator CLI. A failed destination remains for
+investigation and must not be reused; the original source remains the recovery
+evidence until an explicit operator policy chooses otherwise.
 
 ## Implementation gates and current boundary
 
@@ -158,8 +169,8 @@ local candidate storage:
    `NXPP` admission, with no alternative receipt append API;
 4. broader filesystem fault injection at every write/sync/publish boundary
    and across supported storage platforms; and
-5. an explicit offline migration design and test corpus before a v1 store can
-   be upgraded.
+5. a broader migration corpus, interrupted-target handling and an operator
+   workflow before a production deployment can schedule upgrades.
 
 The implemented format remains `candidate private-submission journal / NXPL /
 v2` in the registry. It is not consensus durability or a private network

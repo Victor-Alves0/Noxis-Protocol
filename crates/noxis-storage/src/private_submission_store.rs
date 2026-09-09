@@ -73,6 +73,18 @@ impl PrivateSubmissionStoreV2 {
         })
     }
 
+    /// Initializes a fresh v2 store and synchronizes its immutable base before
+    /// returning. This is for an explicit offline migration whose first v2
+    /// state has no reconstructable historic submission receipts.
+    pub fn initialize_with_authenticated_base(
+        path: impl Into<PathBuf>,
+        state: CandidatePrivateLedgerStateV1,
+    ) -> Result<Self, PrivateSubmissionStoreError> {
+        let mut store = Self::initialize(path, state)?;
+        store.prepare_journal_base()?;
+        Ok(store)
+    }
+
     /// Opens after validating every complete composite entry and repairing only
     /// a structurally verified final partial frame/cache publication window.
     pub fn open(path: impl Into<PathBuf>) -> Result<Self, PrivateSubmissionStoreError> {
@@ -116,6 +128,16 @@ impl PrivateSubmissionStoreV2 {
     pub fn submissions(
         &mut self,
     ) -> Result<Vec<StoredPrivateSubmissionV2>, PrivateSubmissionStoreError> {
+        let scan = self
+            .journal
+            .scan_recoverable_tail()
+            .map_err(PrivateSubmissionStoreError::Journal)?;
+        if scan.incomplete_tail.is_some() {
+            return Err(PrivateSubmissionStoreError::JournalTailPresent);
+        }
+        if scan.entries.is_empty() {
+            return Ok(Vec::new());
+        }
         let base = read_journal_base(&self.base_path)?;
         let recovered = self
             .journal
@@ -707,5 +729,60 @@ mod tests {
             ))
         ));
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn offline_v1_migration_preserves_final_state_without_fabricating_receipts() {
+        let source_path = path();
+        let target_path = source_path.parent().unwrap().join("migrated.nxpr");
+        let source_state_id;
+        {
+            let mut source = crate::PrivateStateStoreV1::initialize(&source_path, state()).unwrap();
+            let request = CandidatePrivateTransferRequestV1::new(intent(source.state()), ());
+            source_state_id = source
+                .apply_transfer(&request, &AcceptAll)
+                .unwrap()
+                .post_state_id();
+        }
+        let source_journal_path = journal_path(&source_path);
+        let source_journal_before = fs::read(&source_journal_path).unwrap();
+
+        let receipt = crate::migrate_private_state_store_v1_to_submission_store_v2(
+            &source_path,
+            &target_path,
+        )
+        .unwrap();
+        assert_eq!(receipt.source_state_id(), source_state_id);
+        assert_eq!(receipt.target_state_id(), source_state_id);
+        assert_eq!(
+            fs::read(&source_journal_path).unwrap(),
+            source_journal_before
+        );
+        assert_eq!(
+            u16::from_be_bytes(source_journal_before[4..6].try_into().unwrap()),
+            1
+        );
+
+        let mut target = PrivateSubmissionStoreV2::open(&target_path).unwrap();
+        assert_eq!(target.state().anchor().state_id(), source_state_id);
+        assert!(target.submissions().unwrap().is_empty());
+        drop(target);
+        assert!(base_path(&target_path).exists());
+        fs::remove_dir_all(source_path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn migration_refuses_an_in_place_target() {
+        let source_path = path();
+        let store = crate::PrivateStateStoreV1::initialize(&source_path, state()).unwrap();
+        drop(store);
+        assert!(matches!(
+            crate::migrate_private_state_store_v1_to_submission_store_v2(
+                &source_path,
+                &source_path
+            ),
+            Err(crate::PrivateSubmissionMigrationError::SamePath(_))
+        ));
+        fs::remove_dir_all(source_path.parent().unwrap()).unwrap();
     }
 }
