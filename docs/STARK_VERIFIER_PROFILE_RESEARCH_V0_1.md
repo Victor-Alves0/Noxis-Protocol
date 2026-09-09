@@ -58,10 +58,11 @@ degree, hash/PCS types and serialization behavior.
 The `NXPP` byte-entry research APIs now derive one
 `ValidationContextId` under
 `NOXIS/CANDIDATE-PRIVATE-RESEARCH-VALIDATION-CONTEXT/V1\0`. It commits to the
-frozen `NXPD` candidate identity and to the full explicit fields of both
-`STANDARD_P24` and `HIGH_DEGREE_P24`, which are respectively used by the
-retained intent/value and ownership proof relations. Admission rejects a state
-with any other context **before** proof parsing or verification.
+ID of a fixed 56-byte, no-magic descriptor. That descriptor commits to the
+frozen `NXPD` candidate identity and the exact fields of both `STANDARD_P24`
+and `HIGH_DEGREE_P24`, which are respectively used by the retained
+intent/value and ownership proof relations. Admission rejects a state with any
+other context **before** proof parsing or verification.
 
 This prevents the current local proof adapter from silently accepting the
 same code-level verifier under a caller-chosen state context. It does not turn

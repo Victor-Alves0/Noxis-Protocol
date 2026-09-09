@@ -105,8 +105,10 @@ pub use public_statement::{
     CandidatePrivateTransferProofPublicStatementV1,
 };
 pub use research_context::{
-    CANDIDATE_PRIVATE_RESEARCH_VALIDATION_CONTEXT_ID_DOMAIN, CandidatePrivateResearchContextError,
-    candidate_private_research_validation_context_id,
+    CANDIDATE_PRIVATE_RESEARCH_VALIDATION_CONTEXT_ID_DOMAIN,
+    CANDIDATE_PRIVATE_RESEARCH_VERIFIER_DESCRIPTOR_ENCODED_LENGTH,
+    CANDIDATE_PRIVATE_RESEARCH_VERIFIER_DESCRIPTOR_ID_DOMAIN, CandidatePrivateResearchContextError,
+    CandidatePrivateResearchVerifierDescriptorV1, candidate_private_research_validation_context_id,
     require_candidate_private_research_validation_context,
 };
 pub use transfer_bundle::{
