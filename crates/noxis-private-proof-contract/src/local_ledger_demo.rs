@@ -20,13 +20,14 @@ use noxis_private_state::{
 };
 use noxis_storage::PrivateSubmissionStoreV2;
 use noxis_tree_params::CandidatePoseidon2P24ManifestV2;
-use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId, StateId, ValidationContextId};
+use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId, StateId};
 
 use crate::{
     CandidateAnchoredOwnershipWitnessV1, CandidateOutputNoteWitnessV1,
     CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleEnvelopeV1,
     CandidatePrivateTransferProofPublicStatementV1, admit_candidate_private_proof_bundle_envelope,
     admit_candidate_private_proof_bundle_envelope_to_submission_store,
+    candidate_private_research_validation_context_id,
     prove_candidate_private_transfer_proof_bundle,
 };
 
@@ -191,7 +192,7 @@ fn run_candidate_private_ledger_demo_at(
     ));
     let anchor = attempt(PrivateStateAnchorV2::new(
         GenesisId::new([1; 32]),
-        ValidationContextId::new([2; 32]),
+        attempt(candidate_private_research_validation_context_id())?,
         tree_parameters,
         &snapshot,
         &pre_tree,

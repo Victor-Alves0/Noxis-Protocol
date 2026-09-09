@@ -21,9 +21,11 @@ use noxis_storage::{
 use crate::proof_bundle_envelope::candidate_private_proof_bundle_envelope_id;
 use crate::{
     CandidatePrivateProofBundleEnvelopeError, CandidatePrivateProofBundleEnvelopeIdV1,
-    CandidatePrivateProofBundleEnvelopeV1, CandidatePrivateTransferProofBundleVerifierV1,
+    CandidatePrivateProofBundleEnvelopeV1, CandidatePrivateResearchContextError,
+    CandidatePrivateTransferProofBundleVerifierV1,
     CandidatePrivateTransferProofPublicStatementError,
     CandidatePrivateTransferProofPublicStatementV1,
+    require_candidate_private_research_validation_context,
 };
 
 /// Public local receipt returned only after one `NXPP` envelope has passed
@@ -78,6 +80,7 @@ pub fn admit_candidate_private_proof_bundle_envelope(
     envelope_bytes: &[u8],
 ) -> Result<CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleAdmissionError>
 {
+    require_candidate_private_research_validation_context(ledger.anchor().validation_context_id())?;
     let envelope_id = candidate_private_proof_bundle_envelope_id(envelope_bytes);
     let statement = CandidatePrivateTransferProofPublicStatementV1::new(
         ledger.anchor().clone(),
@@ -114,6 +117,9 @@ pub fn admit_candidate_private_proof_bundle_envelope_to_store(
     envelope_bytes: &[u8],
 ) -> Result<CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleAdmissionError>
 {
+    require_candidate_private_research_validation_context(
+        store.state().anchor().validation_context_id(),
+    )?;
     let envelope_id = candidate_private_proof_bundle_envelope_id(envelope_bytes);
     let state = store.state();
     let statement = CandidatePrivateTransferProofPublicStatementV1::new(
@@ -151,6 +157,9 @@ pub fn admit_candidate_private_proof_bundle_envelope_to_submission_store(
     envelope_bytes: &[u8],
 ) -> Result<CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleAdmissionError>
 {
+    require_candidate_private_research_validation_context(
+        store.state().anchor().validation_context_id(),
+    )?;
     let envelope_id = candidate_private_proof_bundle_envelope_id(envelope_bytes);
     let state = store.state();
     let statement = CandidatePrivateTransferProofPublicStatementV1::new(
@@ -183,6 +192,7 @@ pub fn admit_candidate_private_proof_bundle_envelope_to_submission_store(
 #[derive(Debug)]
 pub enum CandidatePrivateProofBundleAdmissionError {
     PublicStatement(CandidatePrivateTransferProofPublicStatementError),
+    ResearchContext(CandidatePrivateResearchContextError),
     Envelope(CandidatePrivateProofBundleEnvelopeError),
     Ledger(CandidatePrivateLedgerError),
     Store(PrivateStateStoreError),
@@ -195,6 +205,11 @@ impl From<CandidatePrivateTransferProofPublicStatementError>
 {
     fn from(value: CandidatePrivateTransferProofPublicStatementError) -> Self {
         Self::PublicStatement(value)
+    }
+}
+impl From<CandidatePrivateResearchContextError> for CandidatePrivateProofBundleAdmissionError {
+    fn from(value: CandidatePrivateResearchContextError) -> Self {
+        Self::ResearchContext(value)
     }
 }
 impl From<CandidatePrivateProofBundleEnvelopeError> for CandidatePrivateProofBundleAdmissionError {

@@ -53,6 +53,21 @@ This is deliberately a Rust-level research descriptor, not a protocol
 selection. Its source and locked dependencies still determine field, extension
 degree, hash/PCS types and serialization behavior.
 
+## Local admission-context binding
+
+The `NXPP` byte-entry research APIs now derive one
+`ValidationContextId` under
+`NOXIS/CANDIDATE-PRIVATE-RESEARCH-VALIDATION-CONTEXT/V1\0`. It commits to the
+frozen `NXPD` candidate identity and to the full explicit fields of both
+`STANDARD_P24` and `HIGH_DEGREE_P24`, which are respectively used by the
+retained intent/value and ownership proof relations. Admission rejects a state
+with any other context **before** proof parsing or verification.
+
+This prevents the current local proof adapter from silently accepting the
+same code-level verifier under a caller-chosen state context. It does not turn
+the derived value into `ProofVerifierId`, a selected verifier, a wire format
+or consensus configuration.
+
 ## Crucial limitation: this is still not portable verification
 
 The configuration is now explicit in a versioned Rust descriptor, but it is

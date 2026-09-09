@@ -20,6 +20,11 @@ The proof-contract adapter implements that authorization interface for
 statement from current ledger state and the request intent, then independently
 verifies the retained intent/value proof and both ownership proofs.
 
+The byte-entry research APIs first require the state validation context to
+equal the explicit local context derived from frozen `NXPD` and both pinned
+research FRI profiles. This is a fail-closed candidate binding, not selection
+of a production `ProofVerifierId`; see the [verifier-profile boundary](STARK_VERIFIER_PROFILE_RESEARCH_V0_1.md).
+
 `admit_candidate_private_proof_bundle_envelope` is the companion byte-entry
 API for `NXPP v1`. It accepts a typed intent and envelope bytes, reconstructs
 the statement from the ledger's current anchor/tree, strictly decodes and

@@ -25,6 +25,7 @@ mod proof_bundle_envelope;
 mod proof_transport_budget;
 mod public_inputs;
 mod public_statement;
+mod research_context;
 mod transfer_bundle;
 mod transfer_preflight;
 mod value_conservation;
@@ -102,6 +103,11 @@ pub use public_statement::{
     CandidatePrivateTransferProofPublicStatementError,
     CandidatePrivateTransferProofPublicStatementIdV1,
     CandidatePrivateTransferProofPublicStatementV1,
+};
+pub use research_context::{
+    CANDIDATE_PRIVATE_RESEARCH_VALIDATION_CONTEXT_ID_DOMAIN, CandidatePrivateResearchContextError,
+    candidate_private_research_validation_context_id,
+    require_candidate_private_research_validation_context,
 };
 pub use transfer_bundle::{
     CandidatePrivateTransferProofBundleError, CandidatePrivateTransferProofBundleReceiptsV1,

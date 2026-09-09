@@ -342,6 +342,7 @@ mod tests {
     use crate::{
         CandidatePrivateProofBundleEnvelopeV1,
         admit_candidate_private_proof_bundle_envelope_to_submission_store,
+        candidate_private_research_validation_context_id,
         prove_candidate_private_transfer_proof_bundle,
     };
     use noxis_codec::PrivateTransferPacketV2;
@@ -358,7 +359,7 @@ mod tests {
     };
     use noxis_storage::PrivateSubmissionStoreV2;
     use noxis_tree_params::CandidatePoseidon2P24ManifestV2;
-    use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId, ValidationContextId};
+    use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId};
     use noxis_wallet_crypto::{
         CandidatePrivateOutputSlotV1, HybridPaymentAddressEntry, RecipientEnvelopeContext,
         candidate_ciphertext_digest_v1, encode_hybrid_recipient_envelope,
@@ -499,7 +500,7 @@ mod tests {
         ));
         let anchor = PrivateStateAnchorV2::new(
             GenesisId::new([1; 32]),
-            ValidationContextId::new([2; 32]),
+            candidate_private_research_validation_context_id().unwrap(),
             tree_parameters,
             &snapshot,
             &pre_tree,
