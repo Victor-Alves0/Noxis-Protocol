@@ -6,6 +6,7 @@ use noxis_private_proof_contract::{
     CandidatePrivateTransferProofDeploymentV1,
 };
 use sha2::{Digest, Sha256};
+use std::sync::OnceLock;
 
 // A fuzzer does not need a valid private statement to exercise the framing
 // boundary. A fixed expected value still forces all candidate inputs through
@@ -42,12 +43,7 @@ fn structured_frame(input: &[u8]) -> Vec<u8> {
     let mut frame = vec![0_u8; FIXED_OVERHEAD + proof_bytes];
     frame[..4].copy_from_slice(b"NXPP");
     frame[4..6].copy_from_slice(&1_u16.to_be_bytes());
-    frame[DEPLOYMENT_ID_OFFSET..STATEMENT_ID_OFFSET].copy_from_slice(
-        &CandidatePrivateTransferProofDeploymentV1::new()
-            .candidate_id()
-            .expect("pinned candidate deployment")
-            .as_bytes(),
-    );
+    frame[DEPLOYMENT_ID_OFFSET..STATEMENT_ID_OFFSET].copy_from_slice(&deployment_id());
     frame[STATEMENT_ID_OFFSET..INPUT_COMMITMENTS_OFFSET].copy_from_slice(&EXPECTED_STATEMENT_ID);
     for commitment in frame[INPUT_COMMITMENTS_OFFSET..PROOF_LENGTHS_OFFSET].chunks_exact_mut(4) {
         commitment.copy_from_slice(&1_u32.to_le_bytes());
@@ -67,4 +63,14 @@ fn structured_frame(input: &[u8]) -> Vec<u8> {
     hasher.update(&frame[..checksum_start]);
     frame[checksum_start..].copy_from_slice(&hasher.finalize());
     frame
+}
+
+fn deployment_id() -> [u8; 32] {
+    static ID: OnceLock<[u8; 32]> = OnceLock::new();
+    *ID.get_or_init(|| {
+        CandidatePrivateTransferProofDeploymentV1::new()
+            .candidate_id()
+            .expect("pinned candidate deployment")
+            .as_bytes()
+    })
 }
