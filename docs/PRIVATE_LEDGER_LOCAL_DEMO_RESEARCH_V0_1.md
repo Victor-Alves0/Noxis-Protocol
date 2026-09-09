@@ -98,6 +98,9 @@ proofs nor witnesses.
 ## Next implementation gate
 
 The candidate snapshot/store/reopen path now accepts a fully bound `NXPT`
-packet through one local composite receipt/state mutation boundary. Next, add
-fault-injection and migration corpus coverage before considering any
-ABCI-facing private-admission design.
+packet through one local composite receipt/state mutation boundary. The storage
+suite now scans every prefix of one real `NXPL v2` composite frame and accepts
+only the complete frame as an entry; the existing store-reopen cases prove that
+a verified incomplete tail is removed and returns the authenticated base. Next,
+extend fault-injection and migration corpus coverage to filesystem-operation
+failures before considering any ABCI-facing private-admission design.

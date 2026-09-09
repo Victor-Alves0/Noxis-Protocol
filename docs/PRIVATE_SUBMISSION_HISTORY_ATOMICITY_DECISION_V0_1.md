@@ -113,6 +113,12 @@ uses one authority:
 | Complete sync before cache publish | Recover both receipt and post-state from the journal; repair cache. |
 | Corrupt complete frame or mid-history link | Fail closed; never infer a missing receipt or post-state. |
 
+The implemented storage suite scans every byte-prefix interruption point of one
+actual composite frame and accepts only the complete frame as an entry. Separate
+store-reopen cases discard a verified incomplete tail and restore the
+authenticated base. This is framing/recovery evidence, not a substitute for
+filesystem fault injection across operating systems.
+
 The on-disk receipt is local operator metadata. It must not be automatically
 logged to peers, exposed through a public API, or treated as wallet payment
 tracking because its envelope ID and state-delta facts are correlatable.

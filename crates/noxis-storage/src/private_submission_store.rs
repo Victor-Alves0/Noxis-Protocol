@@ -749,6 +749,53 @@ mod tests {
     }
 
     #[test]
+    fn recovery_handles_every_interruption_point_of_one_composite_frame() {
+        let source_path = path();
+        let target_path = source_path
+            .parent()
+            .unwrap()
+            .join("interruption-target.nxpr");
+        let initial = state();
+        let expected_id;
+        {
+            let mut source =
+                PrivateSubmissionStoreV2::initialize(&source_path, initial.clone()).unwrap();
+            let request = CandidatePrivateTransferRequestV1::new(intent(source.state()), ());
+            expected_id = source
+                .apply_transfer(
+                    &request,
+                    &AcceptAll,
+                    PrivateSubmissionMetadataV1::new([5; 32]).unwrap(),
+                )
+                .unwrap()
+                .post_state_id();
+        }
+        let complete_frame = fs::read(journal_path(&source_path)).unwrap();
+        assert!(!complete_frame.is_empty());
+
+        {
+            let mut target = PrivateSubmissionStoreV2::initialize(&target_path, initial).unwrap();
+            target.prepare_journal_base().unwrap();
+        }
+        let target_journal_path = journal_path(&target_path);
+        for interruption_at in 1..complete_frame.len() {
+            fs::write(&target_journal_path, &complete_frame[..interruption_at]).unwrap();
+            let mut journal = PrivateSubmissionJournalV2::open(&target_journal_path).unwrap();
+            let scan = journal.scan_recoverable_tail().unwrap();
+            assert!(scan.entries.is_empty());
+            assert!(scan.incomplete_tail.is_some());
+        }
+
+        fs::write(&target_journal_path, &complete_frame).unwrap();
+        let mut reopened = PrivateSubmissionStoreV2::open(&target_path).unwrap();
+        assert_eq!(reopened.state().anchor().state_id(), expected_id);
+        assert_eq!(reopened.submissions().unwrap().len(), 1);
+        drop(reopened);
+        assert_eq!(fs::read(&target_journal_path).unwrap(), complete_frame);
+        fs::remove_dir_all(source_path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
     fn complete_frame_with_a_recomputed_checksum_still_rejects_zero_envelope_id() {
         let path = path();
         let metadata = PrivateSubmissionMetadataV1::new([6; 32]).unwrap();
