@@ -178,10 +178,11 @@ is still transparent and therefore is not a privacy proof.
 The research proof contract now also has a typed in-memory bundle that retains
 the composed intent/value proof and both ownership proofs, then lets a separate
 fail-closed adapter verify them again against the same `NXPU v1` statement and
-current nullifier state. That adapter now feeds an atomic in-memory private
-ledger boundary using native 64-byte nullifiers: the optimized integration test
-commits both outputs and rejects replay. It deliberately has no byte encoding,
-durable state, ABCI or consensus activation; see
+current nullifier state. The executable local path wraps its bounded `NXPP v1`
+proof envelope together with two hybrid `NXRE v1` recipient envelopes in an
+`NXPT v1` packet, verifies each output-slot digest before proof admission, and
+then feeds the atomic private-ledger boundary using native 64-byte nullifiers.
+It deliberately has no user wallet, ABCI or consensus activation; see
 [`docs/PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md`](docs/PRIVATE_TRANSFER_PROOF_BUNDLE_RESEARCH_V0_1.md)
 and [`docs/PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md`](docs/PRIVATE_LEDGER_ADMISSION_RESEARCH_V0_1.md).
 
@@ -191,10 +192,12 @@ Run that exact private proof-to-ledger path locally with an optimized build:
 cargo run --release -p noxis-private-proof-contract --bin noxis-private-ledger-demo
 ```
 
-It proves and admits a deterministic 2x2 private research transfer, then
-rejects its replay. It is deliberately separate from the node demo: it has no
-packet bytes, wallet, ABCI or consensus. By default it is in-memory; its
-optional local snapshot persistence is described below. See
+It creates fresh local recipient descriptors, encrypts two output notes,
+constructs and validates one complete `NXPT` packet, proves and admits its 2x2
+research transfer, then rejects its replay. It is deliberately separate from
+the node demo: it has no user wallet, public transaction interface, ABCI or
+consensus. By default it is in-memory; its optional local snapshot persistence
+is described below. See
 [`docs/PRIVATE_LEDGER_LOCAL_DEMO_RESEARCH_V0_1.md`](docs/PRIVATE_LEDGER_LOCAL_DEMO_RESEARCH_V0_1.md).
 
 Pass `--data-dir PATH` after the binary separator to persist its resulting

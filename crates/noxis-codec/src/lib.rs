@@ -24,8 +24,12 @@ pub const PRIVATE_TRANSFER_MAGIC: [u8; 4] = *b"NXPT";
 pub const PRIVATE_TRANSFER_FORMAT_VERSION: u16 = 1;
 /// Maximum bytes of one encrypted-recipient envelope before KEM is implemented.
 pub const MAX_PRIVATE_ENVELOPE_BYTES: u16 = 4 * 1024;
-/// Provisional upper bound for an opaque v2 proof, pending adversarial benchmarks.
-pub const MAX_PRIVATE_PROOF_BYTES: u32 = 2 * 1024 * 1024;
+/// Candidate upper bound for an opaque v2 proof transport.
+///
+/// It matches the independently bounded local `NXPP v1` envelope: 8 MiB of
+/// proof chunks plus its 244-byte framing. This is a transport limit only; it
+/// does not select the research verifier or make `NXPT` a ledger transaction.
+pub const MAX_PRIVATE_PROOF_BYTES: u32 = 8_454_144;
 
 /// Upper bound on each transfer input/output collection.
 pub const MAX_COLLECTION_ITEMS: u32 = 65_536;

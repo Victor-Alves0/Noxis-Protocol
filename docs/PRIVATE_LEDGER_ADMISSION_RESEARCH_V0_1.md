@@ -46,6 +46,14 @@ ledger request. That store synchronizes one `NXPL v2` frame containing the
 receipt facts and rebuilt successor `NXPR` before publishing its cache.
 Neither the exact envelope nor proof/witness material reaches disk.
 
+`admit_candidate_private_transfer_packet` and its `PrivateSubmissionStoreV2`
+variant accept the complete local `NXPT v1` packet instead of a separately
+supplied typed intent. They first validate both canonical `NXRE` recipient
+envelopes and their output-slot digest bindings, then use the packet's single
+intent to derive `NXPU` and its bounded proof field as `NXPP`. This prevents a
+packet's delivery metadata from being paired with another intent or proof
+before the same atomic ledger boundary runs.
+
 All byte-entry APIs return a local
 [submission receipt](PRIVATE_PROOF_SUBMISSION_RECEIPT_CANDIDATE_V0_1.md) only
 after commit. In the v2 store path its envelope hash and non-secret transition
@@ -86,9 +94,10 @@ They cover:
 - rejection of an unknown asset before authorization; and
 - replay rejection without a second mutation.
 
-The full optimized integration creates the real proof bundle, serializes it as
-`NXPP`, uses the byte-entry API to decode/verify/commit the private transition
-and rejects the same bytes and intent after commit:
+The full optimized integration creates recipient envelopes, binds them in one
+`NXPT` intent, serializes the proof as the packet's `NXPP` field, uses the
+packet byte-entry API to decode/validate/verify/commit the private transition
+and rejects the same packet after commit:
 
 ```powershell
 cargo test --release -p noxis-private-proof-contract transfer_preflight::tests::executes_every_available_private_relation_for_one_statement --lib -- --exact --ignored --nocapture
@@ -126,7 +135,8 @@ This boundary does not yet provide:
 
 - a selected `ProofVerifierId` or production proof suite; `NXPP` is portable
   only inside the pinned local research profile;
-- an `NXPT` submission command or wallet transaction builder;
+- a user-facing `NXPT` submission command or persistent wallet transaction
+  builder;
 - recipient-envelope persistence or availability guarantees;
 - durable proof-envelope availability or historic proof re-verification;
   `NXPL v2` retains only an envelope ID and transition delta next to the
@@ -147,11 +157,13 @@ An optimized command now drives the proof-to-commit boundary directly:
 cargo run --release -p noxis-private-proof-contract --bin noxis-private-ledger-demo
 ```
 
-It produces the retained proof bundle, admits its fixed research transfer and
-then proves that the same request is rejected. See
+It produces two ephemeral recipient envelopes plus the retained proof bundle,
+admits their one fixed research packet and then proves that the same request is
+rejected. See
 [the local private-ledger demo](PRIVATE_LEDGER_LOCAL_DEMO_RESEARCH_V0_1.md) for
-the command, expected output and limits. It intentionally does not yet build a
-packet or retain private state after the process exits.
+the command, expected output and limits. It does not retain packet bytes,
+recipient material or private state after the process exits unless `--data-dir`
+is used, and even that durable path retains only receipt/state facts.
 
 ## Next implementation gate
 

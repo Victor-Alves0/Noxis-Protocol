@@ -83,7 +83,10 @@ pinned-research proof objects: 2,836,034 for intent/value, 1,066,377 for the
 first ownership proof and 1,066,100 for the second. This is one research-case
 measurement, not a maximum, protocol size limit or network-ready envelope.
 The deliberately separate [candidate transport budget](PRIVATE_PROOF_TRANSPORT_BUDGET_CANDIDATE_V0_1.md)
-uses that evidence for a bounded future envelope without changing `NXPT v1`.
+uses that evidence for the bounded `NXPP v1` envelope carried in the opaque
+proof field of the local `NXPT v1` candidate packet path. This transport
+coupling does not select a verifier profile or make `NXPT` a consensus
+transaction.
 The subsequent `NXPP` release round trip completed in 991.30 seconds with a
 fresh 4,967,527-byte raw bundle and a 4,967,771-byte complete envelope; see
 [the envelope evidence](PRIVATE_PROOF_BUNDLE_ENVELOPE_CANDIDATE_V0_1.md).
@@ -97,6 +100,9 @@ wallet benchmark.
 
 The typed private-ledger admission boundary now reconstructs `NXPU v1`, invokes
 this verifier and atomically applies both nullifiers and commitments without
-using the legacy 32-byte transfer model. The bundle itself remains local and
-in memory; portable proof encoding, durable private transition history,
-verifier identity and consensus activation remain separate later gates.
+using the legacy 32-byte transfer model. Its complete local packet entrypoint
+strictly validates the two `NXRE` recipient envelopes in `NXPT` before using
+that packet's intent and `NXPP` proof field. The durable `NXPL v2` option
+retains only local receipt facts and post-state, not packet, envelope or proof
+bytes. A portable verifier identity and consensus activation remain separate
+later gates.

@@ -3,17 +3,18 @@
 //! The construction uses deterministic research witnesses. It generates the
 //! currently retained local proofs, verifies them through the ledger's
 //! authorizer seam, commits one candidate private transfer and proves that a
-//! replay cannot mutate the resulting state. No packet bytes, wallet secret,
-//! persistence, network or consensus claim is made here.
+//! replay cannot mutate the resulting state. It builds local `NXPT`/`NXRE`
+//! delivery bytes but makes no wallet, persistence, network or consensus claim.
 
 use std::fmt;
 
+use noxis_codec::{PrivateTransferPacketV2, encode_private_transfer};
 use noxis_nullifier_tree_state::NullifierSparseTreeStateV1;
 use noxis_poseidon2_privacy_reference::Poseidon2P24PrivacyReference;
 use noxis_poseidon2_reference::Poseidon2P24Reference;
 use noxis_privacy_types::{
-    CiphertextDigestV2, CircuitId, NoteCommitmentV2, NullifierV2, PrivateTransferIntentV2,
-    PrivateTransferOutputV2, TreeParametersId, TreeParametersV2,
+    CircuitId, NoteCommitmentV2, NullifierV2, PrivateTransferIntentV2, PrivateTransferOutputV2,
+    TreeParametersId, TreeParametersV2,
 };
 use noxis_private_state::{
     CandidatePrivateLedgerStateV1, CandidatePrivateStateSnapshotV1, PrivateStateAnchorV2,
@@ -21,12 +22,17 @@ use noxis_private_state::{
 use noxis_storage::PrivateSubmissionStoreV2;
 use noxis_tree_params::CandidatePoseidon2P24ManifestV2;
 use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId, StateId};
+use noxis_wallet_crypto::{
+    CandidatePrivateOutputSlotV1, CandidatePrivateRecipientKeysetV1, RecipientEnvelopeContext,
+    candidate_ciphertext_digest_v1, encode_hybrid_recipient_envelope,
+    encrypt_candidate_private_note_to_descriptor,
+};
 
 use crate::{
     CandidateAnchoredOwnershipWitnessV1, CandidateOutputNoteWitnessV1,
     CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleEnvelopeV1,
-    CandidatePrivateTransferProofPublicStatementV1, admit_candidate_private_proof_bundle_envelope,
-    admit_candidate_private_proof_bundle_envelope_to_submission_store,
+    CandidatePrivateTransferProofPublicStatementV1, admit_candidate_private_transfer_packet,
+    admit_candidate_private_transfer_packet_to_submission_store,
     candidate_private_research_validation_context_id,
     prove_candidate_private_transfer_proof_bundle,
 };
@@ -152,25 +158,43 @@ fn run_candidate_private_ledger_demo_at(
         )
     };
 
-    let mut output_one = note_with_recipient(attempt(privacy.hash_addr(&[21; 32]))?, 13);
-    let mut output_two = note_with_recipient(attempt(privacy.hash_addr(&[37; 32]))?, 17);
+    let output_context = attempt(RecipientEnvelopeContext::new(
+        b"noxis-private-ledger-demo",
+        1,
+    ))?;
+    let first_recipient = attempt(CandidatePrivateRecipientKeysetV1::generate(1))?;
+    let second_recipient = attempt(CandidatePrivateRecipientKeysetV1::generate(1))?;
+    let first_descriptor = first_recipient.public_descriptor();
+    let second_descriptor = second_recipient.public_descriptor();
+    let mut output_one =
+        note_with_recipient_commitment(first_descriptor.recipient_commitment().as_bytes(), 13);
+    let mut output_two =
+        note_with_recipient_commitment(second_descriptor.recipient_commitment().as_bytes(), 17);
     set_asset_and_value(&mut output_one, 45);
     set_asset_and_value(&mut output_two, 55);
+    let first_encrypted_output = attempt(encrypt_candidate_private_note_to_descriptor(
+        &first_descriptor,
+        &output_context,
+        output_one,
+    ))?;
+    let second_encrypted_output = attempt(encrypt_candidate_private_note_to_descriptor(
+        &second_descriptor,
+        &output_context,
+        output_two,
+    ))?;
     let mut outputs = [
         (
-            attempt(NoteCommitmentV2::from_elements(attempt(
-                privacy.hash_note(&output_one),
-            )?))?,
+            first_encrypted_output.commitment(),
             output_one,
+            first_encrypted_output,
         ),
         (
-            attempt(NoteCommitmentV2::from_elements(attempt(
-                privacy.hash_note(&output_two),
-            )?))?,
+            second_encrypted_output.commitment(),
             output_two,
+            second_encrypted_output,
         ),
     ];
-    outputs.sort_by_key(|(commitment, _)| commitment.as_bytes());
+    outputs.sort_by_key(|(commitment, _, _)| commitment.as_bytes());
 
     let snapshot = attempt(CandidatePrivateStateSnapshotV1::new(
         vec![
@@ -209,11 +233,19 @@ fn run_candidate_private_ledger_demo_at(
         [
             PrivateTransferOutputV2::new(
                 outputs[0].0,
-                attempt(CiphertextDigestV2::from_elements([41; 16]))?,
+                attempt(candidate_ciphertext_digest_v1(
+                    CandidatePrivateOutputSlotV1::First,
+                    outputs[0].0,
+                    outputs[0].2.envelope(),
+                ))?,
             ),
             PrivateTransferOutputV2::new(
                 outputs[1].0,
-                attempt(CiphertextDigestV2::from_elements([43; 16]))?,
+                attempt(candidate_ciphertext_digest_v1(
+                    CandidatePrivateOutputSlotV1::Second,
+                    outputs[1].0,
+                    outputs[1].2.envelope(),
+                ))?,
             ),
         ],
     ))?;
@@ -233,6 +265,15 @@ fn run_candidate_private_ledger_demo_at(
     let envelope_bytes = attempt(CandidatePrivateProofBundleEnvelopeV1::encode(
         &bundle, &statement,
     ))?;
+    let packet = attempt(PrivateTransferPacketV2::new(
+        statement.air_public_inputs().intent().clone(),
+        [
+            attempt(encode_hybrid_recipient_envelope(outputs[0].2.envelope()))?,
+            attempt(encode_hybrid_recipient_envelope(outputs[1].2.envelope()))?,
+        ],
+        envelope_bytes.clone(),
+    ))?;
+    let packet_bytes = attempt(encode_private_transfer(&packet))?;
 
     let mut ledger = attempt(CandidatePrivateLedgerStateV1::new(
         statement.anchor().genesis_id(),
@@ -258,23 +299,17 @@ fn run_candidate_private_ledger_demo_at(
         durable_submission_count,
     ) = if let Some(path) = persistent_path {
         let mut store = attempt(PrivateSubmissionStoreV2::initialize(path, ledger))?;
-        let accepted = attempt(
-            admit_candidate_private_proof_bundle_envelope_to_submission_store(
-                &mut store,
-                statement.air_public_inputs().intent().clone(),
-                &envelope_bytes,
-            ),
-        )?;
+        let accepted = attempt(admit_candidate_private_transfer_packet_to_submission_store(
+            &mut store,
+            &packet_bytes,
+        ))?;
         let counts = (
             store.state().snapshot().commitments().len(),
             store.state().nullifier_tree().spent_count(),
         );
-        let replay_rejected = admit_candidate_private_proof_bundle_envelope_to_submission_store(
-            &mut store,
-            statement.air_public_inputs().intent().clone(),
-            &envelope_bytes,
-        )
-        .is_err();
+        let replay_rejected =
+            admit_candidate_private_transfer_packet_to_submission_store(&mut store, &packet_bytes)
+                .is_err();
         drop(store);
         let mut reopened = attempt(PrivateSubmissionStoreV2::open(path))?;
         let durable_submission_count = attempt(reopened.submissions())?.len();
@@ -287,21 +322,16 @@ fn run_candidate_private_ledger_demo_at(
             Some(durable_submission_count),
         )
     } else {
-        let accepted = attempt(admit_candidate_private_proof_bundle_envelope(
+        let accepted = attempt(admit_candidate_private_transfer_packet(
             &mut ledger,
-            statement.air_public_inputs().intent().clone(),
-            &envelope_bytes,
+            &packet_bytes,
         ))?;
         let counts = (
             ledger.snapshot().commitments().len(),
             ledger.nullifier_tree().spent_count(),
         );
-        let replay_rejected = admit_candidate_private_proof_bundle_envelope(
-            &mut ledger,
-            statement.air_public_inputs().intent().clone(),
-            &envelope_bytes,
-        )
-        .is_err();
+        let replay_rejected =
+            admit_candidate_private_transfer_packet(&mut ledger, &packet_bytes).is_err();
         (accepted, counts.0, counts.1, replay_rejected, None, None)
     };
     if !replay_rejected {
@@ -328,6 +358,13 @@ fn note_with_recipient(recipient: [u32; 16], seed: u8) -> [u8; 178] {
     for (lane, value) in recipient.into_iter().enumerate() {
         note[50 + (lane * 4)..54 + (lane * 4)].copy_from_slice(&value.to_le_bytes());
     }
+    note
+}
+
+fn note_with_recipient_commitment(recipient: [u8; 64], seed: u8) -> [u8; 178] {
+    let mut note = core::array::from_fn(|index| (index as u8).wrapping_mul(19).wrapping_add(seed));
+    note[..2].copy_from_slice(&1_u16.to_be_bytes());
+    note[50..114].copy_from_slice(&recipient);
     note
 }
 

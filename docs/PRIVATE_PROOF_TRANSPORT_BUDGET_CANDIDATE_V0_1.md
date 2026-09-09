@@ -7,10 +7,10 @@ currently executable, three-proof private-transfer research bundle. It is not
 a wire format, proof-verifier selection, consensus rule, wallet benchmark or
 production denial-of-service policy. The active service remains fail-closed.
 
-It intentionally does not modify `NXPT v1`. `NXPT` has one opaque proof field
-limited to 2 MiB, while the current research bundle already exceeds that
-limit. Reusing or silently widening that legacy field would blur unrelated
-packet and proof-bundle designs.
+`NXPT v1` now has one opaque proof field capped at exactly **8,454,144 bytes**,
+matching this candidate `NXPP v1` envelope bound. The packet remains a local
+transport frame: the matching cap neither selects a verifier nor makes an
+`NXPT` packet a ledger, wallet, network or consensus transaction.
 
 ## Measured input
 
@@ -31,7 +31,7 @@ The command and its limitations are recorded in
 ## Candidate bound
 
 `noxis-private-proof-contract::CandidatePrivateProofTransportBudgetV1`
-enforces the following independent, inclusive limits before a future envelope
+enforces the following independent, inclusive limits before its local envelope
 decoder can reserve variable-length storage:
 
 | Component | Limit | Rationale |
@@ -59,7 +59,7 @@ following:
 4. Fuzzing of every length, truncation, trailing-byte and malformed-field path.
 5. A separate review before any network, ABCI, wallet or consensus admission.
 
-The next implementation step may therefore use this budget only to build a
-separate **candidate local proof-bundle envelope**. It must serialize, decode,
-reconstruct and independently verify all three relations before a ledger can
-consume it; it cannot activate private settlement merely by existing.
+The implemented local `NXPP v1` envelope uses this budget and can be carried
+by `NXPT v1`. Packet admission must still serialize, decode, reconstruct and
+independently verify all three relations before the candidate ledger consumes
+it; it cannot activate private settlement merely by existing.

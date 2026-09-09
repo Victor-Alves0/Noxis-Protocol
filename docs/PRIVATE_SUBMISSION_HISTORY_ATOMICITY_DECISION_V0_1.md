@@ -23,7 +23,9 @@ The current candidate path has two true but intentionally separate facts:
    `NXPL v1`, then publishes a replaceable cache; and
 2. successful byte admission returns an in-memory
    `CandidatePrivateProofBundleAdmissionReceiptV1` containing a local hash of
-   exact `NXPP` bytes and public transition facts.
+   exact `NXPP` bytes and public transition facts. The complete local packet
+   entrypoint first validates the enclosing `NXPT` and its `NXRE` envelopes;
+   neither packet nor envelope bytes are retained here.
 
 Persisting the receipt in another file would create an unreviewed distributed
 commit problem. A crash could produce either of these unsafe observations:
@@ -75,7 +77,8 @@ complete frame is the unit of durability, recovery and history observation.
 
 Before appending, a v2 writer must already have:
 
-1. validated the exact `NXPP` bytes against the current state;
+1. validated either the exact direct `NXPP` bytes or the `NXPP` bytes extracted
+   from a strictly validated local `NXPT` packet against the current state;
 2. produced the typed candidate ledger receipt; and
 3. reconstructed and validated the complete successor `NXPR`.
 

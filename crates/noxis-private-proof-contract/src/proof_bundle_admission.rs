@@ -9,6 +9,10 @@
 use std::fmt;
 
 use noxis_privacy_types::PrivateTransferIntentV2;
+use noxis_private_packet_validation::{
+    CandidatePrivatePacketEnvelopeValidationError,
+    decode_and_validate_candidate_private_transfer_packet_envelopes,
+};
 use noxis_private_state::{
     CandidatePrivateLedgerError, CandidatePrivateLedgerStateV1,
     CandidatePrivateTransferAdmissionReceiptV1, CandidatePrivateTransferRequestV1,
@@ -89,6 +93,45 @@ pub fn admit_candidate_private_proof_bundle_envelope(
     )?;
     let bundle = CandidatePrivateProofBundleEnvelopeV1::decode_and_verify(
         envelope_bytes,
+        &statement,
+        ledger.nullifier_tree(),
+    )?;
+    let request = CandidatePrivateTransferRequestV1::new(intent, bundle);
+    let ledger_receipt = ledger.apply_transfer(
+        &request,
+        &CandidatePrivateTransferProofBundleVerifierV1::new(),
+    )?;
+    Ok(CandidatePrivateProofBundleAdmissionReceiptV1 {
+        envelope_id,
+        ledger_receipt,
+    })
+}
+
+/// Parses, validates, verifies and atomically admits one complete local `NXPT
+/// v1` packet against the present in-memory candidate ledger state.
+///
+/// The packet's recipient envelopes are checked before its proof field is
+/// treated as `NXPP`. The packet intent is the only intent used to derive the
+/// current `NXPU` statement, preventing delivery metadata and a proof from
+/// unrelated packets being combined. This is local research admission only;
+/// it is not wallet, ABCI, consensus or network transaction admission.
+pub fn admit_candidate_private_transfer_packet(
+    ledger: &mut CandidatePrivateLedgerStateV1,
+    packet_bytes: &[u8],
+) -> Result<CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleAdmissionError>
+{
+    require_candidate_private_research_validation_context(ledger.anchor().validation_context_id())?;
+    let packet = decode_and_validate_candidate_private_transfer_packet_envelopes(packet_bytes)?;
+    let intent = packet.packet().intent().clone();
+    let proof_bytes = packet.packet().proof();
+    let envelope_id = candidate_private_proof_bundle_envelope_id(proof_bytes);
+    let statement = CandidatePrivateTransferProofPublicStatementV1::new(
+        ledger.anchor().clone(),
+        ledger.nullifier_tree(),
+        intent.clone(),
+    )?;
+    let bundle = CandidatePrivateProofBundleEnvelopeV1::decode_and_verify(
+        proof_bytes,
         &statement,
         ledger.nullifier_tree(),
     )?;
@@ -184,6 +227,51 @@ pub fn admit_candidate_private_proof_bundle_envelope_to_submission_store(
     })
 }
 
+/// Parses, validates, verifies and durably admits one complete local `NXPT v1`
+/// packet through the composite `NXPL v2` store.
+///
+/// The packet's two `NXRE` recipient envelopes are strictly decoded and bound
+/// to its output slots before the `NXPP` bytes in its proof field are parsed.
+/// The same packet intent then builds the current `NXPU` statement used to
+/// verify those proof bytes. This joins delivery metadata and proof admission
+/// without persisting recipient envelopes, `NXPT`/`NXPP` bytes, proofs or
+/// witnesses. It remains local research software, not wallet, ABCI, consensus
+/// or network transaction admission.
+pub fn admit_candidate_private_transfer_packet_to_submission_store(
+    store: &mut PrivateSubmissionStoreV2,
+    packet_bytes: &[u8],
+) -> Result<CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleAdmissionError>
+{
+    require_candidate_private_research_validation_context(
+        store.state().anchor().validation_context_id(),
+    )?;
+    let packet = decode_and_validate_candidate_private_transfer_packet_envelopes(packet_bytes)?;
+    let intent = packet.packet().intent().clone();
+    let proof_bytes = packet.packet().proof();
+    let envelope_id = candidate_private_proof_bundle_envelope_id(proof_bytes);
+    let state = store.state();
+    let statement = CandidatePrivateTransferProofPublicStatementV1::new(
+        state.anchor().clone(),
+        state.nullifier_tree(),
+        intent.clone(),
+    )?;
+    let bundle = CandidatePrivateProofBundleEnvelopeV1::decode_and_verify(
+        proof_bytes,
+        &statement,
+        state.nullifier_tree(),
+    )?;
+    let request = CandidatePrivateTransferRequestV1::new(intent, bundle);
+    let ledger_receipt = store.apply_transfer(
+        &request,
+        &CandidatePrivateTransferProofBundleVerifierV1::new(),
+        PrivateSubmissionMetadataV1::new(envelope_id.as_bytes())?,
+    )?;
+    Ok(CandidatePrivateProofBundleAdmissionReceiptV1 {
+        envelope_id,
+        ledger_receipt,
+    })
+}
+
 /// Errors from the local `NXPP` byte-to-ledger admission boundary.
 ///
 /// Each variant leaves the supplied ledger unchanged: parsing and proof
@@ -193,6 +281,7 @@ pub fn admit_candidate_private_proof_bundle_envelope_to_submission_store(
 pub enum CandidatePrivateProofBundleAdmissionError {
     PublicStatement(CandidatePrivateTransferProofPublicStatementError),
     ResearchContext(CandidatePrivateResearchContextError),
+    Packet(CandidatePrivatePacketEnvelopeValidationError),
     Envelope(CandidatePrivateProofBundleEnvelopeError),
     Ledger(CandidatePrivateLedgerError),
     Store(PrivateStateStoreError),
@@ -210,6 +299,13 @@ impl From<CandidatePrivateTransferProofPublicStatementError>
 impl From<CandidatePrivateResearchContextError> for CandidatePrivateProofBundleAdmissionError {
     fn from(value: CandidatePrivateResearchContextError) -> Self {
         Self::ResearchContext(value)
+    }
+}
+impl From<CandidatePrivatePacketEnvelopeValidationError>
+    for CandidatePrivateProofBundleAdmissionError
+{
+    fn from(value: CandidatePrivatePacketEnvelopeValidationError) -> Self {
+        Self::Packet(value)
     }
 }
 impl From<CandidatePrivateProofBundleEnvelopeError> for CandidatePrivateProofBundleAdmissionError {

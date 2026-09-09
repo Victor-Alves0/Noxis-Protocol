@@ -21,9 +21,10 @@ service remains fail-closed. In particular, the current proof composition
 still has independently verified relations rather than one reviewed
 transfer-proof system with nullifier absence inside its AIR.
 
-`NXPP` deliberately does **not** alter `NXPT v1`: `NXPT` remains the older
-two-envelope structural packet with one 2 MiB opaque-proof field, while the
-measured three-proof bundle is already 4,968,511 raw bytes.
+`NXPP` now fits in `NXPT v1`'s opaque proof field: that packet's explicit
+local-candidate limit is 8,454,144 bytes, matching the bounded `NXPP` envelope
+rather than the former insufficient 2 MiB provisional limit. This does not
+turn either format into a selected transaction or consensus format.
 
 ## Exact layout
 
@@ -95,15 +96,25 @@ envelope ID is a domain-separated SHA-256 hash of the exact bytes. That ID is
 local and correlatable; it is deliberately outside the `NXPP` layout and is
 not a public transaction identifier.
 
+`admit_candidate_private_transfer_packet_to_submission_store` is the complete
+local packet path. It strictly decodes `NXPT`, validates both `NXRE` values and
+their output-slot ciphertext digests, then treats the packet's bounded proof
+field as `NXPP`. The packet intent is the sole source used to derive `NXPU`, so
+recipient delivery metadata, public intent and proof statement cannot be mixed
+across packets. Successful admission persists only the existing local `NXPP`
+receipt ID and successor state facts in `NXPL v2`; it does not retain the
+packet, envelopes, proofs or witnesses. This remains local candidate storage,
+not a wallet submission, ABCI or consensus path.
+
 ## Required evidence and remaining gates
 
 The focused unit test covers malformed framing before P3 deserialization. The
 ignored optimized integration test additionally exercises the full real path,
-including `bundle → NXPP → decoded bundle → verify → ledger mutation → replay
-rejection`:
+including `bundle → NXPP inside validated NXPT → decoded bundle → verify →
+ledger mutation → replay rejection`:
 
 ```powershell
-cargo test --release -p noxis-private-proof-contract transfer_preflight::tests::executes_every_available_private_relation_for_one_statement --lib -- --exact --ignored --nocapture
+cargo test --release -p noxis-private-proof-contract local_ledger_demo::tests::proves_commits_and_rejects_replay_through_the_local_demo --lib -- --exact --ignored --nocapture
 ```
 
 Its cost remains substantial: it executes the current research prover and
@@ -111,7 +122,13 @@ verifier rather than a wallet-ready prover. The previous full path took about
 16–18 minutes and peaked near 4.45 GB resident memory. `NXPP` does not reduce
 that cost and must not be advertised as a network admission budget.
 
-On 2026-09-02, the complete release command passed in **991.30 seconds**. Its
+On 2026-09-09, this exact complete release test passed in **526.09 seconds**
+after adding the local `NXPT`/`NXRE` packet path. A separate fresh persistent
+release command also accepted the packet, rejected replay and recovered one
+`NXPL v2` receipt/state frame after reopen. These are supporting local research
+evidence, not wallet or consensus performance claims.
+
+On 2026-09-02, the earlier complete release command passed in **991.30 seconds**. Its
 freshly generated raw proof chunks totaled **4,967,527 bytes** and the exact
 `NXPP v1` envelope was **4,967,771 bytes** (the fixed framing/checksum cost is
 244 bytes). P3 proof serialization varies slightly across generated proofs,

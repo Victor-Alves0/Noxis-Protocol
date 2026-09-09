@@ -124,14 +124,15 @@ cargo test --release -p noxis-stark-experiment ownership::tests::ownership_stark
 On 2026-09-02 this test emitted **1,066,268 bytes** for one serialized
 depth-32 ownership proof. The fixed two-input relation therefore needs more
 than 2 MiB for ownership proofs alone, before the intent/value proof or public
-metadata. The current `NXPT v1` 2 MiB opaque-proof cap is consequently known
-to be insufficient for this research bundle and must not be used as its future
-transport budget. A bounded envelope needs full-bundle measurements and an
-explicit denial-of-service review before selecting a replacement limit.
+metadata. This evidence informed the bounded local `NXPP v1` envelope and the
+matching **8,454,144-byte** opaque-proof cap in `NXPT v1`. That cap is a local
+transport bound only, not a selected network budget; it still needs explicit
+adversarial denial-of-service review.
 
 The complete release bundle measurement on the same date was **4,968,511
 bytes** of raw proof objects: 2,836,034 for the intent/value relation,
 1,066,377 for ownership slot zero and 1,066,100 for ownership slot one. This
 is evidence from one fixed research statement, not a maximum or a selected
-network budget. The future envelope must account separately for bounded public
-metadata, framing/checksum overhead and adversarial-size review.
+network budget. The implemented local envelope accounts separately for bounded
+public metadata and framing/checksum overhead; adversarial-size review remains
+required before any activation.
