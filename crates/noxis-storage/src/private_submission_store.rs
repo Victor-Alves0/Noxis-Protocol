@@ -622,4 +622,90 @@ mod tests {
         assert_eq!(fs::metadata(&journal_path).unwrap().len(), complete_length);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
+
+    #[test]
+    fn complete_composite_frame_repairs_a_cache_never_published_after_sync() {
+        let path = path();
+        let metadata = PrivateSubmissionMetadataV1::new([7; 32]).unwrap();
+        let expected;
+        {
+            let mut store = PrivateSubmissionStoreV2::initialize(&path, state()).unwrap();
+            let predecessor = store.state.clone();
+            let request = CandidatePrivateTransferRequestV1::new(intent(&predecessor), ());
+            let mut successor = predecessor.clone();
+            let receipt = successor.apply_transfer(&request, &AcceptAll).unwrap();
+            expected = receipt.post_state_id();
+            store.prepare_journal_base().unwrap();
+            store
+                .journal
+                .append_submission(
+                    &predecessor,
+                    &successor,
+                    metadata,
+                    receipt.asset_id(),
+                    *receipt.input_nullifiers(),
+                    *receipt.output_commitments(),
+                )
+                .unwrap();
+            // Deliberately omit cache publication: this models a crash after
+            // `sync_data` of one complete composite frame.
+        }
+
+        let mut reopened = PrivateSubmissionStoreV2::open(&path).unwrap();
+        assert_eq!(reopened.state().anchor().state_id(), expected);
+        assert_eq!(reopened.submissions().unwrap().len(), 1);
+        drop(reopened);
+        assert_eq!(read_state(&path).unwrap().anchor().state_id(), expected);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn incomplete_first_frame_rolls_back_to_the_authenticated_base() {
+        let path = path();
+        let initial = state();
+        let expected = initial.anchor().state_id();
+        {
+            let mut store = PrivateSubmissionStoreV2::initialize(&path, initial).unwrap();
+            store.prepare_journal_base().unwrap();
+        }
+        let journal_path = journal_path(&path);
+        fs::write(&journal_path, b"NXP").unwrap();
+
+        let mut reopened = PrivateSubmissionStoreV2::open(&path).unwrap();
+        assert_eq!(reopened.state().anchor().state_id(), expected);
+        assert!(reopened.submissions().unwrap().is_empty());
+        drop(reopened);
+        assert_eq!(fs::metadata(&journal_path).unwrap().len(), 0);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn complete_frame_with_a_recomputed_checksum_still_rejects_zero_envelope_id() {
+        let path = path();
+        let metadata = PrivateSubmissionMetadataV1::new([6; 32]).unwrap();
+        {
+            let mut store = PrivateSubmissionStoreV2::initialize(&path, state()).unwrap();
+            let request = CandidatePrivateTransferRequestV1::new(intent(store.state()), ());
+            store
+                .apply_transfer(&request, &AcceptAll, metadata)
+                .unwrap();
+        }
+        let journal_path = journal_path(&path);
+        let mut bytes = fs::read(&journal_path).unwrap();
+        let payload_start = crate::PRIVATE_SUBMISSION_JOURNAL_HEADER_LENGTH;
+        let envelope_start = payload_start + 72;
+        bytes[envelope_start..envelope_start + 32].fill(0);
+        let checksum_start = bytes.len() - crate::PRIVATE_SUBMISSION_JOURNAL_CHECKSUM_LENGTH;
+        let checksum = crate::crc32(&bytes[payload_start..checksum_start]).to_be_bytes();
+        bytes[checksum_start..].copy_from_slice(&checksum);
+        fs::write(&journal_path, bytes).unwrap();
+
+        assert!(matches!(
+            PrivateSubmissionStoreV2::open(&path),
+            Err(PrivateSubmissionStoreError::Journal(
+                crate::PrivateSubmissionJournalError::ZeroEnvelopeId
+            ))
+        ));
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
 }

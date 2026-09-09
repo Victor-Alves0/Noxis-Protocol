@@ -145,8 +145,10 @@ implementation gates; no migration code is authorized by this decision alone.
 
 The implemented v2 boundary provides the source magic/version, strict bounded
 codec, canonical field decoding, one store mutation path, release tests for
-reopen and a partial final frame, and a registry row. The following work
-remains required before it can move beyond local candidate storage:
+reopen, a partial final frame, a crash after journal sync/before cache publish,
+and a complete checksum-recomputed frame with an invalid receipt field, plus a
+registry row. The following work remains required before it can move beyond
+local candidate storage:
 
 1. a narrowly owned v2 codec and strict parser tests for every header, length,
    receipt field, nested `NXPR`, trailing byte and CRC path;
@@ -154,8 +156,8 @@ remains required before it can move beyond local candidate storage:
    predecessor/receipt-delta mismatches;
 3. one store mutation path that produces the composite frame after verified
    `NXPP` admission, with no alternative receipt append API;
-4. crash/fault tests at every write/sync/publish boundary, including cache
-   repair and no-complete-frame rollback; and
+4. broader filesystem fault injection at every write/sync/publish boundary
+   and across supported storage platforms; and
 5. an explicit offline migration design and test corpus before a v1 store can
    be upgraded.
 
