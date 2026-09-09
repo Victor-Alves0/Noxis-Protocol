@@ -65,6 +65,49 @@ pub fn status_local(directory: DataDirectory) -> Result<LocalNodeStatus, Researc
     initialize_local(directory)
 }
 
+/// Submits one externally supplied canonical transaction to the explicit
+/// research-only node configuration.
+///
+/// This is intentionally separate from [`run_local`]: an operator can inspect
+/// the durable state between submissions and observe each acceptance or
+/// rejection. The fixture verifier and mint policy still authorize only their
+/// documented research transactions; this is not a public transaction API.
+pub fn submit_local(
+    directory: DataDirectory,
+    transaction_bytes: &[u8],
+) -> Result<SubmissionOutcome, ResearchDemoError> {
+    let mut runtime = open_local_runtime(directory)?;
+    Ok(runtime.node_mut().submit_canonical(transaction_bytes))
+}
+
+/// Returns the canonical bytes of the one fixture-authorized mint.
+///
+/// The bytes are meant for the `research submit` command and are not a wallet
+/// output, an asset issuance interface or a production authorization.
+pub fn fixture_mint_bytes() -> Result<Vec<u8>, ResearchDemoError> {
+    encode_transaction(&mint_transaction()).map_err(ResearchDemoError::from)
+}
+
+/// Returns the canonical bytes of the one fixture-authorized transfer.
+///
+/// It succeeds only after [`fixture_mint_bytes`] has created its input and can
+/// be submitted only once because the fixture nullifier is then spent.
+pub fn fixture_transfer_bytes() -> Result<Vec<u8>, ResearchDemoError> {
+    encode_transaction(&transfer_transaction(2, DEMO_TRANSFER_COMMITMENT))
+        .map_err(ResearchDemoError::from)
+}
+
+/// Returns distinct canonical fixture bytes that attempt to spend the same
+/// fixture nullifier as [`fixture_transfer_bytes`].
+///
+/// Submit this only after the regular fixture transfer to observe the
+/// `NullifierAlreadySpent` invariant independently from transaction-ID replay
+/// protection.
+pub fn fixture_duplicate_nullifier_bytes() -> Result<Vec<u8>, ResearchDemoError> {
+    encode_transaction(&transfer_transaction(3, DEMO_DUPLICATE_COMMITMENT))
+        .map_err(ResearchDemoError::from)
+}
+
 /// Runs the complete durable sequence in `directory` and then reopens it.
 pub fn run_local(directory: DataDirectory) -> Result<ResearchDemoReport, ResearchDemoError> {
     let mut runtime = open_local_runtime(directory.clone())?;
@@ -76,24 +119,21 @@ pub fn run_local(directory: DataDirectory) -> Result<ResearchDemoReport, Researc
     }
 
     let mint = accepted(
-        runtime
-            .node_mut()
-            .submit_canonical(&encode_transaction(&mint_transaction())?),
+        runtime.node_mut().submit_canonical(&fixture_mint_bytes()?),
         "mint",
     )?;
     let transfer = accepted(
         runtime
             .node_mut()
-            .submit_canonical(&encode_transaction(&transfer_transaction(
-                2,
-                DEMO_TRANSFER_COMMITMENT,
-            ))?),
+            .submit_canonical(&fixture_transfer_bytes()?),
         "research transfer",
     )?;
     let after_transfer = runtime.node().status();
-    let duplicate_rejection = duplicate_rejection(runtime.node_mut().submit_canonical(
-        &encode_transaction(&transfer_transaction(3, DEMO_DUPLICATE_COMMITMENT))?,
-    ))?;
+    let duplicate_rejection = duplicate_rejection(
+        runtime
+            .node_mut()
+            .submit_canonical(&fixture_duplicate_nullifier_bytes()?),
+    )?;
 
     drop(runtime);
     let recovered_runtime = open_local_runtime(directory)?;
@@ -357,6 +397,47 @@ mod tests {
         let reopened = status_local(DataDirectory::new(&path).unwrap()).unwrap();
         assert_eq!(initial.sequence, 0);
         assert_eq!(initial, reopened);
+        fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn separately_submitted_fixture_bytes_are_durable_and_reject_replay() {
+        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("noxis-research-submit-{suffix}-{sequence}"));
+
+        assert!(matches!(
+            submit_local(DataDirectory::new(&path).unwrap(), &fixture_mint_bytes().unwrap())
+                .unwrap(),
+            SubmissionOutcome::LocallyDurable(receipt) if receipt.sequence == 1
+        ));
+        assert!(matches!(
+            submit_local(
+                DataDirectory::new(&path).unwrap(),
+                &fixture_duplicate_nullifier_bytes().unwrap(),
+            )
+            .unwrap(),
+            SubmissionOutcome::LocallyDurable(receipt) if receipt.sequence == 2
+        ));
+        assert!(matches!(
+            submit_local(
+                DataDirectory::new(&path).unwrap(),
+                &fixture_transfer_bytes().unwrap(),
+            )
+            .unwrap(),
+            SubmissionOutcome::Rejected(SubmissionRejection::Ledger(
+                LedgerError::NullifierAlreadySpent(_)
+            ))
+        ));
+        assert_eq!(
+            status_local(DataDirectory::new(&path).unwrap())
+                .unwrap()
+                .sequence,
+            2
+        );
         fs::remove_dir_all(path).unwrap();
     }
 }

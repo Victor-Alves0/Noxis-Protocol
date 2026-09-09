@@ -50,6 +50,35 @@ cargo run -p noxis-node --features research-testing -- research demo --data-dir 
 manifesto ou a recuperação durável não forem válidos. A altura exibida é a
 sequência local; não é altura de consenso.
 
+## Submissão manual observável
+
+O demo completo continua sendo o modo mais curto de verificar a sequência,
+mas as fixtures também podem ser submetidas uma a uma. Isso permite inspecionar
+o estado entre cada operação e ver qual invariante causou uma rejeição.
+
+Em PowerShell, em um diretório inicialmente vazio:
+
+```powershell
+$dataDir = '.\target\noxis-research-submit'
+$mint = cargo run -q -p noxis-node --features research-testing -- research fixture mint-hex | Select-Object -Last 1
+cargo run -q -p noxis-node --features research-testing -- research submit --data-dir $dataDir --transaction-hex $mint
+
+$transfer = cargo run -q -p noxis-node --features research-testing -- research fixture transfer-hex | Select-Object -Last 1
+cargo run -q -p noxis-node --features research-testing -- research submit --data-dir $dataDir --transaction-hex $transfer
+
+$duplicate = cargo run -q -p noxis-node --features research-testing -- research fixture duplicate-nullifier-hex | Select-Object -Last 1
+cargo run -q -p noxis-node --features research-testing -- research submit --data-dir $dataDir --transaction-hex $duplicate
+
+cargo run -q -p noxis-node --features research-testing -- research status --data-dir $dataDir
+```
+
+O primeiro comando de submissão aceita o mint, o segundo aceita a transferência
+e o terceiro imprime uma rejeição `NullifierAlreadySpent`. A rejeição não é
+erro de processo: ela é o resultado esperado da validação e não altera a
+sequência local, que permanece em `2`. Os valores hex são bytes canônicos de
+fixtures públicas; não são segredos, chaves, endereços de wallet nem uma API
+de emissão de ativos.
+
 ## Limites deliberados
 
 O comando exige `research-testing` e imprime esse aviso. A política de mint e

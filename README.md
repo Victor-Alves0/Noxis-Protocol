@@ -245,6 +245,11 @@ directory for inspection.
 For an explicit persistent research-node lifecycle, use
 `research init --data-dir PATH` and `research status --data-dir PATH`; see
 [`docs/LOCAL_OPERATIONAL_DEMO_V0_1.md`](docs/LOCAL_OPERATIONAL_DEMO_V0_1.md).
+That guide also shows the separate `research fixture ...` and `research submit`
+commands, which let an operator submit the documented canonical fixture bytes
+one at a time and observe acceptance, durable recovery and duplicate-nullifier
+rejection. They remain research fixtures, not a wallet or public transaction
+endpoint.
 
 Run the separate local hybrid recipient demonstration with:
 
