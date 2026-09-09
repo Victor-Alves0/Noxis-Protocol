@@ -48,6 +48,11 @@ submission ordering, proof availability, a replay protocol across replicas or
 interrupted-submission recovery. Those are the next separate design and
 implementation gate.
 
+The [submission-history atomicity decision](PRIVATE_SUBMISSION_HISTORY_ATOMICITY_DECISION_V0_1.md)
+defines that gate: a future durable receipt must share one `NXPL v2` composite
+frame with its canonical `NXPR` post-state, rather than becoming a second
+independent journal. That design is not implemented yet.
+
 ## Verification
 
 The envelope-identity test checks deterministic, exact-byte and
