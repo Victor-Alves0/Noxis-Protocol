@@ -68,7 +68,9 @@ pub use private_submission_migration::{
     PrivateSubmissionMigrationError, PrivateSubmissionMigrationReceiptV1,
     migrate_private_state_store_v1_to_submission_store_v2,
 };
-pub use private_submission_store::{PrivateSubmissionStoreError, PrivateSubmissionStoreV2};
+pub use private_submission_store::{
+    PrivateSubmissionStoreError, PrivateSubmissionStoreStatusV1, PrivateSubmissionStoreV2,
+};
 
 use noxis_checkpoint::{Checkpoint, CheckpointError};
 use noxis_codec::{CodecError, decode_transaction, encode_transaction, transaction_intent_id};

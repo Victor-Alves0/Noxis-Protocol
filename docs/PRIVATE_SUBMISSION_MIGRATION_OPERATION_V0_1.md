@@ -34,6 +34,17 @@ On success it prints both final state IDs and reports zero target receipt/state
 frames. Equal IDs are the required result. The target has a separate immutable
 base snapshot so its first future v2 admission can be checked against it.
 
+Validate the resulting target at any later time with the local status command:
+
+```powershell
+cargo run --release -p noxis-storage --bin noxis-private-state-status -- `
+  --state .\new\private-state.nxpr
+```
+
+It reopens and validates the whole v2 journal before printing the state ID,
+commitment count, spent-nullifier count and durable local receipt/state-frame
+count. It is not a public RPC, wallet balance or consensus query.
+
 ## What the command does
 
 ```text

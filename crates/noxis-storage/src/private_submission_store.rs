@@ -40,6 +40,33 @@ pub struct PrivateSubmissionStoreV2 {
     state: CandidatePrivateLedgerStateV1,
 }
 
+/// Non-secret local facts obtained only after validating the v2 journal.
+///
+/// This is an operator-status view, not a network query, wallet balance or
+/// consensus commitment.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PrivateSubmissionStoreStatusV1 {
+    state_id: noxis_types::StateId,
+    commitment_count: usize,
+    spent_nullifier_count: usize,
+    durable_submission_count: usize,
+}
+
+impl PrivateSubmissionStoreStatusV1 {
+    pub const fn state_id(self) -> noxis_types::StateId {
+        self.state_id
+    }
+    pub const fn commitment_count(self) -> usize {
+        self.commitment_count
+    }
+    pub const fn spent_nullifier_count(self) -> usize {
+        self.spent_nullifier_count
+    }
+    pub const fn durable_submission_count(self) -> usize {
+        self.durable_submission_count
+    }
+}
+
 impl PrivateSubmissionStoreV2 {
     /// Initializes a fresh v2 directory. Existing sidecars are never reused.
     pub fn initialize(
@@ -121,6 +148,21 @@ impl PrivateSubmissionStoreV2 {
     }
     pub fn state(&self) -> &CandidatePrivateLedgerStateV1 {
         &self.state
+    }
+
+    /// Revalidates local durable history before returning a compact operator
+    /// view. A corrupt, incomplete or unlinked frame produces an error rather
+    /// than a partial count.
+    pub fn status(
+        &mut self,
+    ) -> Result<PrivateSubmissionStoreStatusV1, PrivateSubmissionStoreError> {
+        let durable_submission_count = self.submissions()?.len();
+        Ok(PrivateSubmissionStoreStatusV1 {
+            state_id: self.state.anchor().state_id(),
+            commitment_count: self.state.snapshot().commitments().len(),
+            spent_nullifier_count: self.state.snapshot().spent_nullifiers().len(),
+            durable_submission_count,
+        })
     }
 
     /// Returns the complete locally durable receipt/state history after
@@ -616,6 +658,11 @@ mod tests {
         let history = reopened.submissions().unwrap();
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].metadata.envelope_id(), [9; 32]);
+        let status = reopened.status().unwrap();
+        assert_eq!(status.state_id(), receipt.post_state_id());
+        assert_eq!(status.commitment_count(), 4);
+        assert_eq!(status.spent_nullifier_count(), 2);
+        assert_eq!(status.durable_submission_count(), 1);
         drop(reopened);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }

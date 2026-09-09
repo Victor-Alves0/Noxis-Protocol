@@ -217,6 +217,13 @@ cargo run --release -p noxis-storage --bin noxis-private-state-migrate -- `
 This remains candidate local storage; follow the [migration operation guide](docs/PRIVATE_SUBMISSION_MIGRATION_OPERATION_V0_1.md)
 before using it.
 
+Inspect and revalidate a v2 local store without submitting anything:
+
+```powershell
+cargo run --release -p noxis-storage --bin noxis-private-state-status -- `
+  --state .\new\private-state.nxpr
+```
+
 To reproduce the separate complete `NXSM` local preflight, explicitly opt in:
 
 ```powershell
