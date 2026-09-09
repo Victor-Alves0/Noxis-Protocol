@@ -17,7 +17,7 @@ It contains only:
 It contains no proof object, `NXPP` bytes, note preimage, recipient material,
 nullifier key, ciphertext or Merkle witness.
 
-## Why this exists before durable history
+## Durable local v2 boundary
 
 The private state store already has one correct mutation path:
 
@@ -25,15 +25,16 @@ The private state store already has one correct mutation path:
 verify candidate transition → append verified post-state to NXPL → publish cache
 ```
 
-Adding a second journal for submission history now would require a reviewed
-cross-file atomicity and recovery protocol. Without that protocol, a crash
-could leave a history entry without its post-state, or vice versa.
+`PrivateSubmissionStoreV2` now implements the reviewed composite alternative:
+after verified admission it appends one `NXPL v2` frame with this receipt's
+non-secret facts and the canonical successor `NXPR`, synchronizes the frame,
+then publishes its replaceable cache. A reopen validates the receipt/state
+delta together. This avoids a second journal and the resulting cross-file
+atomicity problem.
 
-The receipt therefore establishes the minimum auditable identity and facts
-that a future history design must bind, while keeping the current `NXPL`
-post-state journal authoritative. The receipt is returned only after the
-ledger/store mutation succeeds; a rejected or malformed envelope produces no
-receipt.
+The receipt is returned only after the ledger/store mutation succeeds; a
+rejected or malformed envelope produces no receipt. `NXPL v1` remains the
+separate compatible post-state-only store; it never interprets v2 frames.
 
 ## Privacy and scope limits
 
@@ -43,15 +44,16 @@ must not be published, used as a wallet payment ID, treated as a nullifier, or
 presented as consensus finality. Different randomized proof bytes for an
 otherwise equivalent statement can have different envelope IDs.
 
-Neither the receipt nor `NXPL` establishes durable transaction history,
-submission ordering, proof availability, a replay protocol across replicas or
-interrupted-submission recovery. Those are the next separate design and
-implementation gate.
+`NXPL v2` establishes local durable receipt/state ordering and can recover a
+structurally verified interrupted final frame. It does not establish proof
+availability, historic proof re-verification, a replica replay protocol,
+wallet payment tracking or consensus finality.
 
 The [submission-history atomicity decision](PRIVATE_SUBMISSION_HISTORY_ATOMICITY_DECISION_V0_1.md)
-defines that gate: a future durable receipt must share one `NXPL v2` composite
+defines the implemented shape: the receipt shares one `NXPL v2` composite
 frame with its canonical `NXPR` post-state, rather than becoming a second
-independent journal. That design is not implemented yet.
+independent journal. Offline v1-to-v2 migration and network admission remain
+separate gates.
 
 ## Verification
 

@@ -18,7 +18,7 @@ use noxis_privacy_types::{
 use noxis_private_state::{
     CandidatePrivateLedgerStateV1, CandidatePrivateStateSnapshotV1, PrivateStateAnchorV2,
 };
-use noxis_storage::PrivateStateStoreV1;
+use noxis_storage::PrivateSubmissionStoreV2;
 use noxis_tree_params::CandidatePoseidon2P24ManifestV2;
 use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId, StateId, ValidationContextId};
 
@@ -26,7 +26,7 @@ use crate::{
     CandidateAnchoredOwnershipWitnessV1, CandidateOutputNoteWitnessV1,
     CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleEnvelopeV1,
     CandidatePrivateTransferProofPublicStatementV1, admit_candidate_private_proof_bundle_envelope,
-    admit_candidate_private_proof_bundle_envelope_to_store,
+    admit_candidate_private_proof_bundle_envelope_to_submission_store,
     prove_candidate_private_transfer_proof_bundle,
 };
 
@@ -43,6 +43,7 @@ pub struct CandidatePrivateLedgerDemoReportV1 {
     final_spent_nullifier_count: u64,
     proof_envelope_bytes: usize,
     recovered_state_id: Option<StateId>,
+    durable_submission_count: Option<usize>,
 }
 
 impl CandidatePrivateLedgerDemoReportV1 {
@@ -74,6 +75,10 @@ impl CandidatePrivateLedgerDemoReportV1 {
     }
     pub const fn recovered_state_id(&self) -> Option<StateId> {
         self.recovered_state_id
+    }
+    /// Number of composite local receipt/state entries after persistent reopen.
+    pub const fn durable_submission_count(&self) -> Option<usize> {
+        self.durable_submission_count
     }
 }
 
@@ -249,31 +254,36 @@ fn run_candidate_private_ledger_demo_at(
         final_spent_nullifier_count,
         replay_rejected,
         recovered_state_id,
+        durable_submission_count,
     ) = if let Some(path) = persistent_path {
-        let mut store = attempt(PrivateStateStoreV1::initialize(path, ledger))?;
-        let accepted = attempt(admit_candidate_private_proof_bundle_envelope_to_store(
-            &mut store,
-            statement.air_public_inputs().intent().clone(),
-            &envelope_bytes,
-        ))?;
+        let mut store = attempt(PrivateSubmissionStoreV2::initialize(path, ledger))?;
+        let accepted = attempt(
+            admit_candidate_private_proof_bundle_envelope_to_submission_store(
+                &mut store,
+                statement.air_public_inputs().intent().clone(),
+                &envelope_bytes,
+            ),
+        )?;
         let counts = (
             store.state().snapshot().commitments().len(),
             store.state().nullifier_tree().spent_count(),
         );
-        let replay_rejected = admit_candidate_private_proof_bundle_envelope_to_store(
+        let replay_rejected = admit_candidate_private_proof_bundle_envelope_to_submission_store(
             &mut store,
             statement.air_public_inputs().intent().clone(),
             &envelope_bytes,
         )
         .is_err();
         drop(store);
-        let reopened = attempt(PrivateStateStoreV1::open(path))?;
+        let mut reopened = attempt(PrivateSubmissionStoreV2::open(path))?;
+        let durable_submission_count = attempt(reopened.submissions())?.len();
         (
             accepted,
             counts.0,
             counts.1,
             replay_rejected,
             Some(reopened.state().anchor().state_id()),
+            Some(durable_submission_count),
         )
     } else {
         let accepted = attempt(admit_candidate_private_proof_bundle_envelope(
@@ -291,7 +301,7 @@ fn run_candidate_private_ledger_demo_at(
             &envelope_bytes,
         )
         .is_err();
-        (accepted, counts.0, counts.1, replay_rejected, None)
+        (accepted, counts.0, counts.1, replay_rejected, None, None)
     };
     if !replay_rejected {
         return Err(CandidatePrivateLedgerDemoError::new(
@@ -307,6 +317,7 @@ fn run_candidate_private_ledger_demo_at(
         final_spent_nullifier_count,
         proof_envelope_bytes: envelope_bytes.len(),
         recovered_state_id,
+        durable_submission_count,
     })
 }
 

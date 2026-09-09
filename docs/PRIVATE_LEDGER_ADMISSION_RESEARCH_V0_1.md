@@ -29,15 +29,23 @@ an already-authorized flag. The final ledger authorizer independently verifies
 again immediately before mutation.
 
 `admit_candidate_private_proof_bundle_envelope_to_store` applies the identical
-verification sequence to `PrivateStateStoreV1`. It then calls the store's sole
-clone/journal/publish mutation method. The durable record is therefore the
-post-state already verified by the ledger; `NXPP` bytes and proof material are
-deliberately not retained as a transaction log.
+verification sequence to the legacy `PrivateStateStoreV1`. It then calls the
+store's sole clone/journal/publish mutation method. The durable record is
+therefore the post-state already verified by the ledger; `NXPP` bytes and
+proof material are deliberately not retained as a transaction log.
 
-Both byte-entry APIs return a local
+`admit_candidate_private_proof_bundle_envelope_to_submission_store` is the
+new v2 persistent boundary. After independently verifying `NXPP`, it gives
+`PrivateSubmissionStoreV2` only the nonzero local envelope ID and the typed
+ledger request. That store synchronizes one `NXPL v2` frame containing the
+receipt facts and rebuilt successor `NXPR` before publishing its cache.
+Neither the exact envelope nor proof/witness material reaches disk.
+
+All byte-entry APIs return a local
 [submission receipt](PRIVATE_PROOF_SUBMISSION_RECEIPT_CANDIDATE_V0_1.md) only
-after commit. Its envelope hash supports local operator correlation without
-introducing an unreviewed durable transaction history.
+after commit. In the v2 store path its envelope hash and non-secret transition
+facts are durable local metadata in the same frame as the successor state;
+they are not a public transaction ID or proof archive.
 
 ## Atomic admission sequence
 
@@ -92,10 +100,10 @@ admitted it through `admit_candidate_private_proof_bundle_envelope` and
 rejected replay of those same bytes after the commit. Generated P3 proof sizes
 vary slightly; neither measurement is a protocol maximum.
 
-The same day, the runnable persistent demo admitted a 4,968,208-byte `NXPP`
-through `PrivateStateStoreV1`, rejected its replay and reopened the exact
-post-state from the `NXPL`-backed store. It is evidence of local verified
-post-state durability, not durable transaction history or consensus replay.
+The earlier v1 demo evidence persists only the post-state. The current
+persistent demo targets `PrivateSubmissionStoreV2`, which additionally
+reopens the matching local receipt/state-frame count. This is still evidence
+of local candidate durability, not proof replay or consensus replay.
 
 ## What is now functional
 
@@ -115,9 +123,9 @@ This boundary does not yet provide:
   only inside the pinned local research profile;
 - an `NXPT` submission command or wallet transaction builder;
 - recipient-envelope persistence or availability guarantees;
-- a durable proof-envelope history or recovery of an interrupted proof
-  submission; `NXPL` already journals complete post-state snapshots locally,
-  but it deliberately does not retain proofs or act as consensus history;
+- durable proof-envelope availability or historic proof re-verification;
+  `NXPL v2` retains only an envelope ID and transition delta next to the
+  successor state, never proofs, and does not act as consensus history;
 - ABCI/mempool/consensus admission;
 - concurrent writer control for private state; or
 - production-approved privacy, post-quantum security or performance.

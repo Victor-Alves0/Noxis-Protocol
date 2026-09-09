@@ -3,7 +3,7 @@
 fn main() {
     println!("Noxis private-ledger demo — RESEARCH ONLY");
     println!("No wallet, portable proof, network or consensus claim is made.");
-    println!("With --data-dir it persists one local candidate snapshot and reopens it.\n");
+    println!("With --data-dir it persists one local receipt/state frame and reopens it.\n");
     println!("constructing candidate notes and proving three local STARK relations ...");
 
     let mut arguments = std::env::args().skip(1);
@@ -55,6 +55,9 @@ fn main() {
             println!("submitted same private transfer bytes ... rejected: stale state");
             if let Some(recovered) = report.recovered_state_id() {
                 println!("reopened private state ... recovered: {recovered}");
+            }
+            if let Some(count) = report.durable_submission_count() {
+                println!("durable local receipt/state frames ... recovered: {count}");
             }
         }
         Err(error) => {

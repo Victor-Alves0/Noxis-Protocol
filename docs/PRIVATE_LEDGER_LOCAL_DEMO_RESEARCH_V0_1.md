@@ -52,8 +52,10 @@ cargo run --release -p noxis-private-proof-contract --bin noxis-private-ledger-d
 ```
 
 On success, the command reopens `private-state.nxpr` in that directory and
-prints the recovered post-state ID. It persists the verified **post-state**,
-not `NXPP` bytes, private witnesses or a transaction history.
+prints both the recovered post-state ID and recovered composite-frame count.
+It persists the verified post-state plus a local envelope-ID/transition receipt
+in one `NXPL v2` frame. It does **not** persist `NXPP` bytes, private
+witnesses or a proof archive.
 
 On 2026-09-02, the persistent release demo accepted a 4,968,208-byte `NXPP`
 envelope, advanced commitments from 2 to 4 and spent nullifiers from 2 to 4.
@@ -70,8 +72,9 @@ an optimized run takes many minutes on ordinary development hardware.
 This is not a user transaction command. In particular, it does not produce an
 `NXPT` packet, encrypt a real recipient envelope, use a wallet key, select a
 production proof profile, enter a mempool, start CometBFT or claim finality.
-With `--data-dir`, it persists only a candidate post-state snapshot/journal;
-it does not persist a transaction history, `NXPP` bytes or private witnesses.
+With `--data-dir`, it persists only candidate local receipt/state frames; it
+does not persist `NXPP` bytes, proofs or private witnesses, and does not make
+the local receipt a public transaction history.
 Its two ciphertext-digest fields are fixed non-secret fixture values; they
 exist only to form the canonical private intent.
 
@@ -81,7 +84,7 @@ portable proof and private transaction-log design exist.
 
 ## Next implementation gate
 
-The candidate snapshot record/store and reopen path now accept verified `NXPP`
-bytes through one local mutation boundary. Next, specify durable private
-transaction-history and interrupted-submission recovery before ABCI admission
-can retain user-facing state.
+The candidate snapshot/store/reopen path now accepts verified `NXPP` bytes
+through one local composite receipt/state mutation boundary. Next, add the
+fault-injection and migration corpus before considering any ABCI-facing
+private-admission design.

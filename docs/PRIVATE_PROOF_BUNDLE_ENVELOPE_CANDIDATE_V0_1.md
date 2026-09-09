@@ -83,6 +83,12 @@ function uses `PrivateStateStoreV1`'s existing single-writer `NXPL` journal
 path. It persists a verified post-state and supports reopen/recovery; it does
 not turn `NXPP` into durable transaction or proof history.
 
+`admit_candidate_private_proof_bundle_envelope_to_submission_store` uses the
+separate `PrivateSubmissionStoreV2` path. It verifies the same bytes first,
+then persists the local envelope ID and typed transition facts with the
+successor state in one `NXPL v2` frame. It still never persists `NXPP` bytes,
+proofs or witnesses, and is not a network transaction history.
+
 After a successful local admission, the API returns a separate
 [submission receipt](PRIVATE_PROOF_SUBMISSION_RECEIPT_CANDIDATE_V0_1.md) whose
 envelope ID is a domain-separated SHA-256 hash of the exact bytes. That ID is

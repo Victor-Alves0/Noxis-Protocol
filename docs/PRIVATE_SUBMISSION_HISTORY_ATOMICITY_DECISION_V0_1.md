@@ -7,11 +7,13 @@ The candidate implementation direction is instead a future **`NXPL v2` frame**
 that carries one canonical local submission receipt and the corresponding
 canonical `NXPR` post-state inside the same synchronized append.
 
-This document is a decision and implementation contract, not evidence that
-`NXPL v2`, durable submission history, private transaction replay, ABCI
-admission or consensus history exists today. The implemented store remains
-`NXPL v1`: an authoritative local post-state journal with no submission
-history.
+`NXPL v2` is now implemented as a local candidate codec/store:
+`PrivateSubmissionStoreV2` appends a single synchronized composite frame after
+verified `NXPP` admission, returns the local receipt, and reopens the receipt
+and successor state together. The implementation remains **local candidate
+storage**. It does not establish durable proof availability, historic proof
+re-verification, offline v1-to-v2 migration, ABCI admission, consensus history
+or network transaction replay.
 
 ## Problem
 
@@ -139,10 +141,12 @@ separate offline operation, not an open-time guess:
 The exact directory swap, failure injection matrix and operator tool are
 implementation gates; no migration code is authorized by this decision alone.
 
-## Implementation gates
+## Implementation gates and current boundary
 
-Before adding an `NXPL v2` source magic/version or registry row, implementers
-must provide:
+The implemented v2 boundary provides the source magic/version, strict bounded
+codec, canonical field decoding, one store mutation path, release tests for
+reopen and a partial final frame, and a registry row. The following work
+remains required before it can move beyond local candidate storage:
 
 1. a narrowly owned v2 codec and strict parser tests for every header, length,
    receipt field, nested `NXPR`, trailing byte and CRC path;
@@ -155,6 +159,6 @@ must provide:
 5. an explicit offline migration design and test corpus before a v1 store can
    be upgraded.
 
-Only after these gates may the format registry gain `candidate private
-submission-history journal / NXPL / v2`. It would still be local candidate
-storage, not consensus durability or a private network transaction log.
+The implemented format remains `candidate private-submission journal / NXPL /
+v2` in the registry. It is not consensus durability or a private network
+transaction log.

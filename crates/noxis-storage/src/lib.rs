@@ -40,6 +40,8 @@ pub mod checkpoint_store;
 mod persistent_execution;
 pub mod private_state_journal;
 pub mod private_state_store;
+pub mod private_submission_journal;
+pub mod private_submission_store;
 pub mod record_log;
 
 pub use persistent_execution::{
@@ -53,6 +55,15 @@ pub use private_state_journal::{
     PrivateStateJournalV1, StoredPrivateState,
 };
 pub use private_state_store::{PrivateStateStoreError, PrivateStateStoreV1};
+pub use private_submission_journal::{
+    PRIVATE_SUBMISSION_JOURNAL_CHECKSUM_LENGTH, PRIVATE_SUBMISSION_JOURNAL_HEADER_LENGTH,
+    PRIVATE_SUBMISSION_JOURNAL_MAGIC, PRIVATE_SUBMISSION_JOURNAL_MAX_PAYLOAD_LENGTH,
+    PRIVATE_SUBMISSION_JOURNAL_PAYLOAD_PREFIX_LENGTH, PRIVATE_SUBMISSION_JOURNAL_VERSION,
+    PrivateSubmissionJournalError, PrivateSubmissionJournalIncompleteTail,
+    PrivateSubmissionJournalRecoveryScan, PrivateSubmissionJournalV2, PrivateSubmissionMetadataV1,
+    StoredPrivateSubmissionV2,
+};
+pub use private_submission_store::{PrivateSubmissionStoreError, PrivateSubmissionStoreV2};
 
 use noxis_checkpoint::{Checkpoint, CheckpointError};
 use noxis_codec::{CodecError, decode_transaction, encode_transaction, transaction_intent_id};

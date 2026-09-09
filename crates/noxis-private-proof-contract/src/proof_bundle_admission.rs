@@ -13,7 +13,10 @@ use noxis_private_state::{
     CandidatePrivateLedgerError, CandidatePrivateLedgerStateV1,
     CandidatePrivateTransferAdmissionReceiptV1, CandidatePrivateTransferRequestV1,
 };
-use noxis_storage::{PrivateStateStoreError, PrivateStateStoreV1};
+use noxis_storage::{
+    PrivateStateStoreError, PrivateStateStoreV1, PrivateSubmissionMetadataV1,
+    PrivateSubmissionStoreError, PrivateSubmissionStoreV2,
+};
 
 use crate::proof_bundle_envelope::candidate_private_proof_bundle_envelope_id;
 use crate::{
@@ -134,6 +137,44 @@ pub fn admit_candidate_private_proof_bundle_envelope_to_store(
     })
 }
 
+/// Parses, verifies and durably admits one local `NXPP v1` envelope through
+/// the composite `NXPL v2` store.
+///
+/// Unlike the v1 store path, success synchronizes one local envelope-ID
+/// receipt and its canonical successor `NXPR` record in the same journal
+/// frame before publishing the replaceable cache. The exact envelope, proof
+/// bytes and witness remain absent from disk. This is still local candidate
+/// storage, not a network transaction, wallet API, ABCI admission or finality.
+pub fn admit_candidate_private_proof_bundle_envelope_to_submission_store(
+    store: &mut PrivateSubmissionStoreV2,
+    intent: PrivateTransferIntentV2,
+    envelope_bytes: &[u8],
+) -> Result<CandidatePrivateProofBundleAdmissionReceiptV1, CandidatePrivateProofBundleAdmissionError>
+{
+    let envelope_id = candidate_private_proof_bundle_envelope_id(envelope_bytes);
+    let state = store.state();
+    let statement = CandidatePrivateTransferProofPublicStatementV1::new(
+        state.anchor().clone(),
+        state.nullifier_tree(),
+        intent.clone(),
+    )?;
+    let bundle = CandidatePrivateProofBundleEnvelopeV1::decode_and_verify(
+        envelope_bytes,
+        &statement,
+        state.nullifier_tree(),
+    )?;
+    let request = CandidatePrivateTransferRequestV1::new(intent, bundle);
+    let ledger_receipt = store.apply_transfer(
+        &request,
+        &CandidatePrivateTransferProofBundleVerifierV1::new(),
+        PrivateSubmissionMetadataV1::new(envelope_id.as_bytes())?,
+    )?;
+    Ok(CandidatePrivateProofBundleAdmissionReceiptV1 {
+        envelope_id,
+        ledger_receipt,
+    })
+}
+
 /// Errors from the local `NXPP` byte-to-ledger admission boundary.
 ///
 /// Each variant leaves the supplied ledger unchanged: parsing and proof
@@ -145,6 +186,8 @@ pub enum CandidatePrivateProofBundleAdmissionError {
     Envelope(CandidatePrivateProofBundleEnvelopeError),
     Ledger(CandidatePrivateLedgerError),
     Store(PrivateStateStoreError),
+    SubmissionStore(PrivateSubmissionStoreError),
+    SubmissionMetadata(noxis_storage::PrivateSubmissionJournalError),
 }
 
 impl From<CandidatePrivateTransferProofPublicStatementError>
@@ -167,6 +210,18 @@ impl From<CandidatePrivateLedgerError> for CandidatePrivateProofBundleAdmissionE
 impl From<PrivateStateStoreError> for CandidatePrivateProofBundleAdmissionError {
     fn from(value: PrivateStateStoreError) -> Self {
         Self::Store(value)
+    }
+}
+impl From<PrivateSubmissionStoreError> for CandidatePrivateProofBundleAdmissionError {
+    fn from(value: PrivateSubmissionStoreError) -> Self {
+        Self::SubmissionStore(value)
+    }
+}
+impl From<noxis_storage::PrivateSubmissionJournalError>
+    for CandidatePrivateProofBundleAdmissionError
+{
+    fn from(value: noxis_storage::PrivateSubmissionJournalError) -> Self {
+        Self::SubmissionMetadata(value)
     }
 }
 impl fmt::Display for CandidatePrivateProofBundleAdmissionError {

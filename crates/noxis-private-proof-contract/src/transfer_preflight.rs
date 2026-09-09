@@ -334,8 +334,14 @@ impl std::error::Error for CandidatePrivateTransferStarkPreflightError {}
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
     use crate::{
-        CandidatePrivateProofBundleEnvelopeV1, admit_candidate_private_proof_bundle_envelope,
+        CandidatePrivateProofBundleEnvelopeV1,
+        admit_candidate_private_proof_bundle_envelope_to_submission_store,
         prove_candidate_private_transfer_proof_bundle,
     };
     use noxis_codec::PrivateTransferPacketV2;
@@ -350,6 +356,7 @@ mod tests {
     use noxis_private_state::{
         CandidatePrivateLedgerStateV1, CandidatePrivateStateSnapshotV1, PrivateStateAnchorV2,
     };
+    use noxis_storage::PrivateSubmissionStoreV2;
     use noxis_tree_params::CandidatePoseidon2P24ManifestV2;
     use noxis_types::{AssetDefinition, AssetId, AssetKind, GenesisId, ValidationContextId};
     use noxis_wallet_crypto::{
@@ -672,42 +679,64 @@ mod tests {
                 AssetDefinition::new(AssetId::new([5; 32]), "NOX", AssetKind::Synthetic).unwrap(),
             )
             .unwrap();
-        let receipt = admit_candidate_private_proof_bundle_envelope(
-            &mut private_ledger,
+        let directory = std::env::temp_dir().join(format!(
+            "noxis-private-proof-submission-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos(),
+        ));
+        let state_path = directory.join("state.nxpr");
+        let mut private_store =
+            PrivateSubmissionStoreV2::initialize(&state_path, private_ledger).unwrap();
+        let receipt = admit_candidate_private_proof_bundle_envelope_to_submission_store(
+            &mut private_store,
             statement.air_public_inputs().intent().clone(),
             &envelope_bytes,
         )
         .unwrap();
         assert_ne!(receipt.envelope_id().as_bytes(), [0; 32]);
         assert_eq!(receipt.pre_state_id(), statement.anchor().state_id());
-        assert_eq!(receipt.post_state_id(), private_ledger.anchor().state_id());
-        assert_eq!(private_ledger.snapshot().commitments().len(), 4);
-        assert_eq!(private_ledger.nullifier_tree().spent_count(), 4);
+        assert_eq!(
+            receipt.post_state_id(),
+            private_store.state().anchor().state_id()
+        );
+        assert_eq!(private_store.state().snapshot().commitments().len(), 4);
+        assert_eq!(private_store.state().nullifier_tree().spent_count(), 4);
         assert!(
-            private_ledger
+            private_store
+                .state()
                 .nullifier_tree()
                 .is_spent(receipt.input_nullifiers()[0])
         );
         assert!(
-            private_ledger
+            private_store
+                .state()
                 .nullifier_tree()
                 .is_spent(receipt.input_nullifiers()[1])
         );
 
         // The same authorized request is stale after commit and must not
         // mutate the already-committed state a second time.
-        let committed_anchor = private_ledger.anchor().clone();
+        let committed_anchor = private_store.state().anchor().clone();
         assert!(
-            admit_candidate_private_proof_bundle_envelope(
-                &mut private_ledger,
+            admit_candidate_private_proof_bundle_envelope_to_submission_store(
+                &mut private_store,
                 statement.air_public_inputs().intent().clone(),
                 &envelope_bytes,
             )
             .is_err()
         );
-        assert_eq!(private_ledger.anchor(), &committed_anchor);
-        assert_eq!(private_ledger.snapshot().commitments().len(), 4);
-        assert_eq!(private_ledger.nullifier_tree().spent_count(), 4);
+        assert_eq!(private_store.state().anchor(), &committed_anchor);
+        assert_eq!(private_store.state().snapshot().commitments().len(), 4);
+        assert_eq!(private_store.state().nullifier_tree().spent_count(), 4);
+        drop(private_store);
+        let mut reopened = PrivateSubmissionStoreV2::open(&state_path).unwrap();
+        assert_eq!(reopened.state().anchor(), &committed_anchor);
+        assert_eq!(reopened.submissions().unwrap().len(), 1);
+        drop(reopened);
+        fs::remove_dir_all(directory).unwrap();
 
         let mut corrupted = preflight.stark().clone();
         let mut changed = corrupted.intent_result.intent_commitment.elements();
