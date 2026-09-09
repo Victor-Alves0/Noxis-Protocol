@@ -79,5 +79,8 @@ deployment runbook.
 Release tests prove the source v1 journal remains byte-for-byte unchanged for a
 complete source, the destination reopens at the same final state and contains
 no fabricated history. The corpus also rejects a preexisting partial target
-without changing a complete source, and rejects a corrupt source before it can
-create a target. See the [atomicity decision](PRIVATE_SUBMISSION_HISTORY_ATOMICITY_DECISION_V0_1.md).
+without changing a complete source, rejects a corrupt source before it can
+create a target, and injects a target cache-publication failure while confirming
+the complete v1 source remains byte-for-byte unchanged. The injection is a
+test-only seam, not an operating-system fault claim. See the [atomicity
+decision](PRIVATE_SUBMISSION_HISTORY_ATOMICITY_DECISION_V0_1.md).

@@ -1016,4 +1016,36 @@ mod tests {
         assert!(!journal_path(&target_path).exists());
         fs::remove_dir_all(source_path.parent().unwrap()).unwrap();
     }
+
+    #[test]
+    fn migration_cache_publication_failure_leaves_the_source_unchanged() {
+        let source_path = path();
+        let target_path = source_path.parent().unwrap().join("failed-target.nxpr");
+        {
+            let mut source = crate::PrivateStateStoreV1::initialize(&source_path, state()).unwrap();
+            let request = CandidatePrivateTransferRequestV1::new(intent(source.state()), ());
+            source.apply_transfer(&request, &AcceptAll).unwrap();
+        }
+        let source_journal_path = journal_path(&source_path);
+        let source_before = fs::read(&source_journal_path).unwrap();
+
+        fail_next_state_publication();
+        assert!(matches!(
+            crate::migrate_private_state_store_v1_to_submission_store_v2(
+                &source_path,
+                &target_path,
+            ),
+            Err(crate::PrivateSubmissionMigrationError::Target(
+                PrivateSubmissionStoreError::Io {
+                    operation: "inject private-submission cache publication failure",
+                    ..
+                }
+            ))
+        ));
+        assert_eq!(fs::read(&source_journal_path).unwrap(), source_before);
+        assert!(!target_path.exists());
+        assert!(!base_path(&target_path).exists());
+        assert!(!journal_path(&target_path).exists());
+        fs::remove_dir_all(source_path.parent().unwrap()).unwrap();
+    }
 }
