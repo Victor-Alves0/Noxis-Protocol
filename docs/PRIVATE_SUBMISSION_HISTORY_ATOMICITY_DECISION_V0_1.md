@@ -116,8 +116,11 @@ uses one authority:
 The implemented storage suite scans every byte-prefix interruption point of one
 actual composite frame and accepts only the complete frame as an entry. Separate
 store-reopen cases discard a verified incomplete tail and restore the
-authenticated base. This is framing/recovery evidence, not a substitute for
-filesystem fault injection across operating systems.
+authenticated base. A test-only, thread-local failpoint also injects a cache
+publication error immediately after journal synchronization; the caller sees
+the error, while reopen restores the journal's successor state and one receipt.
+This is framing/recovery evidence, not a substitute for filesystem fault
+injection across operating systems.
 
 The on-disk receipt is local operator metadata. It must not be automatically
 logged to peers, exposed through a public API, or treated as wallet payment

@@ -12,6 +12,9 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
+#[cfg(test)]
+use std::cell::Cell;
+
 use fs2::FileExt;
 use noxis_private_state::{
     CandidatePrivateLedgerError, CandidatePrivateLedgerStateV1, CandidatePrivateStateRecordError,
@@ -30,6 +33,11 @@ const LOCK_EXTENSION: &str = "lock";
 const JOURNAL_EXTENSION: &str = "nxpl";
 const BASE_EXTENSION: &str = "base";
 static TEMPORARY_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(test)]
+thread_local! {
+    static FAIL_NEXT_STATE_PUBLICATION: Cell<bool> = const { Cell::new(false) };
+}
 
 /// Single-process v2 writer with one journal authority for state and receipt.
 pub struct PrivateSubmissionStoreV2 {
@@ -319,6 +327,14 @@ fn publish_state(
     path: &Path,
     state: &CandidatePrivateLedgerStateV1,
 ) -> Result<(), PrivateSubmissionStoreError> {
+    #[cfg(test)]
+    if take_state_publication_failpoint() {
+        return Err(PrivateSubmissionStoreError::Io {
+            operation: "inject private-submission cache publication failure",
+            path: path.to_path_buf(),
+            source: io::Error::other("test-only private-submission cache failpoint"),
+        });
+    }
     let encoded = encode_candidate_private_ledger_state(state)
         .map_err(PrivateSubmissionStoreError::Record)?;
     let temporary = temporary_path(path);
@@ -369,6 +385,16 @@ fn publish_state(
         })?;
     }
     result
+}
+
+#[cfg(test)]
+fn fail_next_state_publication() {
+    FAIL_NEXT_STATE_PUBLICATION.with(|value| value.set(true));
+}
+
+#[cfg(test)]
+fn take_state_publication_failpoint() -> bool {
+    FAIL_NEXT_STATE_PUBLICATION.with(|value| value.replace(false))
 }
 fn write_or_validate_journal_base(
     path: &Path,
@@ -725,6 +751,48 @@ mod tests {
         assert_eq!(reopened.submissions().unwrap().len(), 1);
         drop(reopened);
         assert_eq!(read_state(&path).unwrap().anchor().state_id(), expected);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn injected_cache_publication_failure_keeps_the_synced_journal_authoritative() {
+        let path = path();
+        let initial = state();
+        let initial_id = initial.anchor().state_id();
+        let expected_id;
+        {
+            let mut expected = initial.clone();
+            let request = CandidatePrivateTransferRequestV1::new(intent(&expected), ());
+            expected_id = expected
+                .apply_transfer(&request, &AcceptAll)
+                .unwrap()
+                .post_state_id();
+        }
+        {
+            let mut store = PrivateSubmissionStoreV2::initialize(&path, initial).unwrap();
+            store.prepare_journal_base().unwrap();
+            let request = CandidatePrivateTransferRequestV1::new(intent(store.state()), ());
+            fail_next_state_publication();
+            assert!(matches!(
+                store.apply_transfer(
+                    &request,
+                    &AcceptAll,
+                    PrivateSubmissionMetadataV1::new([4; 32]).unwrap(),
+                ),
+                Err(PrivateSubmissionStoreError::Io {
+                    operation: "inject private-submission cache publication failure",
+                    ..
+                })
+            ));
+            assert_eq!(store.state().anchor().state_id(), initial_id);
+            assert!(!fs::read(journal_path(&path)).unwrap().is_empty());
+        }
+
+        let mut reopened = PrivateSubmissionStoreV2::open(&path).unwrap();
+        assert_eq!(reopened.state().anchor().state_id(), expected_id);
+        assert_eq!(reopened.submissions().unwrap().len(), 1);
+        drop(reopened);
+        assert_eq!(read_state(&path).unwrap().anchor().state_id(), expected_id);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 
